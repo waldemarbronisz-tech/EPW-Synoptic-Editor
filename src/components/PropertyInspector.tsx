@@ -1,5 +1,6 @@
 import React from 'react';
 import { useStore } from '../store';
+import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 
 export const PropertyInspector: React.FC = () => {
   const { objects, selectedIds, updateObject } = useStore();
@@ -18,17 +19,27 @@ export const PropertyInspector: React.FC = () => {
   const selectedObj = objects.find(o => o.id === selectedIds[0]);
   if (!selectedObj) return null;
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
     let finalValue: any = value;
 
     if (type === 'checkbox') {
-      finalValue = checked;
+      finalValue = (e.target as HTMLInputElement).checked;
     } else if (type === 'number') {
       finalValue = parseFloat(value);
     }
 
-    updateObject(selectedObj.id, { [name]: finalValue });
+    if (name.startsWith('editor.') || name.startsWith('bindings.')) {
+      const [group, key] = name.split('.');
+      updateObject(selectedObj.id, {
+        [group]: {
+          ...(selectedObj as any)[group],
+          [key]: finalValue
+        }
+      });
+    } else {
+      updateObject(selectedObj.id, { [name]: finalValue });
+    }
   };
 
   const handleCustomPropertyChange = (key: string, value: string) => {
@@ -133,22 +144,31 @@ export const PropertyInspector: React.FC = () => {
         </div>
 
         <div className="property-group">
-          <div className="property-group-title">Logic</div>
+          <div className="property-group-title">Editor Preview</div>
           <div className="property-row">
-            <label>Animation</label>
-            <input type="text" name="animation" value={selectedObj.animation || ''} onChange={handleChange} />
+            <label>State</label>
+            <select name="editor.preview_state" value={selectedObj.editor?.preview_state || ''} onChange={handleChange}>
+              <option value="">(Default)</option>
+              {getSymbolDefinition(selectedObj.type)?.allowedStates.map(st => (
+                <option key={st} value={st}>{st}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="property-group">
+          <div className="property-group-title">Bindings</div>
+          <div className="property-row">
+            <label>State</label>
+            <input type="text" name="bindings.state" value={selectedObj.bindings?.state || ''} onChange={handleChange} />
           </div>
           <div className="property-row">
             <label>Alarm</label>
-            <input type="text" name="alarm" value={selectedObj.alarm || ''} onChange={handleChange} />
+            <input type="text" name="bindings.alarm" value={selectedObj.bindings?.alarm || ''} onChange={handleChange} />
           </div>
           <div className="property-row">
-            <label>Runtime Var</label>
-            <input type="text" name="runtimeVariable" value={selectedObj.runtimeVariable || ''} onChange={handleChange} />
-          </div>
-          <div className="property-row">
-            <label>Connection</label>
-            <input type="text" name="logicConnection" value={selectedObj.logicConnection || ''} onChange={handleChange} />
+            <label>Command</label>
+            <input type="text" name="bindings.command" value={selectedObj.bindings?.command || ''} onChange={handleChange} />
           </div>
         </div>
 

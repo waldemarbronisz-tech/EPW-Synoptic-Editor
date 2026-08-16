@@ -1,7 +1,9 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Stage, Layer, Rect, Text, Group, Circle, Transformer } from 'react-konva';
+import { Stage, Layer, Rect, Group, Transformer } from 'react-konva';
 import { useStore } from '../store';
 import type { SynopticObject } from '../store';
+import { SymbolRenderer } from '../symbols/SymbolRenderer';
+import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 
 const GRID_SIZE = 20;
 
@@ -20,8 +22,6 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange }: {
       trRef.current.getLayer().batchDraw();
     }
   }, [isSelected]);
-
-  const isCircle = obj.type === 'Circle' || obj.type.includes('Pump') || obj.type.includes('valve') || obj.type.includes('meter');
 
   return (
     <React.Fragment>
@@ -62,34 +62,7 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange }: {
           });
         }}
       >
-        {isCircle ? (
-          <Circle
-            x={obj.width / 2}
-            y={obj.height / 2}
-            radius={obj.width / 2}
-            fill={obj.fill || '#c0c0c0'}
-            stroke={obj.border || '#000000'}
-            strokeWidth={1}
-          />
-        ) : (
-          <Rect
-            width={obj.width}
-            height={obj.height}
-            fill={obj.fill || '#c0c0c0'}
-            stroke={obj.border || '#000000'}
-            strokeWidth={1}
-          />
-        )}
-        <Text
-          text={obj.text || obj.type}
-          width={obj.width}
-          height={obj.height}
-          align="center"
-          verticalAlign="middle"
-          fontSize={12}
-          fontFamily="system-ui"
-          fill="#000"
-        />
+        <SymbolRenderer obj={obj} />
       </Group>
       {isSelected && !obj.locked && (
         <Transformer
@@ -284,8 +257,9 @@ export const Canvas: React.FC = () => {
     x = Math.round(x / GRID_SIZE) * GRID_SIZE;
     y = Math.round(y / GRID_SIZE) * GRID_SIZE;
 
-    const width = 80;
-    const height = 40;
+    const def = getSymbolDefinition(data.type);
+    const width = def?.defaultWidth || 80;
+    const height = def?.defaultHeight || 80;
 
     addObject({
       type: data.type,
@@ -303,9 +277,12 @@ export const Canvas: React.FC = () => {
       color: '#000000',
       fill: '#c0c0c0',
       border: '#000000',
-      text: data.type,
+      text: def?.label || data.type,
       font: 'Arial',
       fontSize: 12,
+      editor: {
+        preview_state: def?.defaultState || ''
+      },
       animation: '',
       alarm: '',
       runtimeVariable: '',

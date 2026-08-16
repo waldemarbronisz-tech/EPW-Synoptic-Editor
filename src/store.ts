@@ -24,7 +24,17 @@ export interface SynopticObject {
   font: string;
   fontSize: number;
 
-  // Logic
+  // Logic & Bindings
+  bindings?: {
+    state?: string;
+    command?: string;
+    alarm?: string;
+  };
+  editor?: {
+    preview_state?: string;
+  };
+
+  // Legacy / Other
   animation: string;
   alarm: string;
   runtimeVariable: string;
