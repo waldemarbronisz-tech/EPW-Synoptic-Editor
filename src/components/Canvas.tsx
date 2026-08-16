@@ -1,17 +1,19 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Stage, Layer, Rect, Circle, Group, Transformer } from 'react-konva';
+import { Stage, Layer, Rect, Circle, Group, Transformer, Text } from 'react-konva';
 import { useStore } from '../store';
 import type { SynopticObject } from '../store';
 import { SymbolRenderer } from '../symbols/SymbolRenderer';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
+import { ConnectionLine } from './ConnectionLine';
 
 const GRID_SIZE = 20;
 
-const ObjectNode = ({ obj, isSelected, onSelect, onChange }: {
+const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick }: {
   obj: SynopticObject,
   isSelected: boolean,
   onSelect: () => void,
-  onChange: (newAttrs: Partial<SynopticObject>) => void
+  onChange: (newAttrs: Partial<SynopticObject>) => void,
+  onPortClick: (objId: string, portId: string) => void
 }) => {
   const shapeRef = useRef<any>(null);
   const trRef = useRef<any>(null);
@@ -66,6 +68,20 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange }: {
       >
         <SymbolRenderer obj={obj} />
 
+        {/* Render Designation/Name Label */}
+        {(!obj.type.startsWith('graphics.') && !obj.type.startsWith('measurements.') && !def?.isLine) && (
+          <Text
+            x={0}
+            y={obj.height + 5}
+            width={obj.width}
+            text={obj.designation || obj.name || obj.tag}
+            align="center"
+            fontSize={12}
+            fontFamily="monospace"
+            fill="#2c3e50"
+          />
+        )}
+
         {/* Render Connection Points if Selected */}
         {isSelected && def?.connectionPoints?.map((cp, idx) => (
            <Circle
@@ -87,6 +103,14 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange }: {
                 const container = e.target.getStage()?.container();
                 if (container) container.style.cursor = 'default';
              }}
+             onClick={(e) => {
+                 e.cancelBubble = true;
+                 onPortClick(obj.id, cp.id);
+               }}
+               onTap={(e) => {
+                 e.cancelBubble = true;
+                 onPortClick(obj.id, cp.id);
+               }}
            />
         ))}
       </Group>
@@ -118,6 +142,9 @@ export const Canvas: React.FC = () => {
   // Panning
   const isPanningRef = useRef(false);
   const lastPanPosRef = useRef({ x: 0, y: 0 });
+
+  // Connection Drawing
+  const [drawStartPort, setDrawStartPort] = useState<{objId: string, portId: string} | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -227,6 +254,12 @@ export const Canvas: React.FC = () => {
     if (e.evt.button === 1 || isPanningRef.current) {
       isPanningRef.current = false;
       if (containerRef.current) containerRef.current.style.cursor = 'default';
+      return;
+    }
+
+    if (useStore.getState().isDrawingConnection) {
+      selectionStartRef.current = null;
+      setSelectionBox(null);
       return;
     }
 
@@ -353,6 +386,39 @@ export const Canvas: React.FC = () => {
     return lines;
   };
 
+  const {
+    connections,
+    selectedConnectionIds,
+    selectConnections,
+    isDrawingConnection,
+    drawingConnectionType,
+    setDrawingMode,
+    addConnection
+  } = useStore();
+
+  const handlePortClick = (objId: string, portId: string) => {
+    if (!isDrawingConnection) return;
+
+    if (!drawStartPort) {
+      setDrawStartPort({ objId, portId });
+      useStore.getState().addMessage(`[INFO] Connection started from ${objId}:${portId}`);
+    } else {
+      if (drawStartPort.objId !== objId) {
+        addConnection({
+          fromId: drawStartPort.objId,
+          fromPort: drawStartPort.portId,
+          toId: objId,
+          toPort: portId,
+          type: drawingConnectionType,
+          editor: { preview_state: 'DEENERGIZED' } // Default state
+        });
+        useStore.getState().addMessage(`[INFO] Connection created`);
+      }
+      setDrawStartPort(null);
+      setDrawingMode(false);
+    }
+  };
+
   return (
     <div
       className="canvas-container"
@@ -378,6 +444,16 @@ export const Canvas: React.FC = () => {
           {drawGrid()}
         </Layer>
         <Layer>
+          {connections.map(conn => (
+            <ConnectionLine
+              key={conn.id}
+              conn={conn}
+              fromObj={objects.find(o => o.id === conn.fromId)}
+              toObj={objects.find(o => o.id === conn.toId)}
+              isSelected={selectedConnectionIds.includes(conn.id)}
+              onSelect={() => selectConnections([conn.id], false)}
+            />
+          ))}
           {objects.map((obj) => (
             <ObjectNode
               key={obj.id}
@@ -385,6 +461,7 @@ export const Canvas: React.FC = () => {
               isSelected={selectedIds.includes(obj.id)}
               onSelect={() => selectObjects([obj.id], false)}
               onChange={(newAttrs) => updateObject(obj.id, newAttrs)}
+              onPortClick={handlePortClick}
             />
           ))}
           {selectionBox && (

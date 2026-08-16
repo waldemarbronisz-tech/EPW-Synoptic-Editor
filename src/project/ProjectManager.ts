@@ -42,7 +42,8 @@ export class ProjectManager {
         height: 1080,
         background: "#ffffff"
       },
-      objects: state.objects
+      objects: state.objects,
+      connections: state.connections || []
     };
     return JSON.stringify(proj, null, 2);
   }
@@ -50,6 +51,7 @@ export class ProjectManager {
   private static loadProjectToStore(project: EPWProjectSchema, isDirty: boolean) {
     useStore.setState({
       objects: project.objects,
+      connections: project.connections || [],
       projectName: project.project.name,
       isDirty: isDirty,
       selectedIds: [],

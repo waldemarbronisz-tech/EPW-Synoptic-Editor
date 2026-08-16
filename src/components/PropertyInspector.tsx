@@ -70,8 +70,12 @@ export const PropertyInspector: React.FC = () => {
             <input type="text" value={selectedObj.type} disabled />
           </div>
           <div className="property-row">
-            <label>Tag</label>
-            <input type="text" name="tag" value={selectedObj.tag || ''} onChange={handleChange} />
+            <label>Designation</label>
+            <input type="text" name="designation" value={selectedObj.designation || ''} onChange={handleChange} />
+          </div>
+          <div className="property-row">
+            <label>Name</label>
+            <input type="text" name="name" value={selectedObj.name || ''} onChange={handleChange} />
           </div>
           <div className="property-row">
             <label>Description</label>

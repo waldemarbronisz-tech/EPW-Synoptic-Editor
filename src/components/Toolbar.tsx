@@ -4,14 +4,15 @@ import {
   Undo, Redo, Copy, ClipboardPaste, Trash2,
   BringToFront, SendToBack, AlignLeft, AlignCenter, AlignRight,
   AlignVerticalSpaceAround, AlignHorizontalSpaceAround,
-  Lock, Unlock, RotateCcw, RotateCw
+  Lock, Unlock, RotateCcw, RotateCw, PenLine
 } from 'lucide-react';
 
 export const Toolbar: React.FC = () => {
   const {
-    undo, redo, copySelected, paste, deleteObjects, selectedIds,
+    undo, redo, copySelected, paste, deleteObjects, selectedIds, selectedConnectionIds,
     bringToFront, sendToBack, alignSelected, distributeSelected,
-    lockSelected, unlockSelected, rotateSelected
+    lockSelected, unlockSelected, rotateSelected,
+    isDrawingConnection, drawingConnectionType, setDrawingMode
   } = useStore();
 
   return (
@@ -33,7 +34,33 @@ export const Toolbar: React.FC = () => {
       <div className="toolbar-group">
         <button title="Copy" onClick={copySelected}><Copy size={16} /></button>
         <button title="Paste" onClick={paste}><ClipboardPaste size={16} /></button>
-        <button title="Delete" onClick={() => deleteObjects(selectedIds)}><Trash2 size={16} /></button>
+        <button title="Delete" onClick={() => deleteObjects(selectedIds, selectedConnectionIds)}><Trash2 size={16} /></button>
+      </div>
+
+      <div className="toolbar-divider" />
+
+      <div className="toolbar-group">
+        <button
+          title="Draw Electrical Connection"
+          onClick={() => setDrawingMode(isDrawingConnection && drawingConnectionType === 'electrical_ac' ? false : true, 'electrical_ac')}
+          style={{ backgroundColor: isDrawingConnection && drawingConnectionType === 'electrical_ac' ? '#3498db' : 'transparent' }}
+        >
+          <PenLine size={16} color={isDrawingConnection && drawingConnectionType === 'electrical_ac' ? '#e74c3c' : 'inherit'} />
+        </button>
+        <button
+          title="Draw Water Connection"
+          onClick={() => setDrawingMode(isDrawingConnection && drawingConnectionType === 'water' ? false : true, 'water')}
+          style={{ backgroundColor: isDrawingConnection && drawingConnectionType === 'water' ? '#3498db' : 'transparent' }}
+        >
+          <PenLine size={16} color={isDrawingConnection && drawingConnectionType === 'water' ? '#3498db' : 'inherit'} />
+        </button>
+        <button
+          title="Draw HVAC Connection"
+          onClick={() => setDrawingMode(isDrawingConnection && drawingConnectionType === 'hvac_air' ? false : true, 'hvac_air')}
+          style={{ backgroundColor: isDrawingConnection && drawingConnectionType === 'hvac_air' ? '#3498db' : 'transparent' }}
+        >
+          <PenLine size={16} color={isDrawingConnection && drawingConnectionType === 'hvac_air' ? '#95a5a6' : 'inherit'} />
+        </button>
       </div>
 
       <div className="toolbar-divider" />

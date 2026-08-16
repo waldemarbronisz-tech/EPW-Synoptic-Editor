@@ -1,4 +1,4 @@
-import type { SynopticObject } from '../store';
+import type { SynopticObject, SynopticConnection } from '../store';
 
 export interface EPWProjectInfo {
   name: string;
@@ -19,6 +19,7 @@ export interface EPWProjectSchema {
   project: EPWProjectInfo;
   canvas: EPWCanvasSchema;
   objects: SynopticObject[];
+  connections?: SynopticConnection[];
 }
 
 export const CURRENT_SCHEMA_VERSION = 1;
@@ -39,7 +40,8 @@ export function createEmptyProject(name: string = "New Project"): EPWProjectSche
       height: 1080,
       background: "#ffffff"
     },
-    objects: []
+    objects: [],
+    connections: []
   };
 }
 

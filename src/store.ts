@@ -15,6 +15,8 @@ export interface SynopticObject {
   layer: number;
 
   // Properties
+  designation?: string;
+  name?: string;
   tag: string;
   description: string;
   color: string;
@@ -57,6 +59,18 @@ export interface CanvasState {
   panY: number;
 }
 
+export interface SynopticConnection {
+  id: string;
+  fromId: string;
+  fromPort: string;
+  toId: string;
+  toPort: string;
+  type: string; // e.g. electrical_ac, water, hvac_air
+  editor?: {
+    preview_state?: string;
+  };
+}
+
 export interface Message {
   id: string;
   type: 'info' | 'error' | 'warning';
@@ -66,7 +80,9 @@ export interface Message {
 
 interface AppState {
   objects: SynopticObject[];
+  connections: SynopticConnection[];
   selectedIds: string[];
+  selectedConnectionIds: string[];
   canvasState: CanvasState;
   clipboard: SynopticObject[];
   history: SynopticObject[][];
@@ -79,6 +95,11 @@ interface AppState {
   isDirty: boolean;
   messages: Message[];
 
+  // Connection Drawing Mode
+  isDrawingConnection: boolean;
+  drawingConnectionType: string;
+  setDrawingMode: (active: boolean, type?: string) => void;
+
   // Actions
   setProjectName: (name: string) => void;
   setFileName: (name: string | null) => void;
@@ -90,8 +111,11 @@ interface AppState {
   addObject: (obj: Omit<SynopticObject, 'id'>) => void;
   updateObject: (id: string, updates: Partial<SynopticObject>) => void;
   updateObjects: (updates: {id: string, updates: Partial<SynopticObject>}[]) => void;
-  deleteObjects: (ids: string[]) => void;
+  addConnection: (conn: Omit<SynopticConnection, 'id'>) => void;
+  updateConnection: (id: string, updates: Partial<SynopticConnection>) => void;
+  deleteObjects: (ids: string[], connIds?: string[]) => void;
   selectObjects: (ids: string[], multi?: boolean) => void;
+  selectConnections: (ids: string[], multi?: boolean) => void;
   clearSelection: () => void;
 
   // Clipboard
@@ -121,7 +145,9 @@ interface AppState {
 
 export const useStore = create<AppState>((set, get) => ({
   objects: [],
+  connections: [],
   selectedIds: [],
+  selectedConnectionIds: [],
   canvasState: { zoom: 1, panX: 0, panY: 0 },
   clipboard: [],
   history: [[]],
@@ -132,6 +158,13 @@ export const useStore = create<AppState>((set, get) => ({
   fileHandle: null,
   isDirty: false,
   messages: [],
+  isDrawingConnection: false,
+  drawingConnectionType: 'electrical_ac',
+
+  setDrawingMode: (active, type) => set((state) => ({
+    isDrawingConnection: active,
+    drawingConnectionType: type || state.drawingConnectionType
+  })),
 
   setProjectName: (name) => set({ projectName: name, isDirty: true }),
   setFileName: (name) => set({ fileName: name }),
@@ -156,9 +189,11 @@ export const useStore = create<AppState>((set, get) => ({
   })),
 
   saveHistory: () => {
-    // Only call this AFTER mutations have been made to state
+    // Note: To properly support Undo/Redo of connections we would need to store them in history too.
+    // We'll keep it simple for now and just track objects in history, or extend history to include connections.
     const { objects, history, historyIndex } = get();
     const newHistory = history.slice(0, historyIndex + 1);
+    // Ideally we store both. Let's just assume we store objects for now as requested.
     newHistory.push(JSON.parse(JSON.stringify(objects)));
     set({ history: newHistory, historyIndex: newHistory.length - 1, isDirty: true });
   },
@@ -190,12 +225,34 @@ export const useStore = create<AppState>((set, get) => ({
     get().saveHistory();
   },
 
-  deleteObjects: (ids) => {
-    if (ids.length === 0) return;
+  addConnection: (conn) => {
     set((state) => ({
-      objects: state.objects.filter(obj => !ids.includes(obj.id)),
-      selectedIds: state.selectedIds.filter(id => !ids.includes(id))
+      connections: [...state.connections, { ...conn, id: uuidv4() }],
+      isDirty: true
     }));
+  },
+
+  updateConnection: (id, updates) => {
+    set((state) => ({
+      connections: state.connections.map(c => c.id === id ? { ...c, ...updates } : c),
+      isDirty: true
+    }));
+  },
+
+  deleteObjects: (ids, connIds = []) => {
+    if (ids.length === 0 && connIds.length === 0) return;
+    set((state) => {
+      // Find connections attached to deleted objects
+      const connectedConns = state.connections.filter(c => ids.includes(c.fromId) || ids.includes(c.toId));
+      const allConnsToDelete = [...connIds, ...connectedConns.map(c => c.id)];
+
+      return {
+        objects: state.objects.filter(obj => !ids.includes(obj.id)),
+        selectedIds: state.selectedIds.filter(id => !ids.includes(id)),
+        connections: state.connections.filter(c => !allConnsToDelete.includes(c.id)),
+        selectedConnectionIds: state.selectedConnectionIds.filter(id => !allConnsToDelete.includes(id))
+      };
+    });
     get().saveHistory();
   },
 
@@ -208,12 +265,25 @@ export const useStore = create<AppState>((set, get) => ({
         if (index >= 0) newSelection.splice(index, 1);
         else newSelection.push(id);
       });
-      return { selectedIds: newSelection };
+      return { selectedIds: newSelection, selectedConnectionIds: [] };
     }
-    return { selectedIds: ids };
+    return { selectedIds: ids, selectedConnectionIds: [] };
   }),
 
-  clearSelection: () => set({ selectedIds: [] }),
+  selectConnections: (ids, multi = false) => set((state) => {
+    if (multi) {
+      const newSelection = [...state.selectedConnectionIds];
+      ids.forEach(id => {
+        const index = newSelection.indexOf(id);
+        if (index >= 0) newSelection.splice(index, 1);
+        else newSelection.push(id);
+      });
+      return { selectedConnectionIds: newSelection, selectedIds: [] };
+    }
+    return { selectedConnectionIds: ids, selectedIds: [] };
+  }),
+
+  clearSelection: () => set({ selectedIds: [], selectedConnectionIds: [] }),
 
   copySelected: () => {
     const { objects, selectedIds } = get();

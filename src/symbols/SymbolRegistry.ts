@@ -267,7 +267,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 60,
     allowedStates: ['OFF', 'RUNNING', 'FAULT'],
     defaultState: 'OFF',
-    connectionPoints: [{id: 'SUCTION', x: 0.2, y: 1}, {id: 'DISCHARGE', x: 0.5, y: 0}]
+    connectionPoints: [{id: 'SUCTION', x: 0, y: 0.5}, {id: 'DISCHARGE', x: 0.6, y: 0}]
   },
   'water.tank': {
     type: 'water.tank',
