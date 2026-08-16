@@ -36,7 +36,13 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange }: {
         visible={obj.visible !== false}
         onClick={onSelect}
         onTap={onSelect}
+        onDragMove={(e) => {
+          // Snap during drag for visual feedback (doesn't mutate store yet)
+          e.target.x(Math.round(e.target.x() / GRID_SIZE) * GRID_SIZE);
+          e.target.y(Math.round(e.target.y() / GRID_SIZE) * GRID_SIZE);
+        }}
         onDragEnd={(e) => {
+          // Push final position to store history once
           onChange({
             x: Math.round(e.target.x() / GRID_SIZE) * GRID_SIZE,
             y: Math.round(e.target.y() / GRID_SIZE) * GRID_SIZE,
@@ -115,17 +121,22 @@ export const Canvas: React.FC = () => {
   const lastPanPosRef = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
-    const handleResize = () => {
-      if (containerRef.current) {
+    if (!containerRef.current) return;
+
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
         setSize({
-          width: containerRef.current.offsetWidth,
-          height: containerRef.current.offsetHeight
+          width: entry.contentRect.width,
+          height: entry.contentRect.height
         });
       }
+    });
+
+    observer.observe(containerRef.current);
+
+    return () => {
+      observer.disconnect();
     };
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const handleWheel = (e: any) => {
@@ -248,16 +259,20 @@ export const Canvas: React.FC = () => {
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    if (!stageRef.current) return;
+    if (!stageRef.current || !containerRef.current) return;
 
     const dataStr = e.dataTransfer.getData('application/reactflow');
     if (!dataStr) return;
 
     const data = JSON.parse(dataStr);
 
-    // Get pointer position relative to the stage
-    stageRef.current.setPointersPositions(e);
-    const pos = stageRef.current.getPointerPosition();
+    // Get pointer position relative to the container, and translate it to stage coordinates
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const pos = {
+      x: e.clientX - containerRect.left,
+      y: e.clientY - containerRect.top
+    };
+
     const scale = canvasState.zoom;
     const stageX = canvasState.panX;
     const stageY = canvasState.panY;

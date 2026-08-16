@@ -1,44 +1,51 @@
 import React from 'react';
 import { useStore } from '../store';
+import { ProjectManager } from '../project/ProjectManager';
+import { ProjectFileService } from '../project/ProjectFileService';
 
 export const MenuBar: React.FC = () => {
-  const { undo, redo, copySelected, paste, deleteObjects, selectedIds } = useStore();
+  const { undo, redo, copySelected, paste, deleteObjects, selectedIds, isDirty } = useStore();
 
   const handleMenuClick = (action: () => void) => {
     action();
   };
 
   const handleNew = () => {
-    if (confirm('Are you sure you want to clear the canvas?')) {
-      useStore.setState({ objects: [], selectedIds: [], history: [[]], historyIndex: 0 });
+    if (isDirty) {
+      if (!confirm('Current project has unsaved changes. Are you sure you want to create a new project and lose them?')) {
+        return;
+      }
+    }
+    const name = prompt('Enter new project name:', 'New Project');
+    if (name) {
+      ProjectManager.newProject(name);
     }
   };
 
   const handleSave = () => {
-    const { objects } = useStore.getState();
-    localStorage.setItem('epw-synoptic-studio-save', JSON.stringify(objects));
-    alert('Project saved successfully.');
+    ProjectFileService.saveFile();
+  };
+
+  const handleSaveAs = () => {
+    ProjectFileService.saveFileAs();
   };
 
   const handleOpen = () => {
-    const saved = localStorage.getItem('epw-synoptic-studio-save');
-    if (saved) {
-      try {
-        const objects = JSON.parse(saved);
-        useStore.setState({ objects, selectedIds: [], history: [objects], historyIndex: 0 });
-        alert('Project loaded successfully.');
-      } catch (e) {
-        alert('Error parsing saved project.');
+    if (isDirty) {
+      if (!confirm('Current project has unsaved changes. Are you sure you want to open a different project and lose them?')) {
+        return;
       }
-    } else {
-      alert('No saved project found.');
     }
+    ProjectFileService.openFile();
   };
 
   const handleExit = () => {
-    if (confirm('Are you sure you want to exit? All unsaved progress will be lost.')) {
-      window.close(); // Only works if opened by script, but it fits the aesthetic
+    if (isDirty) {
+      if (!confirm('Are you sure you want to exit? All unsaved progress will be lost.')) {
+        return;
+      }
     }
+    window.close();
   }
 
   return (
@@ -47,8 +54,9 @@ export const MenuBar: React.FC = () => {
         <span>File</span>
         <div className="dropdown">
           <div className="dropdown-item" onClick={handleNew}>New</div>
-          <div className="dropdown-item" onClick={handleOpen}>Open</div>
+          <div className="dropdown-item" onClick={handleOpen}>Open...</div>
           <div className="dropdown-item" onClick={handleSave}>Save</div>
+          <div className="dropdown-item" onClick={handleSaveAs}>Save As...</div>
           <div className="dropdown-item" onClick={handleExit}>Exit</div>
         </div>
       </div>

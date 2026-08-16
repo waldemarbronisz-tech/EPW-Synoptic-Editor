@@ -5,8 +5,18 @@ import { Toolbox } from './components/Toolbox';
 import { Canvas } from './components/Canvas';
 import { PropertyInspector } from './components/PropertyInspector';
 import { MessagesPanel } from './components/MessagesPanel';
+import { useStore } from './store';
+import { useEffect } from 'react';
 
 function App() {
+  const { projectName, fileName, isDirty } = useStore();
+
+  useEffect(() => {
+    const titleName = fileName || `${projectName}.epwsyn`;
+    const dirtyMark = isDirty ? ' *' : '';
+    document.title = `EPW Synoptic Editor — ${titleName}${dirtyMark}`;
+  }, [projectName, fileName, isDirty]);
+
   return (
     <div className="app-container">
       <MenuBar />

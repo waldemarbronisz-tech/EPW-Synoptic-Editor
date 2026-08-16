@@ -44,6 +44,13 @@ export interface CanvasState {
   panY: number;
 }
 
+export interface Message {
+  id: string;
+  type: 'info' | 'error' | 'warning';
+  text: string;
+  time: string;
+}
+
 interface AppState {
   objects: SynopticObject[];
   selectedIds: string[];
@@ -52,10 +59,24 @@ interface AppState {
   history: SynopticObject[][];
   historyIndex: number;
 
+  // Project State
+  projectName: string;
+  fileName: string | null;
+  fileHandle: any | null;
+  isDirty: boolean;
+  messages: Message[];
+
   // Actions
+  setProjectName: (name: string) => void;
+  setFileName: (name: string | null) => void;
+  setFileHandle: (handle: any | null) => void;
+  setDirty: (dirty: boolean) => void;
+  addMessage: (text: string) => void;
+
   setCanvasState: (state: Partial<CanvasState>) => void;
   addObject: (obj: Omit<SynopticObject, 'id'>) => void;
   updateObject: (id: string, updates: Partial<SynopticObject>) => void;
+  updateObjects: (updates: {id: string, updates: Partial<SynopticObject>}[]) => void;
   deleteObjects: (ids: string[]) => void;
   selectObjects: (ids: string[], multi?: boolean) => void;
   clearSelection: () => void;
@@ -90,40 +111,76 @@ export const useStore = create<AppState>((set, get) => ({
   history: [[]],
   historyIndex: 0,
 
+  projectName: 'New Project',
+  fileName: null,
+  fileHandle: null,
+  isDirty: false,
+  messages: [],
+
+  setProjectName: (name) => set({ projectName: name, isDirty: true }),
+  setFileName: (name) => set({ fileName: name }),
+  setFileHandle: (handle) => set({ fileHandle: handle }),
+  setDirty: (dirty) => set({ isDirty: dirty }),
+  addMessage: (text) => {
+    let type: 'info' | 'error' | 'warning' = 'info';
+    if (text.startsWith('[ERROR]')) type = 'error';
+    if (text.startsWith('[WARNING]')) type = 'warning';
+
+    const msg: Message = {
+      id: Date.now().toString() + Math.random().toString(),
+      type,
+      text: text.replace(/\[.*?\]\s*/, ''),
+      time: new Date().toLocaleTimeString()
+    };
+    set(state => ({ messages: [...state.messages, msg] }));
+  },
+
   setCanvasState: (state) => set((prev) => ({
     canvasState: { ...prev.canvasState, ...state }
   })),
 
   saveHistory: () => {
+    // Only call this AFTER mutations have been made to state
     const { objects, history, historyIndex } = get();
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push(JSON.parse(JSON.stringify(objects)));
-    set({ history: newHistory, historyIndex: newHistory.length - 1 });
+    set({ history: newHistory, historyIndex: newHistory.length - 1, isDirty: true });
   },
 
   addObject: (obj) => {
-    get().saveHistory();
     set((state) => ({
       objects: [...state.objects, { ...obj, id: uuidv4() }]
     }));
+    get().saveHistory();
   },
 
   updateObject: (id, updates) => {
-    get().saveHistory();
     set((state) => ({
       objects: state.objects.map(obj =>
         obj.id === id ? { ...obj, ...updates } : obj
       )
     }));
+    get().saveHistory();
+  },
+
+  updateObjects: (updates) => {
+    set((state) => {
+      let newObjects = [...state.objects];
+      updates.forEach(u => {
+        newObjects = newObjects.map(obj => obj.id === u.id ? { ...obj, ...u.updates } : obj);
+      });
+      return { objects: newObjects };
+    });
+    get().saveHistory();
   },
 
   deleteObjects: (ids) => {
     if (ids.length === 0) return;
-    get().saveHistory();
     set((state) => ({
       objects: state.objects.filter(obj => !ids.includes(obj.id)),
       selectedIds: state.selectedIds.filter(id => !ids.includes(id))
     }));
+    get().saveHistory();
   },
 
   selectObjects: (ids, multi = false) => set((state) => {
@@ -151,7 +208,6 @@ export const useStore = create<AppState>((set, get) => ({
   paste: () => {
     const { clipboard } = get();
     if (clipboard.length === 0) return;
-    get().saveHistory();
 
     const newIds: string[] = [];
     const newObjects = clipboard.map(obj => {
@@ -164,6 +220,7 @@ export const useStore = create<AppState>((set, get) => ({
       objects: [...state.objects, ...newObjects],
       selectedIds: newIds
     }));
+    get().saveHistory();
   },
 
   undo: () => {
@@ -172,7 +229,8 @@ export const useStore = create<AppState>((set, get) => ({
       set({
         historyIndex: historyIndex - 1,
         objects: JSON.parse(JSON.stringify(history[historyIndex - 1])),
-        selectedIds: []
+        selectedIds: [],
+        isDirty: true
       });
     }
   },
@@ -183,31 +241,31 @@ export const useStore = create<AppState>((set, get) => ({
       set({
         historyIndex: historyIndex + 1,
         objects: JSON.parse(JSON.stringify(history[historyIndex + 1])),
-        selectedIds: []
+        selectedIds: [],
+        isDirty: true
       });
     }
   },
 
   bringToFront: () => {
-    get().saveHistory();
     const { objects, selectedIds } = get();
     const unselected = objects.filter(obj => !selectedIds.includes(obj.id));
     const selected = objects.filter(obj => selectedIds.includes(obj.id));
     set({ objects: [...unselected, ...selected] });
+    get().saveHistory();
   },
 
   sendToBack: () => {
-    get().saveHistory();
     const { objects, selectedIds } = get();
     const unselected = objects.filter(obj => !selectedIds.includes(obj.id));
     const selected = objects.filter(obj => selectedIds.includes(obj.id));
     set({ objects: [...selected, ...unselected] });
+    get().saveHistory();
   },
 
   alignSelected: (alignment) => {
     const { objects, selectedIds } = get();
     if (selectedIds.length < 2) return;
-    get().saveHistory();
 
     const selected = objects.filter(obj => selectedIds.includes(obj.id));
     let target = 0;
@@ -237,12 +295,12 @@ export const useStore = create<AppState>((set, get) => ({
         }
       })
     });
+    get().saveHistory();
   },
 
   distributeSelected: (axis) => {
     const { objects, selectedIds } = get();
     if (selectedIds.length < 3) return;
-    get().saveHistory();
 
     const selected = objects.filter(obj => selectedIds.includes(obj.id));
 
@@ -273,23 +331,24 @@ export const useStore = create<AppState>((set, get) => ({
         })
       });
     }
+    get().saveHistory();
   },
 
   lockSelected: () => {
     const { selectedIds } = get();
     if (selectedIds.length === 0) return;
-    get().saveHistory();
     set((state) => ({
       objects: state.objects.map(obj => selectedIds.includes(obj.id) ? { ...obj, locked: true } : obj)
     }));
+    get().saveHistory();
   },
 
   unlockSelected: () => {
     const { selectedIds } = get();
     if (selectedIds.length === 0) return;
-    get().saveHistory();
     set((state) => ({
       objects: state.objects.map(obj => selectedIds.includes(obj.id) ? { ...obj, locked: false } : obj)
     }));
+    get().saveHistory();
   }
 }));

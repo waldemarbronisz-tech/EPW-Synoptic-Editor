@@ -1,10 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useStore } from '../store';
 
 export const MessagesPanel: React.FC = () => {
-  const [messages] = useState([
-    { id: 1, type: 'info', text: 'System initialized successfully.', time: new Date().toLocaleTimeString() },
-    { id: 2, type: 'info', text: 'Ready for engineering.', time: new Date().toLocaleTimeString() }
-  ]);
+  const { messages } = useStore();
 
   return (
     <div className="messages-panel">

@@ -1,32 +1,41 @@
-# React + TypeScript + Vite
+# EPW Synoptic Editor
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Professional industrial HMI/SCADA synoptic editor for EPW OS. Inspired by SimCity 2000 engineering workflow, featuring drag-and-drop process design, real-time visualization, and seamless integration with EPW Logic Studio and Runtime.
 
-Currently, two official plugins are available:
+## Overview
+EPW Synoptic Editor is a standalone application responsible ONLY for EDITING `.epwsyn` project files. It does not handle runtime execution, Modbus communication, or logic gates—those are handled by EPW OS Synoptic Runtime and EPW Logic Studio.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Prerequisites
+- Node.js (v22.22 or higher, compatible with current Vite version)
+- NPM
 
-## React Compiler
+## How to Start (Windows)
+Double-click `START_EPW_SYNOPTIC.bat`. This script will:
+1. Verify Node.js is installed.
+2. Automatically run `npm install` if dependencies are missing.
+3. Start the application locally and open it in your default web browser (typically `http://127.0.0.1:5173`).
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## How to Start (Manually)
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+2. Start the development server:
+   ```bash
+   npm run dev
+   ```
 
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+## How to Build
+To build the application for production, run:
+```bash
+npm run build
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## .epwsyn File Format
+The editor saves projects in `.epwsyn` format, which is a pure JSON schema that holds the application drawing and logic bindings but contains no executable code.
+
+## Current Project Status
+- Complete functional UI inspired by 1998 industrial engineering software.
+- Full drag-and-drop functionality with infinite canvas.
+- Project loading and saving logic decoupled into a proper ProjectManager layer.
+- Responsive resizable panels and property inspectors.
