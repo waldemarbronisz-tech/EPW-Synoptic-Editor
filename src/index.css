@@ -221,7 +221,7 @@ body, html, #root {
 /* Canvas */
 .canvas-container {
   flex: 1;
-  background-color: #ffffff; /* Classic white canvas */
+  background-color: #c0c0c0; /* Classic grey engineering workspace */
   overflow: hidden;
   position: relative;
   border: 2px inset var(--sys-dark);

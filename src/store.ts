@@ -32,6 +32,9 @@ export interface SynopticObject {
   };
   editor?: {
     preview_state?: string;
+    preview_value?: string;
+    unit?: string;
+    format?: string;
   };
 
   // Legacy / Other
@@ -111,6 +114,9 @@ interface AppState {
   // Lock/Unlock
   lockSelected: () => void;
   unlockSelected: () => void;
+
+  // Rotation
+  rotateSelected: (direction: 'cw' | 'ccw') => void;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -358,6 +364,20 @@ export const useStore = create<AppState>((set, get) => ({
     if (selectedIds.length === 0) return;
     set((state) => ({
       objects: state.objects.map(obj => selectedIds.includes(obj.id) ? { ...obj, locked: false } : obj)
+    }));
+    get().saveHistory();
+  },
+
+  rotateSelected: (direction: 'cw' | 'ccw') => {
+    const { selectedIds } = get();
+    if (selectedIds.length === 0) return;
+    set((state) => ({
+      objects: state.objects.map(obj => {
+        if (!selectedIds.includes(obj.id)) return obj;
+        const currentRotation = obj.rotation || 0;
+        const newRotation = direction === 'cw' ? currentRotation + 90 : currentRotation - 90;
+        return { ...obj, rotation: newRotation };
+      })
     }));
     get().saveHistory();
   }

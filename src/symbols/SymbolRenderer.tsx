@@ -13,6 +13,9 @@ import { TeeSymbol } from './water/TeeSymbol';
 import { ValveSymbol } from './water/ValveSymbol';
 import { PumpSymbol } from './water/PumpSymbol';
 import { TankSymbol } from './water/TankSymbol';
+import { MeasurementDisplaySymbol } from './measurements/MeasurementDisplaySymbol';
+import { FanSymbol } from './hvac/FanSymbol';
+import { TemperatureSensorSymbol } from './sensors/TemperatureSensorSymbol';
 
 export interface SymbolProps {
   obj: SynopticObject;
@@ -84,6 +87,12 @@ export const SymbolRenderer: React.FC<{ obj: SynopticObject }> = ({ obj }) => {
       return <PumpSymbol obj={obj} state={state} />;
     case 'water.tank':
       return <TankSymbol obj={obj} state={state} />;
+    case 'measurements.generic_display':
+      return <MeasurementDisplaySymbol obj={obj} state={state} />;
+    case 'hvac.fan':
+      return <FanSymbol obj={obj} state={state} />;
+    case 'sensors.temperature':
+      return <TemperatureSensorSymbol obj={obj} state={state} />;
     default:
       return <GenericSymbol obj={obj} state={state} />;
   }

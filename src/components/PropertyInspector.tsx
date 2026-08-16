@@ -154,12 +154,28 @@ export const PropertyInspector: React.FC = () => {
               ))}
             </select>
           </div>
+          {selectedObj.category === 'Measurements' || selectedObj.type.startsWith('measurements.') ? (
+            <>
+              <div className="property-row">
+                <label>Value</label>
+                <input type="text" name="editor.preview_value" value={selectedObj.editor?.preview_value || ''} onChange={handleChange} />
+              </div>
+              <div className="property-row">
+                <label>Unit</label>
+                <input type="text" name="editor.unit" value={selectedObj.editor?.unit || ''} onChange={handleChange} />
+              </div>
+              <div className="property-row">
+                <label>Format</label>
+                <input type="text" name="editor.format" placeholder="e.g. 0.0" value={selectedObj.editor?.format || ''} onChange={handleChange} />
+              </div>
+            </>
+          ) : null}
         </div>
 
         <div className="property-group">
           <div className="property-group-title">Bindings</div>
           <div className="property-row">
-            <label>State</label>
+            <label>State/Value</label>
             <input type="text" name="bindings.state" value={selectedObj.bindings?.state || ''} onChange={handleChange} />
           </div>
           <div className="property-row">

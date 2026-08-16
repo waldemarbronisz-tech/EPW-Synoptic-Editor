@@ -306,7 +306,7 @@ export const Canvas: React.FC = () => {
           y={0}
           width={1}
           height={height}
-          fill="#e0e0e0"
+          fill="rgba(0, 0, 0, 0.1)" /* subtle retro engineering grid */
           name="grid"
         />
       );
@@ -319,7 +319,7 @@ export const Canvas: React.FC = () => {
           y={j * GRID_SIZE}
           width={width}
           height={1}
-          fill="#e0e0e0"
+          fill="rgba(0, 0, 0, 0.1)"
           name="grid"
         />
       );

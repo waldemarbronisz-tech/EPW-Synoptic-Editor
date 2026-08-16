@@ -121,6 +121,39 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultState: 'NORMAL'
   },
 
+  // HVAC
+  'hvac.fan': {
+    type: 'hvac.fan',
+    label: 'Fan',
+    category: 'HVAC',
+    defaultWidth: 50,
+    defaultHeight: 50,
+    allowedStates: ['OFF', 'RUNNING', 'FAULT'],
+    defaultState: 'OFF'
+  },
+
+  // Sensors
+  'sensors.temperature': {
+    type: 'sensors.temperature',
+    label: 'Temp Sensor',
+    category: 'Sensors',
+    defaultWidth: 30,
+    defaultHeight: 60,
+    allowedStates: ['NORMAL', 'FAULT'],
+    defaultState: 'NORMAL'
+  },
+
+  // Measurements
+  'measurements.generic_display': {
+    type: 'measurements.generic_display',
+    label: 'Value Display',
+    category: 'Measurements',
+    defaultWidth: 100,
+    defaultHeight: 50,
+    allowedStates: ['NORMAL', 'FAULT'],
+    defaultState: 'NORMAL'
+  },
+
   // Generic primitives
   'graphics.rectangle': {
     type: 'graphics.rectangle',

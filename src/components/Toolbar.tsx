@@ -4,14 +4,14 @@ import {
   Undo, Redo, Copy, ClipboardPaste, Trash2,
   BringToFront, SendToBack, AlignLeft, AlignCenter, AlignRight,
   AlignVerticalSpaceAround, AlignHorizontalSpaceAround,
-  Lock, Unlock
+  Lock, Unlock, RotateCcw, RotateCw
 } from 'lucide-react';
 
 export const Toolbar: React.FC = () => {
   const {
     undo, redo, copySelected, paste, deleteObjects, selectedIds,
     bringToFront, sendToBack, alignSelected, distributeSelected,
-    lockSelected, unlockSelected
+    lockSelected, unlockSelected, rotateSelected
   } = useStore();
 
   return (
@@ -60,6 +60,13 @@ export const Toolbar: React.FC = () => {
       <div className="toolbar-group">
         <button title="Lock" onClick={lockSelected}><Lock size={16} /></button>
         <button title="Unlock" onClick={unlockSelected}><Unlock size={16} /></button>
+      </div>
+
+      <div className="toolbar-divider" />
+
+      <div className="toolbar-group">
+        <button title="Rotate Left" onClick={() => rotateSelected('ccw')}><RotateCcw size={16} /></button>
+        <button title="Rotate Right" onClick={() => rotateSelected('cw')}><RotateCw size={16} /></button>
       </div>
     </div>
   );
