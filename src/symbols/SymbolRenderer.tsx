@@ -37,6 +37,11 @@ import { VoltageDisplaySymbol, CurrentDisplaySymbol, TemperatureDisplaySymbol } 
 import { FanSymbol } from './hvac/FanSymbol';
 import { HeaterSymbol } from './hvac/HeaterSymbol';
 import { TemperatureSensorSymbol } from './instrumentation/TemperatureSensorSymbol';
+import { DuctSymbol } from './hvac/DuctSymbol';
+import { DuctElbowSymbol } from './hvac/DuctElbowSymbol';
+import { DuctTeeSymbol } from './hvac/DuctTeeSymbol';
+import { ReducerSymbol } from './hvac/ReducerSymbol';
+import { DamperSymbol } from './hvac/DamperSymbol';
 import { PressureSensorSymbol } from './instrumentation/PressureSensorSymbol';
 import { LevelSensorSymbol } from './instrumentation/LevelSensorSymbol';
 import { HumiditySensorSymbol } from './instrumentation/HumiditySensorSymbol';
@@ -165,6 +170,11 @@ export const SymbolRenderer: React.FC<{ obj: SynopticObject }> = ({ obj }) => {
       return <CurrentDisplaySymbol obj={obj} state={state} />;
     case 'measurements.temperature_display':
       return <TemperatureDisplaySymbol obj={obj} state={state} />;
+    case 'hvac.duct': return <DuctSymbol obj={obj} state={state} />;
+    case 'hvac.duct_elbow': return <DuctElbowSymbol obj={obj} state={state} />;
+    case 'hvac.duct_tee': return <DuctTeeSymbol obj={obj} state={state} />;
+    case 'hvac.reducer': return <ReducerSymbol obj={obj} state={state} />;
+    case 'hvac.damper': return <DamperSymbol obj={obj} state={state} />;
     case 'hvac.fan':
       return <FanSymbol obj={obj} state={state} />;
     case 'hvac.heater':

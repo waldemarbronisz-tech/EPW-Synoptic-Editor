@@ -32,6 +32,10 @@ export interface SynopticObject {
     command?: string;
     alarm?: string;
   };
+  hvac?: {
+    shape: 'ROUND' | 'RECTANGULAR';
+    diameter?: number;
+  };
   editor?: {
     preview_state?: string;
     preview_value?: string;
@@ -66,6 +70,10 @@ export interface SynopticConnection {
   toId: string;
   toPort: string;
   type: string; // e.g. electrical_ac, water, hvac_air
+  name?: string;
+  direction?: string;
+  visible?: boolean;
+  locked?: boolean;
   editor?: {
     preview_state?: string;
   };
@@ -189,12 +197,12 @@ export const useStore = create<AppState>((set, get) => ({
   })),
 
   saveHistory: () => {
-    // Note: To properly support Undo/Redo of connections we would need to store them in history too.
-    // We'll keep it simple for now and just track objects in history, or extend history to include connections.
-    const { objects, history, historyIndex } = get();
+    const { objects, connections, history, historyIndex } = get();
     const newHistory = history.slice(0, historyIndex + 1);
-    // Ideally we store both. Let's just assume we store objects for now as requested.
-    newHistory.push(JSON.parse(JSON.stringify(objects)));
+    newHistory.push({
+      objects: JSON.parse(JSON.stringify(objects)),
+      connections: JSON.parse(JSON.stringify(connections))
+    } as any);
     set({ history: newHistory, historyIndex: newHistory.length - 1, isDirty: true });
   },
 
@@ -230,6 +238,7 @@ export const useStore = create<AppState>((set, get) => ({
       connections: [...state.connections, { ...conn, id: uuidv4() }],
       isDirty: true
     }));
+    get().saveHistory();
   },
 
   updateConnection: (id, updates) => {
@@ -237,6 +246,7 @@ export const useStore = create<AppState>((set, get) => ({
       connections: state.connections.map(c => c.id === id ? { ...c, ...updates } : c),
       isDirty: true
     }));
+    get().saveHistory();
   },
 
   deleteObjects: (ids, connIds = []) => {
@@ -312,10 +322,13 @@ export const useStore = create<AppState>((set, get) => ({
   undo: () => {
     const { history, historyIndex } = get();
     if (historyIndex > 0) {
+      const prevState = history[historyIndex - 1] as any;
       set({
         historyIndex: historyIndex - 1,
-        objects: JSON.parse(JSON.stringify(history[historyIndex - 1])),
+        objects: JSON.parse(JSON.stringify(prevState.objects || prevState)), // backward compat check
+        connections: prevState.connections ? JSON.parse(JSON.stringify(prevState.connections)) : [],
         selectedIds: [],
+        selectedConnectionIds: [],
         isDirty: true
       });
     }
@@ -324,10 +337,13 @@ export const useStore = create<AppState>((set, get) => ({
   redo: () => {
     const { history, historyIndex } = get();
     if (historyIndex < history.length - 1) {
+      const nextState = history[historyIndex + 1] as any;
       set({
         historyIndex: historyIndex + 1,
-        objects: JSON.parse(JSON.stringify(history[historyIndex + 1])),
+        objects: JSON.parse(JSON.stringify(nextState.objects || nextState)),
+        connections: nextState.connections ? JSON.parse(JSON.stringify(nextState.connections)) : [],
         selectedIds: [],
+        selectedConnectionIds: [],
         isDirty: true
       });
     }

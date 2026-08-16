@@ -146,6 +146,22 @@ export const Canvas: React.FC = () => {
   // Connection Drawing
   const [drawStartPort, setDrawStartPort] = useState<{objId: string, portId: string} | null>(null);
 
+  const {
+    connections,
+    selectedConnectionIds,
+    selectConnections,
+    isDrawingConnection,
+    drawingConnectionType,
+    setDrawingMode,
+    addConnection
+  } = useStore();
+
+  useEffect(() => {
+    if (!isDrawingConnection) {
+      setDrawStartPort(null);
+    }
+  }, [isDrawingConnection]);
+
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -385,16 +401,6 @@ export const Canvas: React.FC = () => {
     }
     return lines;
   };
-
-  const {
-    connections,
-    selectedConnectionIds,
-    selectConnections,
-    isDrawingConnection,
-    drawingConnectionType,
-    setDrawingMode,
-    addConnection
-  } = useStore();
 
   const handlePortClick = (objId: string, portId: string) => {
     if (!isDrawingConnection) return;

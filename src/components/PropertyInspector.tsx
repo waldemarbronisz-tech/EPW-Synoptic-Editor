@@ -3,21 +3,31 @@ import { useStore } from '../store';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 
 export const PropertyInspector: React.FC = () => {
-  const { objects, selectedIds, updateObject } = useStore();
+  const { objects, connections, selectedIds, selectedConnectionIds, updateObject, updateConnection } = useStore();
 
-  if (selectedIds.length !== 1) {
+  if (selectedIds.length === 0 && selectedConnectionIds.length === 0) {
     return (
       <div className="property-inspector">
         <div className="inspector-header">Properties</div>
-        <div className="inspector-empty">
-          {selectedIds.length === 0 ? 'No object selected' : 'Multiple objects selected'}
-        </div>
+        <div className="inspector-empty">No object selected</div>
       </div>
     );
   }
 
-  const selectedObj = objects.find(o => o.id === selectedIds[0]);
-  if (!selectedObj) return null;
+  if (selectedIds.length > 1 || selectedConnectionIds.length > 1 || (selectedIds.length > 0 && selectedConnectionIds.length > 0)) {
+    return (
+      <div className="property-inspector">
+        <div className="inspector-header">Properties</div>
+        <div className="inspector-empty">Multiple objects selected</div>
+      </div>
+    );
+  }
+
+  const isConnectionSelected = selectedConnectionIds.length === 1;
+  const selectedObj = isConnectionSelected ? null : objects.find(o => o.id === selectedIds[0]);
+  const selectedConn = isConnectionSelected ? connections.find(c => c.id === selectedConnectionIds[0]) : null;
+
+  if (!selectedObj && !selectedConn) return null;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -29,6 +39,7 @@ export const PropertyInspector: React.FC = () => {
       finalValue = parseFloat(value);
     }
 
+    if (!selectedObj) return;
     if (name.startsWith('editor.') || name.startsWith('bindings.')) {
       const [group, key] = name.split('.');
       updateObject(selectedObj.id, {
@@ -42,7 +53,44 @@ export const PropertyInspector: React.FC = () => {
     }
   };
 
+  const handleConnChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    if (!selectedConn) return;
+    const { name, value, type } = e.target;
+    let finalValue: any = value;
+    if (type === 'checkbox') {
+      finalValue = (e.target as HTMLInputElement).checked;
+    }
+
+    if (name.startsWith('editor.')) {
+      const key = name.split('.')[1];
+      updateConnection(selectedConn.id, {
+        editor: {
+          ...selectedConn.editor,
+          [key]: finalValue
+        }
+      });
+    } else {
+      updateConnection(selectedConn.id, { [name]: finalValue });
+    }
+  };
+
+  const handleHvacChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
+    if (!selectedObj) return;
+    const { name, value, type } = e.target;
+    let finalValue: any = value;
+    if (type === 'number') finalValue = parseFloat(value);
+
+    const key = name.replace('hvac.', '');
+    updateObject(selectedObj.id, {
+      hvac: {
+        ...(selectedObj.hvac || { shape: 'RECTANGULAR' }),
+        [key]: finalValue
+      }
+    });
+  };
+
   const handleCustomPropertyChange = (key: string, value: string) => {
+    if (!selectedObj) return;
     updateObject(selectedObj.id, {
       customProperties: {
         ...(selectedObj.customProperties || {}),
@@ -57,6 +105,80 @@ export const PropertyInspector: React.FC = () => {
       handleCustomPropertyChange(key, '');
     }
   };
+
+  if (selectedConn) {
+    return (
+      <div className="property-inspector">
+        <div className="inspector-header">Connection Properties</div>
+        <div className="inspector-content">
+          <div className="property-group">
+            <div className="property-group-title">General</div>
+            <div className="property-row">
+              <label>Type</label>
+              <select name="type" value={selectedConn.type} onChange={handleConnChange}>
+                <option value="electrical_ac">Electrical AC</option>
+                <option value="electrical_dc">Electrical DC</option>
+                <option value="water">Water</option>
+                <option value="hvac_air">HVAC Air</option>
+              </select>
+            </div>
+            <div className="property-row">
+              <label>Source Obj</label>
+              <input type="text" value={objects.find(o=>o.id === selectedConn.fromId)?.designation || selectedConn.fromId} disabled />
+            </div>
+            <div className="property-row">
+              <label>Source Port</label>
+              <input type="text" value={selectedConn.fromPort} disabled />
+            </div>
+            <div className="property-row">
+              <label>Target Obj</label>
+              <input type="text" value={objects.find(o=>o.id === selectedConn.toId)?.designation || selectedConn.toId} disabled />
+            </div>
+            <div className="property-row">
+              <label>Target Port</label>
+              <input type="text" value={selectedConn.toPort} disabled />
+            </div>
+            <div className="property-row">
+              <label>Name</label>
+              <input type="text" name="name" value={selectedConn.name || ''} onChange={handleConnChange} />
+            </div>
+            <div className="property-row">
+              <label>Direction</label>
+              <select name="direction" value={selectedConn.direction || 'none'} onChange={handleConnChange}>
+                <option value="none">None</option>
+                <option value="forward">Forward</option>
+                <option value="backward">Backward</option>
+                <option value="bidirectional">Bidirectional</option>
+              </select>
+            </div>
+            <div className="property-row">
+              <label>Visible</label>
+              <input type="checkbox" name="visible" checked={selectedConn.visible !== false} onChange={handleConnChange} />
+            </div>
+            <div className="property-row">
+              <label>Locked</label>
+              <input type="checkbox" name="locked" checked={selectedConn.locked === true} onChange={handleConnChange} />
+            </div>
+          </div>
+          <div className="property-group">
+            <div className="property-group-title">Preview</div>
+            <div className="property-row">
+              <label>State</label>
+              <select name="editor.preview_state" value={selectedConn.editor?.preview_state || ''} onChange={handleConnChange}>
+                <option value="DEENERGIZED">Deenergized / No Flow</option>
+                <option value="ENERGIZED">Energized (Elec)</option>
+                <option value="FLOW">Flow (Water/HVAC)</option>
+                <option value="FAULT">Fault</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Object Property Inspector Below
+  if (!selectedObj) return null;
 
   return (
     <div className="property-inspector">
@@ -146,6 +268,23 @@ export const PropertyInspector: React.FC = () => {
             <input type="text" name="tooltip" value={selectedObj.tooltip || ''} onChange={handleChange} />
           </div>
         </div>
+
+        {selectedObj.category === 'HVAC' && (
+          <div className="property-group">
+            <div className="property-group-title">HVAC</div>
+            <div className="property-row">
+              <label>Shape</label>
+              <select name="hvac.shape" value={selectedObj.hvac?.shape || 'RECTANGULAR'} onChange={handleHvacChange}>
+                <option value="RECTANGULAR">Rectangular</option>
+                <option value="ROUND">Round</option>
+              </select>
+            </div>
+            <div className="property-row">
+              <label>Diameter/Size</label>
+              <input type="number" name="hvac.diameter" value={selectedObj.hvac?.diameter || 100} onChange={handleHvacChange} />
+            </div>
+          </div>
+        )}
 
         <div className="property-group">
           <div className="property-group-title">Editor Preview</div>

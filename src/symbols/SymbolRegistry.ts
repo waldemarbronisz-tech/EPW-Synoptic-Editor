@@ -331,6 +331,56 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
   },
 
   // HVAC
+  'hvac.duct': {
+    type: 'hvac.duct',
+    label: 'Duct',
+    category: 'HVAC',
+    defaultWidth: 100,
+    defaultHeight: 40,
+    allowedStates: ['INACTIVE', 'FLOW', 'FAULT'],
+    defaultState: 'INACTIVE',
+    isLine: true
+  },
+  'hvac.duct_elbow': {
+    type: 'hvac.duct_elbow',
+    label: 'Duct Elbow',
+    category: 'HVAC',
+    defaultWidth: 60,
+    defaultHeight: 60,
+    allowedStates: ['INACTIVE', 'FLOW', 'FAULT'],
+    defaultState: 'INACTIVE',
+    isLine: true
+  },
+  'hvac.duct_tee': {
+    type: 'hvac.duct_tee',
+    label: 'Duct Tee',
+    category: 'HVAC',
+    defaultWidth: 100,
+    defaultHeight: 60,
+    allowedStates: ['INACTIVE', 'FLOW', 'FAULT'],
+    defaultState: 'INACTIVE',
+    isLine: true
+  },
+  'hvac.reducer': {
+    type: 'hvac.reducer',
+    label: 'Reducer',
+    category: 'HVAC',
+    defaultWidth: 60,
+    defaultHeight: 40,
+    allowedStates: ['NORMAL', 'FAULT'],
+    defaultState: 'NORMAL',
+    isLine: true
+  },
+  'hvac.damper': {
+    type: 'hvac.damper',
+    label: 'Damper',
+    category: 'HVAC',
+    defaultWidth: 60,
+    defaultHeight: 60,
+    allowedStates: ['CLOSED', 'OPEN', 'FAULT'],
+    defaultState: 'CLOSED',
+    connectionPoints: [{id: 'IN', x: 0, y: 0.5}, {id: 'OUT', x: 1, y: 0.5}]
+  },
   'hvac.fan': {
     type: 'hvac.fan',
     label: 'Fan',
