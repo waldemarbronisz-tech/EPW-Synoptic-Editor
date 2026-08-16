@@ -7,15 +7,47 @@ import { ContactorSymbol } from './electrical/ContactorSymbol';
 import { TransformerSymbol } from './electrical/TransformerSymbol';
 import { BusbarSymbol } from './electrical/BusbarSymbol';
 import { IndicatorLampSymbol } from './electrical/IndicatorLampSymbol';
+import { GeneratorSymbol } from './electrical/GeneratorSymbol';
+import { FuseSymbol } from './electrical/FuseSymbol';
+import { RelaySymbol } from './electrical/RelaySymbol';
+import { MotorSymbol } from './electrical/MotorSymbol';
+import { TerminalSymbol } from './electrical/TerminalSymbol';
+import { CableSymbol } from './electrical/CableSymbol';
+import { CableTraySymbol } from './electrical/CableTraySymbol';
+import { EarthSymbol } from './electrical/EarthSymbol';
+import { ACWireSymbol } from './electrical/ACWireSymbol';
+import { ThreePhaseLineSymbol } from './electrical/ThreePhaseLineSymbol';
+import { GridSourceSymbol } from './electrical/GridSourceSymbol';
+import { RCDSymbol } from './electrical/RCDSymbol';
+import { SPDSymbol } from './electrical/SPDSymbol';
+import { GenericLoadSymbol } from './electrical/GenericLoadSymbol';
 import { PipeSymbol } from './water/PipeSymbol';
 import { PipeElbowSymbol } from './water/PipeElbowSymbol';
 import { TeeSymbol } from './water/TeeSymbol';
 import { ValveSymbol } from './water/ValveSymbol';
+import { GateValveSymbol } from './water/GateValveSymbol';
+import { BallValveSymbol } from './water/BallValveSymbol';
+import { DrainSymbol } from './water/DrainSymbol';
+import { SolenoidValveSymbol } from './water/SolenoidValveSymbol';
+import { DrainValveSymbol } from './water/DrainValveSymbol';
 import { PumpSymbol } from './water/PumpSymbol';
 import { TankSymbol } from './water/TankSymbol';
 import { MeasurementDisplaySymbol } from './measurements/MeasurementDisplaySymbol';
+import { VoltageDisplaySymbol, CurrentDisplaySymbol, TemperatureDisplaySymbol } from './measurements/SpecificDisplaySymbols';
 import { FanSymbol } from './hvac/FanSymbol';
-import { TemperatureSensorSymbol } from './sensors/TemperatureSensorSymbol';
+import { HeaterSymbol } from './hvac/HeaterSymbol';
+import { TemperatureSensorSymbol } from './instrumentation/TemperatureSensorSymbol';
+import { PressureSensorSymbol } from './instrumentation/PressureSensorSymbol';
+import { LevelSensorSymbol } from './instrumentation/LevelSensorSymbol';
+import { HumiditySensorSymbol } from './instrumentation/HumiditySensorSymbol';
+import { LeakSensorSymbol } from './instrumentation/LeakSensorSymbol';
+import { PLCSymbol } from './automation/PLCSymbol';
+import { RemoteIOSymbol } from './automation/RemoteIOSymbol';
+import { ELAInputsSymbol } from './automation/ELAInputsSymbol';
+import { ADAOutputsSymbol } from './automation/ADAOutputsSymbol';
+import { EPWCoreSymbol } from './automation/EPWCoreSymbol';
+import { EPMSymbol } from './automation/EPMSymbol';
+import { PSU24VSymbol } from './automation/PSU24VSymbol';
 
 export interface SymbolProps {
   obj: SynopticObject;
@@ -75,6 +107,34 @@ export const SymbolRenderer: React.FC<{ obj: SynopticObject }> = ({ obj }) => {
       return <BusbarSymbol obj={obj} state={state} />;
     case 'electrical.indicator_lamp':
       return <IndicatorLampSymbol obj={obj} state={state} />;
+    case 'electrical.generator':
+      return <GeneratorSymbol obj={obj} state={state} />;
+    case 'electrical.grid_source':
+      return <GridSourceSymbol obj={obj} state={state} />;
+    case 'electrical.fuse':
+      return <FuseSymbol obj={obj} state={state} />;
+    case 'electrical.rcd':
+      return <RCDSymbol obj={obj} state={state} />;
+    case 'electrical.spd':
+      return <SPDSymbol obj={obj} state={state} />;
+    case 'electrical.generic_load':
+      return <GenericLoadSymbol obj={obj} state={state} />;
+    case 'electrical.relay':
+      return <RelaySymbol obj={obj} state={state} />;
+    case 'electrical.motor':
+      return <MotorSymbol obj={obj} state={state} />;
+    case 'electrical.terminal':
+      return <TerminalSymbol obj={obj} state={state} />;
+    case 'electrical.cable':
+      return <CableSymbol obj={obj} state={state} />;
+    case 'electrical.ac_wire':
+      return <ACWireSymbol obj={obj} state={state} />;
+    case 'electrical.three_phase_line':
+      return <ThreePhaseLineSymbol obj={obj} state={state} />;
+    case 'electrical.cable_tray':
+      return <CableTraySymbol obj={obj} state={state} />;
+    case 'electrical.earth':
+      return <EarthSymbol obj={obj} state={state} />;
     case 'water.pipe':
       return <PipeSymbol obj={obj} state={state} />;
     case 'water.pipe_elbow':
@@ -83,16 +143,56 @@ export const SymbolRenderer: React.FC<{ obj: SynopticObject }> = ({ obj }) => {
       return <TeeSymbol obj={obj} state={state} />;
     case 'water.valve':
       return <ValveSymbol obj={obj} state={state} />;
+    case 'water.gate_valve':
+      return <GateValveSymbol obj={obj} state={state} />;
+    case 'water.ball_valve':
+      return <BallValveSymbol obj={obj} state={state} />;
+    case 'water.drain':
+      return <DrainSymbol obj={obj} state={state} />;
+    case 'water.solenoid_valve':
+      return <SolenoidValveSymbol obj={obj} state={state} />;
+    case 'water.drain_valve':
+      return <DrainValveSymbol obj={obj} state={state} />;
     case 'water.pump':
       return <PumpSymbol obj={obj} state={state} />;
     case 'water.tank':
       return <TankSymbol obj={obj} state={state} />;
     case 'measurements.generic_display':
       return <MeasurementDisplaySymbol obj={obj} state={state} />;
+    case 'measurements.voltage_display':
+      return <VoltageDisplaySymbol obj={obj} state={state} />;
+    case 'measurements.current_display':
+      return <CurrentDisplaySymbol obj={obj} state={state} />;
+    case 'measurements.temperature_display':
+      return <TemperatureDisplaySymbol obj={obj} state={state} />;
     case 'hvac.fan':
       return <FanSymbol obj={obj} state={state} />;
-    case 'sensors.temperature':
+    case 'hvac.heater':
+      return <HeaterSymbol obj={obj} state={state} />;
+    case 'instrumentation.temperature_sensor':
       return <TemperatureSensorSymbol obj={obj} state={state} />;
+    case 'instrumentation.pressure_sensor':
+      return <PressureSensorSymbol obj={obj} state={state} />;
+    case 'instrumentation.level_sensor':
+      return <LevelSensorSymbol obj={obj} state={state} />;
+    case 'instrumentation.humidity_sensor':
+      return <HumiditySensorSymbol obj={obj} state={state} />;
+    case 'instrumentation.leak_sensor':
+      return <LeakSensorSymbol obj={obj} state={state} />;
+    case 'automation.plc':
+      return <PLCSymbol obj={obj} state={state} />;
+    case 'automation.remote_io':
+      return <RemoteIOSymbol obj={obj} state={state} />;
+    case 'automation.ela_inputs':
+      return <ELAInputsSymbol obj={obj} state={state} />;
+    case 'automation.ada_outputs':
+      return <ADAOutputsSymbol obj={obj} state={state} />;
+    case 'automation.epw_core':
+      return <EPWCoreSymbol obj={obj} state={state} />;
+    case 'automation.epm':
+      return <EPMSymbol obj={obj} state={state} />;
+    case 'automation.psu_24v':
+      return <PSU24VSymbol obj={obj} state={state} />;
     default:
       return <GenericSymbol obj={obj} state={state} />;
   }

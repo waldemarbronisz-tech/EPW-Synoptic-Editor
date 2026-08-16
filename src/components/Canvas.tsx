@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Stage, Layer, Rect, Group, Transformer } from 'react-konva';
+import { Stage, Layer, Rect, Circle, Group, Transformer } from 'react-konva';
 import { useStore } from '../store';
 import type { SynopticObject } from '../store';
 import { SymbolRenderer } from '../symbols/SymbolRenderer';
@@ -22,6 +22,8 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange }: {
       trRef.current.getLayer().batchDraw();
     }
   }, [isSelected]);
+
+  const def = getSymbolDefinition(obj.type);
 
   return (
     <React.Fragment>
@@ -63,6 +65,30 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange }: {
         }}
       >
         <SymbolRenderer obj={obj} />
+
+        {/* Render Connection Points if Selected */}
+        {isSelected && def?.connectionPoints?.map((cp, idx) => (
+           <Circle
+             key={`cp-${idx}`}
+             x={cp.x * obj.width}
+             y={cp.y * obj.height}
+             radius={4}
+             fill="#3498db"
+             stroke="#2980b9"
+             strokeWidth={1}
+             shadowColor="rgba(0,0,0,0.5)"
+             shadowBlur={2}
+             hitStrokeWidth={10}
+             onMouseEnter={(e: any) => {
+                const container = e.target.getStage()?.container();
+                if (container) container.style.cursor = 'crosshair';
+             }}
+             onMouseLeave={(e: any) => {
+                const container = e.target.getStage()?.container();
+                if (container) container.style.cursor = 'default';
+             }}
+           />
+        ))}
       </Group>
       {isSelected && !obj.locked && (
         <Transformer
