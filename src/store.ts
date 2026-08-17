@@ -32,6 +32,9 @@ export interface SynopticObject {
     command?: string;
     alarm?: string;
   };
+  labelPosition?: 'TOP' | 'BOTTOM' | 'LEFT' | 'RIGHT';
+  showDesignation?: boolean;
+  showName?: boolean;
   hvac?: {
     shape: 'ROUND' | 'RECTANGULAR';
     diameter?: number;

@@ -69,18 +69,57 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick }: {
         <SymbolRenderer obj={obj} />
 
         {/* Render Designation/Name Label */}
-        {(!obj.type.startsWith('graphics.') && !obj.type.startsWith('measurements.') && !def?.isLine) && (
-          <Text
-            x={0}
-            y={obj.height + 5}
-            width={obj.width}
-            text={obj.designation || obj.name || obj.tag}
-            align="center"
-            fontSize={12}
-            fontFamily="monospace"
-            fill="#2c3e50"
-          />
-        )}
+        {(!obj.type.startsWith('graphics.') && !obj.type.startsWith('measurements.') && !def?.isLine) && (() => {
+          const showDesignation = obj.showDesignation !== false;
+          const showName = obj.showName !== false;
+
+          let labelLines = [];
+          if (showDesignation && obj.designation) labelLines.push(obj.designation);
+          if (showName && obj.name) labelLines.push(obj.name);
+
+          if (labelLines.length === 0) return null;
+
+          const labelText = labelLines.join(' / ');
+          const pos = obj.labelPosition || 'RIGHT';
+
+          let textX = 0;
+          let textY = 0;
+          let align: any = 'center';
+          let verticalAlign: any = 'top';
+          const padding = 10;
+
+          if (pos === 'TOP') {
+            textX = 0;
+            textY = -20 - padding;
+            align = 'center';
+          } else if (pos === 'BOTTOM') {
+            textX = 0;
+            textY = obj.height + padding;
+            align = 'center';
+          } else if (pos === 'LEFT') {
+            textX = -150 - padding;
+            textY = obj.height / 2 - 6;
+            align = 'right';
+          } else if (pos === 'RIGHT') {
+            textX = obj.width + padding;
+            textY = obj.height / 2 - 6;
+            align = 'left';
+          }
+
+          return (
+            <Text
+              x={textX}
+              y={textY}
+              width={pos === 'LEFT' || pos === 'RIGHT' ? 150 : obj.width}
+              text={labelText}
+              align={align}
+              verticalAlign={verticalAlign}
+              fontSize={12}
+              fontFamily="monospace"
+              fill="#2c3e50"
+            />
+          );
+        })()}
 
         {/* Render Connection Points if Selected */}
         {isSelected && def?.connectionPoints?.map((cp, idx) => (

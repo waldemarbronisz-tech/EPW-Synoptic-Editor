@@ -245,6 +245,23 @@ export const PropertyInspector: React.FC = () => {
         <div className="property-group">
           <div className="property-group-title">Appearance</div>
           <div className="property-row">
+            <label>Show Designation</label>
+            <input type="checkbox" name="showDesignation" checked={selectedObj.showDesignation !== false} onChange={handleChange} />
+          </div>
+          <div className="property-row">
+            <label>Show Name</label>
+            <input type="checkbox" name="showName" checked={selectedObj.showName !== false} onChange={handleChange} />
+          </div>
+          <div className="property-row">
+            <label>Label Position</label>
+            <select name="labelPosition" value={selectedObj.labelPosition || 'RIGHT'} onChange={handleChange}>
+              <option value="TOP">Top</option>
+              <option value="BOTTOM">Bottom</option>
+              <option value="LEFT">Left</option>
+              <option value="RIGHT">Right</option>
+            </select>
+          </div>
+          <div className="property-row">
             <label>Fill</label>
             <input type="color" name="fill" value={selectedObj.fill || '#ffffff'} onChange={handleChange} />
           </div>
