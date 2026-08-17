@@ -6,7 +6,7 @@ export const ContactorSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
   const w = obj.width;
   const h = obj.height;
 
-  const isOn = state === 'ON';
+  const isOn = state === 'CLOSED' || state === 'ON';
   const isFault = state === 'FAULT';
 
   return (

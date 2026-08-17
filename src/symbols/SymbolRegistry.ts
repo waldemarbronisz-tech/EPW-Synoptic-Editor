@@ -26,7 +26,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 40,
     allowedStates: ['OPEN', 'CLOSED', 'TRIPPED', 'FAULT'],
     defaultState: 'OPEN',
-    connectionPoints: [{id: 'IN', x: 0.5, y: 0}, {id: 'OUT', x: 0.5, y: 1}]
+    connectionPoints: [{id: 'TOP', x: 0.5, y: 0}, {id: 'BOTTOM', x: 0.5, y: 1}]
   },
   'electrical.disconnect_switch': {
     type: 'electrical.disconnect_switch',
@@ -36,7 +36,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 40,
     allowedStates: ['OPEN', 'CLOSED', 'FAULT'],
     defaultState: 'OPEN',
-    connectionPoints: [{id: 'IN', x: 0.5, y: 0}, {id: 'OUT', x: 0.5, y: 1}]
+    connectionPoints: [{id: 'TOP', x: 0.5, y: 0}, {id: 'BOTTOM', x: 0.5, y: 1}]
   },
   'electrical.contactor': {
     type: 'electrical.contactor',
@@ -44,8 +44,8 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     category: 'Electrical',
     defaultWidth: 40,
     defaultHeight: 40,
-    allowedStates: ['OFF', 'ON', 'FAULT'],
-    defaultState: 'OFF',
+    allowedStates: ['OPEN', 'CLOSED', 'FAULT'],
+    defaultState: 'OPEN',
     connectionPoints: [{id: 'IN', x: 0.5, y: 0}, {id: 'OUT', x: 0.5, y: 1}, {id: 'COIL', x: 0.8, y: 0.8}]
   },
   'electrical.transformer': {
@@ -56,7 +56,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 60,
     allowedStates: ['NORMAL', 'ENERGIZED', 'FAULT'],
     defaultState: 'NORMAL',
-    connectionPoints: [{id: 'PRIMARY', x: 0.5, y: 0}, {id: 'SECONDARY', x: 0.5, y: 1}]
+    connectionPoints: [{id: 'PRIMARY_1', x: 0.3, y: 0}, {id: 'PRIMARY_2', x: 0.7, y: 0}, {id: 'SECONDARY_1', x: 0.3, y: 1}, {id: 'SECONDARY_2', x: 0.7, y: 1}]
   },
   'electrical.relay': {
     type: 'electrical.relay',
@@ -76,7 +76,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 40,
     allowedStates: ['NORMAL', 'BLOWN'],
     defaultState: 'NORMAL',
-    connectionPoints: [{id: 'IN', x: 0.5, y: 0}, {id: 'OUT', x: 0.5, y: 1}]
+    connectionPoints: [{id: 'TOP', x: 0.5, y: 0}, {id: 'BOTTOM', x: 0.5, y: 1}]
   },
   'electrical.busbar': {
     type: 'electrical.busbar',
@@ -126,7 +126,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 60,
     allowedStates: ['OFF', 'RUNNING', 'FAULT'],
     defaultState: 'OFF',
-    connectionPoints: [{id: 'IN', x: 0.5, y: 0}]
+    connectionPoints: [{id: 'POWER', x: 0.5, y: 0}]
   },
   'electrical.generic_load': {
     type: 'electrical.generic_load',
@@ -339,6 +339,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 40,
     allowedStates: ['INACTIVE', 'FLOW', 'FAULT'],
     defaultState: 'INACTIVE',
+    connectionPoints: [{id: 'IN', x: 0, y: 0.5}, {id: 'OUT', x: 1, y: 0.5}],
     isLine: true
   },
   'hvac.duct_elbow': {
@@ -349,6 +350,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 60,
     allowedStates: ['INACTIVE', 'FLOW', 'FAULT'],
     defaultState: 'INACTIVE',
+    connectionPoints: [{id: 'IN', x: 0.5, y: 1}, {id: 'OUT', x: 1, y: 0.5}],
     isLine: true
   },
   'hvac.duct_tee': {
@@ -359,6 +361,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 60,
     allowedStates: ['INACTIVE', 'FLOW', 'FAULT'],
     defaultState: 'INACTIVE',
+    connectionPoints: [{id: 'IN', x: 0, y: 0.5}, {id: 'OUT_1', x: 1, y: 0.5}, {id: 'OUT_2', x: 0.5, y: 1}],
     isLine: true
   },
   'hvac.reducer': {
@@ -369,6 +372,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 40,
     allowedStates: ['NORMAL', 'FAULT'],
     defaultState: 'NORMAL',
+    connectionPoints: [{id: 'IN', x: 0, y: 0.5}, {id: 'OUT', x: 1, y: 0.5}],
     isLine: true
   },
   'hvac.damper': {
@@ -388,7 +392,8 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultWidth: 50,
     defaultHeight: 50,
     allowedStates: ['OFF', 'RUNNING', 'FAULT'],
-    defaultState: 'OFF'
+    defaultState: 'OFF',
+    connectionPoints: [{id: 'IN', x: 0, y: 0.5}, {id: 'OUT', x: 1, y: 0.5}]
   },
   'hvac.heater': {
     type: 'hvac.heater',
@@ -397,7 +402,18 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultWidth: 80,
     defaultHeight: 40,
     allowedStates: ['OFF', 'HEATING', 'FAULT'],
-    defaultState: 'OFF'
+    defaultState: 'OFF',
+    connectionPoints: [{id: 'IN', x: 0, y: 0.5}, {id: 'OUT', x: 1, y: 0.5}]
+  },
+  'hvac.vent': {
+    type: 'hvac.vent',
+    label: 'Vent / Grille',
+    category: 'HVAC',
+    defaultWidth: 40,
+    defaultHeight: 40,
+    allowedStates: ['NORMAL', 'FAULT'],
+    defaultState: 'NORMAL',
+    connectionPoints: [{id: 'IN', x: 0.5, y: 0}]
   },
 
   // Instrumentation (Sensors & Displays)
@@ -474,7 +490,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 80,
     allowedStates: ['NORMAL', 'FAULT'],
     defaultState: 'NORMAL',
-    connectionPoints: [{id: 'POWER', x: 0.2, y: 0}, {id: 'RS485', x: 0.8, y: 0}]
+    connectionPoints: [{id: 'POWER', x: 0.2, y: 0}, {id: 'RS485', x: 0.5, y: 0}, {id: 'DI_GROUP', x: 0.8, y: 0}, {id: 'AI_GROUP', x: 0.5, y: 1}]
   },
   'automation.ada_outputs': {
     type: 'automation.ada_outputs',
@@ -484,7 +500,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 80,
     allowedStates: ['NORMAL', 'FAULT'],
     defaultState: 'NORMAL',
-    connectionPoints: [{id: 'POWER', x: 0.2, y: 0}, {id: 'RS485', x: 0.8, y: 0}]
+    connectionPoints: [{id: 'POWER', x: 0.2, y: 0}, {id: 'RS485', x: 0.5, y: 0}, {id: 'DO_GROUP', x: 0.8, y: 0}]
   },
   'automation.epw_core': {
     type: 'automation.epw_core',
@@ -494,7 +510,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 80,
     allowedStates: ['OFF', 'RUNNING', 'FAULT'],
     defaultState: 'RUNNING',
-    connectionPoints: [{id: 'POWER', x: 0.2, y: 0}, {id: 'ETH', x: 0.8, y: 0}]
+    connectionPoints: [{id: 'POWER', x: 0.2, y: 0}, {id: 'ETHERNET', x: 0.5, y: 0}, {id: 'RS485', x: 0.8, y: 0}]
   },
   'automation.epm': {
     type: 'automation.epm',
@@ -503,7 +519,8 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultWidth: 60,
     defaultHeight: 80,
     allowedStates: ['OFF', 'RUNNING', 'FAULT'],
-    defaultState: 'RUNNING'
+    defaultState: 'RUNNING',
+    connectionPoints: [{id: 'POWER', x: 0.2, y: 0}, {id: 'RS485', x: 0.5, y: 0}, {id: 'VOLTAGE_INPUTS', x: 0.2, y: 1}, {id: 'CURRENT_INPUTS', x: 0.8, y: 1}]
   },
   'automation.psu_24v': {
     type: 'automation.psu_24v',
@@ -513,7 +530,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 80,
     allowedStates: ['OFF', 'ON', 'FAULT'],
     defaultState: 'ON',
-    connectionPoints: [{id: 'AC_IN', x: 0.5, y: 0}, {id: 'DC_OUT', x: 0.5, y: 1}]
+    connectionPoints: [{id: 'AC_IN', x: 0.5, y: 0}, {id: 'DC_PLUS', x: 0.3, y: 1}, {id: 'DC_MINUS', x: 0.7, y: 1}]
   },
 
   // Measurements

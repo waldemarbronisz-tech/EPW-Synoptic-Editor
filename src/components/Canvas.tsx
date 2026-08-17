@@ -405,18 +405,42 @@ export const Canvas: React.FC = () => {
   const handlePortClick = (objId: string, portId: string) => {
     if (!isDrawingConnection) return;
 
+    const obj = objects.find(o => o.id === objId);
+    if (!obj) return;
+
+    // Quick compat check
+    const isWater = obj.category === 'Water' || obj.type.startsWith('water.');
+    const isHvac = obj.category === 'HVAC' || obj.type.startsWith('hvac.');
+    const isElec = obj.category === 'Electrical' || obj.category === 'Automation';
+
+    if (drawingConnectionType === 'water' && !isWater) {
+      useStore.getState().addMessage(`[ERROR] Cannot connect water to ${obj.category}`);
+      return;
+    }
+    if (drawingConnectionType === 'hvac_air' && !isHvac) {
+      useStore.getState().addMessage(`[ERROR] Cannot connect HVAC to ${obj.category}`);
+      return;
+    }
+    if (drawingConnectionType === 'electrical_ac' && !isElec && !isHvac && !isWater) { // Hvac and Water might have electrical connections in real world, but let's be strict or just warn
+      // Not strictly blocking all, but simple check
+    }
+
     if (!drawStartPort) {
       setDrawStartPort({ objId, portId });
       useStore.getState().addMessage(`[INFO] Connection started from ${objId}:${portId}`);
     } else {
       if (drawStartPort.objId !== objId) {
+        let defState = 'DEENERGIZED';
+        if (drawingConnectionType === 'water' || drawingConnectionType === 'hvac_air') {
+          defState = 'NO_FLOW';
+        }
         addConnection({
           fromId: drawStartPort.objId,
           fromPort: drawStartPort.portId,
           toId: objId,
           toPort: portId,
           type: drawingConnectionType,
-          editor: { preview_state: 'DEENERGIZED' } // Default state
+          editor: { preview_state: defState }
         });
         useStore.getState().addMessage(`[INFO] Connection created`);
       }

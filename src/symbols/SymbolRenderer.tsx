@@ -42,6 +42,7 @@ import { DuctElbowSymbol } from './hvac/DuctElbowSymbol';
 import { DuctTeeSymbol } from './hvac/DuctTeeSymbol';
 import { ReducerSymbol } from './hvac/ReducerSymbol';
 import { DamperSymbol } from './hvac/DamperSymbol';
+import { VentSymbol } from './hvac/VentSymbol';
 import { PressureSensorSymbol } from './instrumentation/PressureSensorSymbol';
 import { LevelSensorSymbol } from './instrumentation/LevelSensorSymbol';
 import { HumiditySensorSymbol } from './instrumentation/HumiditySensorSymbol';
@@ -179,6 +180,7 @@ export const SymbolRenderer: React.FC<{ obj: SynopticObject }> = ({ obj }) => {
       return <FanSymbol obj={obj} state={state} />;
     case 'hvac.heater':
       return <HeaterSymbol obj={obj} state={state} />;
+    case 'hvac.vent': return <VentSymbol obj={obj} state={state} />;
     case 'instrumentation.temperature_sensor':
       return <TemperatureSensorSymbol obj={obj} state={state} />;
     case 'instrumentation.pressure_sensor':

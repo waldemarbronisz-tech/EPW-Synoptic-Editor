@@ -165,7 +165,8 @@ export const PropertyInspector: React.FC = () => {
             <div className="property-row">
               <label>State</label>
               <select name="editor.preview_state" value={selectedConn.editor?.preview_state || ''} onChange={handleConnChange}>
-                <option value="DEENERGIZED">Deenergized / No Flow</option>
+                <option value="DEENERGIZED">Deenergized</option>
+                <option value="NO_FLOW">No Flow</option>
                 <option value="ENERGIZED">Energized (Elec)</option>
                 <option value="FLOW">Flow (Water/HVAC)</option>
                 <option value="FAULT">Fault</option>
