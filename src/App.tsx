@@ -17,25 +17,6 @@ function App() {
     document.title = `EPW Synoptic Editor — ${titleName}${dirtyMark}`;
   }, [projectName, fileName, isDirty]);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't intercept if user is typing in an input or textarea
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
-        return;
-      }
-
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        const { selectedIds, selectedConnectionIds, deleteObjects } = useStore.getState();
-        if (selectedIds.length > 0 || selectedConnectionIds.length > 0) {
-          deleteObjects(selectedIds, selectedConnectionIds);
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
   return (
     <div className="app-container">
       <MenuBar />

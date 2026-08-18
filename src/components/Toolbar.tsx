@@ -12,25 +12,11 @@ export const Toolbar: React.FC = () => {
     undo, redo, copySelected, paste, deleteObjects, selectedIds, selectedConnectionIds,
     bringToFront, sendToBack, alignSelected, distributeSelected,
     lockSelected, unlockSelected, rotateSelected,
-    isDrawingConnection, drawingConnectionType, setDrawingMode,
-    viewMode, setViewMode
+    isDrawingConnection, drawingConnectionType, setDrawingMode
   } = useStore();
 
   return (
     <div className="toolbar">
-      <div className="toolbar-group">
-        <select
-          value={viewMode}
-          onChange={(e) => setViewMode(e.target.value as any)}
-          style={{ fontSize: 12, padding: '2px 4px', fontFamily: 'monospace' }}
-        >
-          <option value="ENGINEERING">Engineering Mode</option>
-          <option value="SCADA">SCADA / Runtime</option>
-        </select>
-      </div>
-
-      <div className="toolbar-divider" />
-
       <div className="toolbar-group">
         <button title="Undo" onClick={undo}><Undo size={16} /></button>
         <button title="Redo" onClick={redo}><Redo size={16} /></button>

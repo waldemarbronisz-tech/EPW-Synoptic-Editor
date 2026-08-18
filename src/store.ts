@@ -32,15 +32,6 @@ export interface SynopticObject {
     command?: string;
     alarm?: string;
   };
-  labelPosition?: 'TOP' | 'BOTTOM' | 'LEFT' | 'RIGHT';
-  showDesignation?: boolean;
-  showName?: boolean;
-  labelOffsetX?: number;
-  labelOffsetY?: number;
-  hvac?: {
-    shape: 'ROUND' | 'RECTANGULAR';
-    diameter?: number;
-  };
   editor?: {
     preview_state?: string;
     preview_value?: string;
@@ -60,6 +51,11 @@ export interface SynopticObject {
   height: number;
 
   customProperties: Record<string, string>;
+  showDesignation?: boolean;
+  showName?: boolean;
+  labelPosition?: 'TOP' | 'BOTTOM' | 'LEFT' | 'RIGHT';
+  labelOffsetX?: number;
+  labelOffsetY?: number;
 }
 
 export interface CanvasState {
@@ -75,10 +71,6 @@ export interface SynopticConnection {
   toId: string;
   toPort: string;
   type: string; // e.g. electrical_ac, water, hvac_air
-  name?: string;
-  direction?: string;
-  visible?: boolean;
-  locked?: boolean;
   editor?: {
     preview_state?: string;
   };
@@ -112,9 +104,6 @@ interface AppState {
   isDrawingConnection: boolean;
   drawingConnectionType: string;
   setDrawingMode: (active: boolean, type?: string) => void;
-
-  viewMode: 'ENGINEERING' | 'SCADA';
-  setViewMode: (mode: 'ENGINEERING' | 'SCADA') => void;
 
   // Actions
   setProjectName: (name: string) => void;
@@ -176,14 +165,11 @@ export const useStore = create<AppState>((set, get) => ({
   messages: [],
   isDrawingConnection: false,
   drawingConnectionType: 'electrical_ac',
-  viewMode: 'ENGINEERING',
 
   setDrawingMode: (active, type) => set((state) => ({
     isDrawingConnection: active,
     drawingConnectionType: type || state.drawingConnectionType
   })),
-
-  setViewMode: (mode) => set({ viewMode: mode }),
 
   setProjectName: (name) => set({ projectName: name, isDirty: true }),
   setFileName: (name) => set({ fileName: name }),

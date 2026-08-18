@@ -55,38 +55,18 @@ export const PropertyInspector: React.FC = () => {
 
   const handleConnChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     if (!selectedConn) return;
-    const { name, value, type } = e.target;
-    let finalValue: any = value;
-    if (type === 'checkbox') {
-      finalValue = (e.target as HTMLInputElement).checked;
-    }
-
+    const { name, value } = e.target;
     if (name.startsWith('editor.')) {
       const key = name.split('.')[1];
       updateConnection(selectedConn.id, {
         editor: {
           ...selectedConn.editor,
-          [key]: finalValue
+          [key]: value
         }
       });
     } else {
-      updateConnection(selectedConn.id, { [name]: finalValue });
+      updateConnection(selectedConn.id, { [name]: value });
     }
-  };
-
-  const handleHvacChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
-    if (!selectedObj) return;
-    const { name, value, type } = e.target;
-    let finalValue: any = value;
-    if (type === 'number') finalValue = parseFloat(value);
-
-    const key = name.replace('hvac.', '');
-    updateObject(selectedObj.id, {
-      hvac: {
-        ...(selectedObj.hvac || { shape: 'RECTANGULAR' }),
-        [key]: finalValue
-      }
-    });
   };
 
   const handleCustomPropertyChange = (key: string, value: string) => {
@@ -138,35 +118,13 @@ export const PropertyInspector: React.FC = () => {
               <label>Target Port</label>
               <input type="text" value={selectedConn.toPort} disabled />
             </div>
-            <div className="property-row">
-              <label>Name</label>
-              <input type="text" name="name" value={selectedConn.name || ''} onChange={handleConnChange} />
-            </div>
-            <div className="property-row">
-              <label>Direction</label>
-              <select name="direction" value={selectedConn.direction || 'none'} onChange={handleConnChange}>
-                <option value="none">None</option>
-                <option value="forward">Forward</option>
-                <option value="backward">Backward</option>
-                <option value="bidirectional">Bidirectional</option>
-              </select>
-            </div>
-            <div className="property-row">
-              <label>Visible</label>
-              <input type="checkbox" name="visible" checked={selectedConn.visible !== false} onChange={handleConnChange} />
-            </div>
-            <div className="property-row">
-              <label>Locked</label>
-              <input type="checkbox" name="locked" checked={selectedConn.locked === true} onChange={handleConnChange} />
-            </div>
           </div>
           <div className="property-group">
             <div className="property-group-title">Preview</div>
             <div className="property-row">
               <label>State</label>
               <select name="editor.preview_state" value={selectedConn.editor?.preview_state || ''} onChange={handleConnChange}>
-                <option value="DEENERGIZED">Deenergized</option>
-                <option value="NO_FLOW">No Flow</option>
+                <option value="DEENERGIZED">Deenergized / No Flow</option>
                 <option value="ENERGIZED">Energized (Elec)</option>
                 <option value="FLOW">Flow (Water/HVAC)</option>
                 <option value="FAULT">Fault</option>
@@ -245,23 +203,6 @@ export const PropertyInspector: React.FC = () => {
         <div className="property-group">
           <div className="property-group-title">Appearance</div>
           <div className="property-row">
-            <label>Show Designation</label>
-            <input type="checkbox" name="showDesignation" checked={selectedObj.showDesignation !== false} onChange={handleChange} />
-          </div>
-          <div className="property-row">
-            <label>Show Name</label>
-            <input type="checkbox" name="showName" checked={selectedObj.showName !== false} onChange={handleChange} />
-          </div>
-          <div className="property-row">
-            <label>Label Position</label>
-            <select name="labelPosition" value={selectedObj.labelPosition || 'RIGHT'} onChange={handleChange}>
-              <option value="TOP">Top</option>
-              <option value="BOTTOM">Bottom</option>
-              <option value="LEFT">Left</option>
-              <option value="RIGHT">Right</option>
-            </select>
-          </div>
-          <div className="property-row">
             <label>Fill</label>
             <input type="color" name="fill" value={selectedObj.fill || '#ffffff'} onChange={handleChange} />
           </div>
@@ -286,23 +227,6 @@ export const PropertyInspector: React.FC = () => {
             <input type="text" name="tooltip" value={selectedObj.tooltip || ''} onChange={handleChange} />
           </div>
         </div>
-
-        {selectedObj.category === 'HVAC' && (
-          <div className="property-group">
-            <div className="property-group-title">HVAC</div>
-            <div className="property-row">
-              <label>Shape</label>
-              <select name="hvac.shape" value={selectedObj.hvac?.shape || 'RECTANGULAR'} onChange={handleHvacChange}>
-                <option value="RECTANGULAR">Rectangular</option>
-                <option value="ROUND">Round</option>
-              </select>
-            </div>
-            <div className="property-row">
-              <label>Diameter/Size</label>
-              <input type="number" name="hvac.diameter" value={selectedObj.hvac?.diameter || 100} onChange={handleHvacChange} />
-            </div>
-          </div>
-        )}
 
         <div className="property-group">
           <div className="property-group-title">Editor Preview</div>

@@ -31,8 +31,28 @@ const getAbsolutePortCoords = (obj: SynopticObject, portX: number, portY: number
 
 // Simple orthogonal router
 const calculateOrthogonalPath = (x1: number, y1: number, x2: number, y2: number) => {
-  const midY = y1 + (y2 - y1) / 2;
-  return `M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`;
+  const dx = Math.abs(x2 - x1);
+  const dy = Math.abs(y2 - y1);
+
+  // Straight line
+  if (dx < 5) return `M ${x1} ${y1} L ${x1} ${y2}`;
+  if (dy < 5) return `M ${x1} ${y1} L ${x2} ${y1}`;
+
+  // One bend (L shape)
+  // To decide whether to go Horizontal then Vertical, or Vertical then Horizontal,
+  // we could look at the port direction, but since we don't pass port direction here,
+  // we just pick the one that looks better based on aspect ratio.
+  // In typical diagrams, vertical drops are preferred from top/bottom ports.
+  // Since we don't have port normal vector, we will fallback to a compact two-bend if distance is large, or one bend if close.
+
+  // Compact two-bend (S shape)
+  if (dy > dx) {
+    const midY = y1 + (y2 - y1) / 2;
+    return `M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`;
+  } else {
+    const midX = x1 + (x2 - x1) / 2;
+    return `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}`;
+  }
 };
 
 export const ConnectionLine: React.FC<ConnectionProps> = ({ conn, fromObj, toObj, isSelected, onSelect }) => {
@@ -41,13 +61,31 @@ export const ConnectionLine: React.FC<ConnectionProps> = ({ conn, fromObj, toObj
   const fromDef = getSymbolDefinition(fromObj.type);
   const toDef = getSymbolDefinition(toObj.type);
 
-  const fromPort = fromDef?.connectionPoints?.find(p => p.id === conn.fromPort);
+  let fromPort = fromDef?.connectionPoints?.find(p => p.id === conn.fromPort);
+  if (!fromPort && conn.fromPort.startsWith('dyn_')) {
+     const pos = parseInt(conn.fromPort.replace('dyn_', ''), 10) / 100;
+     const w = fromDef?.defaultWidth || 80;
+     const h = fromDef?.defaultHeight || 80;
+     if (w >= h) {
+        fromPort = { id: conn.fromPort, x: pos, y: 0.5 };
+     } else {
+        fromPort = { id: conn.fromPort, x: 0.5, y: pos };
+     }
+  }
   const toPort = toDef?.connectionPoints?.find(p => p.id === conn.toPort);
 
   if (!fromPort || !toPort) return null;
 
   const { x: x1, y: y1 } = getAbsolutePortCoords(fromObj, fromPort.x, fromPort.y);
-  const { x: x2, y: y2 } = getAbsolutePortCoords(toObj, toPort.x, toPort.y);
+  let x2, y2;
+  if (conn.toPort === 'cursor') {
+    x2 = toObj.x;
+    y2 = toObj.y;
+  } else {
+    const coords = getAbsolutePortCoords(toObj, toPort.x, toPort.y);
+    x2 = coords.x;
+    y2 = coords.y;
+  }
 
   const path = calculateOrthogonalPath(x1, y1, x2, y2);
 

@@ -5,15 +5,19 @@ import type { SynopticObject } from '../store';
 import { SymbolRenderer } from '../symbols/SymbolRenderer';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 import { ConnectionLine } from './ConnectionLine';
+import { ObjectLabelRenderer } from './ObjectLabelRenderer';
+
 
 const GRID_SIZE = 20;
 
-const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick }: {
+const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMouseDown, onPortMouseUp }: {
   obj: SynopticObject,
   isSelected: boolean,
   onSelect: () => void,
   onChange: (newAttrs: Partial<SynopticObject>) => void,
-  onPortClick: (objId: string, portId: string) => void
+  onPortClick: (objId: string, portId: string) => void,
+  onPortMouseDown: (objId: string, portId: string, e: any) => void,
+  onPortMouseUp: (objId: string, portId: string, e: any) => void
 }) => {
   const shapeRef = useRef<any>(null);
   const trRef = useRef<any>(null);
@@ -40,6 +44,40 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick }: {
         visible={obj.visible !== false}
         onClick={onSelect}
         onTap={onSelect}
+        onMouseUp={(e) => {
+          if (def?.type === 'electrical.busbar') {
+            const stage = e.target.getStage();
+            const pos = stage?.getPointerPosition();
+            if (pos) {
+              const stageScale = stage?.scaleX() || 1;
+              const offsetX = stage?.x() || 0;
+              const offsetY = stage?.y() || 0;
+
+              const globalX = (pos.x - offsetX) / stageScale;
+              const globalY = (pos.y - offsetY) / stageScale;
+
+              // Calculate relative click percentage
+              const localX = globalX - obj.x;
+              const localY = globalY - obj.y;
+
+              // In Canvas, object origin is top-left in our bounding box.
+              // So if w >= h (horizontal), percentage is localX / w.
+              const w = (def?.defaultWidth || 80) * (obj.scaleX || 1);
+              const h = (def?.defaultHeight || 80) * (obj.scaleY || 1);
+
+              let busPos = 0.5;
+              if (w >= h) {
+                busPos = localX / w;
+              } else {
+                busPos = localY / h;
+              }
+              busPos = Math.max(0, Math.min(1, busPos));
+
+              const dynamicPortId = `dyn_${Math.round(busPos * 100)}`;
+              onPortMouseUp(obj.id, dynamicPortId, e);
+            }
+          }
+        }}
         onDragMove={(e) => {
           // Snap during drag for visual feedback (doesn't mutate store yet)
           e.target.x(Math.round(e.target.x() / GRID_SIZE) * GRID_SIZE);
@@ -67,6 +105,7 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick }: {
         }}
       >
         <SymbolRenderer obj={obj} />
+        <ObjectLabelRenderer obj={obj} onChange={onChange} />
 
         {/* Render Designation/Name Label */}
         {(!obj.type.startsWith('graphics.') && !obj.type.startsWith('measurements.') && !def?.isLine) && (
@@ -111,32 +150,17 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick }: {
                  e.cancelBubble = true;
                  onPortClick(obj.id, cp.id);
                }}
+               onMouseDown={(e) => {
+                 e.cancelBubble = true;
+                 onPortMouseDown(obj.id, cp.id, e);
+               }}
+               onMouseUp={(e) => {
+                 e.cancelBubble = true;
+                 onPortMouseUp(obj.id, cp.id, e);
+               }}
            />
         ))}
       </Group>
-      {/* Render Fault Popup */}
-        {(obj.editor?.preview_state === 'FAULT') && (() => {
-          const w = def?.defaultWidth || 80;
-          return (
-            <Group x={w / 2} y={-40} zIndex={999}>
-              <Rect
-                x={-60} y={-20} width={120} height={40}
-                fill="#c0392b" stroke="#e74c3c" strokeWidth={2} cornerRadius={4}
-                shadowColor="black" shadowBlur={5} shadowOpacity={0.5} shadowOffsetY={2}
-              />
-              <Text
-                x={-60} y={-15} width={120} height={20}
-                text={`FAULT: ${obj.name || obj.tag}`} fill="white" fontSize={10} fontFamily="monospace"
-                fontStyle="bold" align="center"
-              />
-              <Text
-                x={-60} y={-2} width={120} height={20}
-                text={new Date().toLocaleTimeString()} fill="#ecf0f1" fontSize={9} fontFamily="monospace"
-                align="center"
-              />
-            </Group>
-          );
-        })()}
       {isSelected && !obj.locked && (
         <Transformer
           ref={trRef}
@@ -168,6 +192,8 @@ export const Canvas: React.FC = () => {
 
   // Connection Drawing
   const [drawStartPort, setDrawStartPort] = useState<{objId: string, portId: string} | null>(null);
+  const [wireDragStart, setWireDragStart] = useState<{objId: string, portId: string} | null>(null);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -240,6 +266,16 @@ export const Canvas: React.FC = () => {
   };
 
   const handleMouseMove = (e: any) => {
+    if (wireDragStart) {
+      const pos = e.target.getStage()?.getPointerPosition();
+      if (pos) {
+        setMousePos({
+           x: (pos.x - canvasState.panX) / canvasState.zoom,
+           y: (pos.y - canvasState.panY) / canvasState.zoom
+        });
+      }
+    }
+
     if (isPanningRef.current) {
       const dx = e.evt.clientX - lastPanPosRef.current.x;
       const dy = e.evt.clientY - lastPanPosRef.current.y;
@@ -419,6 +455,44 @@ export const Canvas: React.FC = () => {
     addConnection
   } = useStore();
 
+  const handlePortMouseDown = (objId: string, portId: string, _e: any) => {
+    setWireDragStart({ objId, portId });
+  };
+  const handlePortMouseUp = (objId: string, portId: string, _e: any) => {
+    if (wireDragStart && wireDragStart.objId !== objId) {
+
+      const fromObj = objects.find(o => o.id === wireDragStart.objId);
+      const toObj = objects.find(o => o.id === objId);
+      const fromDef = fromObj ? getSymbolDefinition(fromObj.type) : null;
+      const toDef = toObj ? getSymbolDefinition(toObj.type) : null;
+      const fromPort = fromDef?.connectionPoints?.find(p => p.id === wireDragStart.portId);
+      const toPort = toDef?.connectionPoints?.find(p => p.id === portId);
+
+      let inferredType = 'electrical_ac';
+      if (fromPort && toPort) {
+         if (fromPort.domain !== toPort.domain && fromPort.domain && toPort.domain) {
+            useStore.getState().addMessage(`[ERROR] Incompatible connection: ${fromPort.domain} -> ${toPort.domain}`);
+            setWireDragStart(null);
+            return;
+         }
+         if (fromPort.domain === 'water') inferredType = 'water';
+         else if (fromPort.domain === 'hvac') inferredType = 'hvac_air';
+         else if (fromPort.domain === 'data' || fromPort.domain === 'control') inferredType = 'data';
+         else inferredType = 'electrical_ac'; // default
+      }
+
+      addConnection({
+        fromId: wireDragStart.objId,
+        fromPort: wireDragStart.portId,
+        toId: objId,
+        toPort: portId,
+        type: inferredType
+      });
+      useStore.getState().addMessage(`[INFO] Connected ${wireDragStart.objId}:${wireDragStart.portId} to ${objId}:${portId}`);
+      setDrawingMode(false, 'electrical_ac');
+    }
+    setWireDragStart(null);
+  };
   const handlePortClick = (objId: string, portId: string) => {
     if (!isDrawingConnection) return;
 
@@ -477,6 +551,27 @@ export const Canvas: React.FC = () => {
               onSelect={() => selectConnections([conn.id], false)}
             />
           ))}
+          {wireDragStart && (() => {
+            const fromObj = objects.find(o => o.id === wireDragStart.objId);
+            if (!fromObj) return null;
+            return (
+              <ConnectionLine
+                key="drawing-wire"
+                conn={{
+                  id: 'temp',
+                  fromId: wireDragStart.objId,
+                  fromPort: wireDragStart.portId,
+                  toId: 'cursor',
+                  toPort: 'cursor',
+                  type: drawingConnectionType || 'electrical_ac'
+                }}
+                fromObj={fromObj}
+                toObj={{...fromObj, width: 0, height: 0, x: mousePos.x, y: mousePos.y, rotation: 0} as any}
+                isSelected={false}
+                onSelect={() => {}}
+              />
+            );
+          })()}
           {objects.map((obj) => (
             <ObjectNode
               key={obj.id}
@@ -485,6 +580,8 @@ export const Canvas: React.FC = () => {
               onSelect={() => selectObjects([obj.id], false)}
               onChange={(newAttrs) => updateObject(obj.id, newAttrs)}
               onPortClick={handlePortClick}
+              onPortMouseDown={handlePortMouseDown}
+              onPortMouseUp={handlePortMouseUp}
             />
           ))}
           {selectionBox && (

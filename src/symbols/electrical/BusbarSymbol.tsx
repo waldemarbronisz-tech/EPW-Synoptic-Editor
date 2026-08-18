@@ -1,5 +1,5 @@
 import React from 'react';
-import { Group, Rect } from 'react-konva';
+import { Group, Rect, Line } from 'react-konva';
 import type { SymbolProps } from '../SymbolRenderer';
 
 import { useState, useEffect } from 'react';
@@ -39,23 +39,42 @@ export const BusbarSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
     };
   }, [isEnergized]);
 
+  // A busbar is a thin line (approx 4px) centered in its bounding box.
+  // It spans the longest dimension (width or height).
+  const isHorizontal = w >= h;
+
   return (
     <Group>
-      {/* The busbar base */}
-      <Rect width={w} height={h} fill={baseColor} stroke="#2c3e50" strokeWidth={2} />
+      {/* Invisible bounding box for easy selection/hover */}
+      <Rect width={w} height={h} fill="transparent" />
+
+      {/* The visible busbar line */}
+      <Line
+        points={isHorizontal ? [0, h/2, w, h/2] : [w/2, 0, w/2, h]}
+        stroke={baseColor}
+        strokeWidth={4}
+        lineCap="square"
+      />
 
       {/* Energy Pulse Overlay */}
       {isEnergized && (
-         <Rect
-           x={2} y={2}
-           width={w-4} height={h-4}
-           fill="#f1c40f"
-           opacity={pulse * 0.8}
-         />
+        <Line
+          points={isHorizontal ? [0, h/2, w, h/2] : [w/2, 0, w/2, h]}
+          stroke="#f1c40f"
+          strokeWidth={4}
+          lineCap="square"
+          opacity={pulse * 0.8}
+        />
       )}
 
       {isFault && (
-        <Rect width={w} height={h} fill="transparent" stroke="#c0392b" strokeWidth={3} />
+        <Line
+          points={isHorizontal ? [0, h/2, w, h/2] : [w/2, 0, w/2, h]}
+          stroke="#c0392b"
+          strokeWidth={6}
+          lineCap="square"
+          dash={[4, 4]}
+        />
       )}
     </Group>
   );
