@@ -35,6 +35,8 @@ export interface SynopticObject {
   labelPosition?: 'TOP' | 'BOTTOM' | 'LEFT' | 'RIGHT';
   showDesignation?: boolean;
   showName?: boolean;
+  labelOffsetX?: number;
+  labelOffsetY?: number;
   hvac?: {
     shape: 'ROUND' | 'RECTANGULAR';
     diameter?: number;
@@ -111,6 +113,9 @@ interface AppState {
   drawingConnectionType: string;
   setDrawingMode: (active: boolean, type?: string) => void;
 
+  viewMode: 'ENGINEERING' | 'SCADA';
+  setViewMode: (mode: 'ENGINEERING' | 'SCADA') => void;
+
   // Actions
   setProjectName: (name: string) => void;
   setFileName: (name: string | null) => void;
@@ -171,11 +176,14 @@ export const useStore = create<AppState>((set, get) => ({
   messages: [],
   isDrawingConnection: false,
   drawingConnectionType: 'electrical_ac',
+  viewMode: 'ENGINEERING',
 
   setDrawingMode: (active, type) => set((state) => ({
     isDrawingConnection: active,
     drawingConnectionType: type || state.drawingConnectionType
   })),
+
+  setViewMode: (mode) => set({ viewMode: mode }),
 
   setProjectName: (name) => set({ projectName: name, isDirty: true }),
   setFileName: (name) => set({ fileName: name }),

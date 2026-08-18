@@ -69,57 +69,18 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick }: {
         <SymbolRenderer obj={obj} />
 
         {/* Render Designation/Name Label */}
-        {(!obj.type.startsWith('graphics.') && !obj.type.startsWith('measurements.') && !def?.isLine) && (() => {
-          const showDesignation = obj.showDesignation !== false;
-          const showName = obj.showName !== false;
-
-          let labelLines = [];
-          if (showDesignation && obj.designation) labelLines.push(obj.designation);
-          if (showName && obj.name) labelLines.push(obj.name);
-
-          if (labelLines.length === 0) return null;
-
-          const labelText = labelLines.join(' / ');
-          const pos = obj.labelPosition || 'RIGHT';
-
-          let textX = 0;
-          let textY = 0;
-          let align: any = 'center';
-          let verticalAlign: any = 'top';
-          const padding = 10;
-
-          if (pos === 'TOP') {
-            textX = 0;
-            textY = -20 - padding;
-            align = 'center';
-          } else if (pos === 'BOTTOM') {
-            textX = 0;
-            textY = obj.height + padding;
-            align = 'center';
-          } else if (pos === 'LEFT') {
-            textX = -150 - padding;
-            textY = obj.height / 2 - 6;
-            align = 'right';
-          } else if (pos === 'RIGHT') {
-            textX = obj.width + padding;
-            textY = obj.height / 2 - 6;
-            align = 'left';
-          }
-
-          return (
-            <Text
-              x={textX}
-              y={textY}
-              width={pos === 'LEFT' || pos === 'RIGHT' ? 150 : obj.width}
-              text={labelText}
-              align={align}
-              verticalAlign={verticalAlign}
-              fontSize={12}
-              fontFamily="monospace"
-              fill="#2c3e50"
-            />
-          );
-        })()}
+        {(!obj.type.startsWith('graphics.') && !obj.type.startsWith('measurements.') && !def?.isLine) && (
+          <Text
+            x={0}
+            y={obj.height + 5}
+            width={obj.width}
+            text={obj.designation || obj.name || obj.tag}
+            align="center"
+            fontSize={12}
+            fontFamily="monospace"
+            fill="#2c3e50"
+          />
+        )}
 
         {/* Render Connection Points if Selected */}
         {isSelected && def?.connectionPoints?.map((cp, idx) => (
@@ -153,6 +114,29 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick }: {
            />
         ))}
       </Group>
+      {/* Render Fault Popup */}
+        {(obj.editor?.preview_state === 'FAULT') && (() => {
+          const w = def?.defaultWidth || 80;
+          return (
+            <Group x={w / 2} y={-40} zIndex={999}>
+              <Rect
+                x={-60} y={-20} width={120} height={40}
+                fill="#c0392b" stroke="#e74c3c" strokeWidth={2} cornerRadius={4}
+                shadowColor="black" shadowBlur={5} shadowOpacity={0.5} shadowOffsetY={2}
+              />
+              <Text
+                x={-60} y={-15} width={120} height={20}
+                text={`FAULT: ${obj.name || obj.tag}`} fill="white" fontSize={10} fontFamily="monospace"
+                fontStyle="bold" align="center"
+              />
+              <Text
+                x={-60} y={-2} width={120} height={20}
+                text={new Date().toLocaleTimeString()} fill="#ecf0f1" fontSize={9} fontFamily="monospace"
+                align="center"
+              />
+            </Group>
+          );
+        })()}
       {isSelected && !obj.locked && (
         <Transformer
           ref={trRef}
@@ -184,22 +168,6 @@ export const Canvas: React.FC = () => {
 
   // Connection Drawing
   const [drawStartPort, setDrawStartPort] = useState<{objId: string, portId: string} | null>(null);
-
-  const {
-    connections,
-    selectedConnectionIds,
-    selectConnections,
-    isDrawingConnection,
-    drawingConnectionType,
-    setDrawingMode,
-    addConnection
-  } = useStore();
-
-  useEffect(() => {
-    if (!isDrawingConnection) {
-      setDrawStartPort(null);
-    }
-  }, [isDrawingConnection]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -441,45 +409,31 @@ export const Canvas: React.FC = () => {
     return lines;
   };
 
+  const {
+    connections,
+    selectedConnectionIds,
+    selectConnections,
+    isDrawingConnection,
+    drawingConnectionType,
+    setDrawingMode,
+    addConnection
+  } = useStore();
+
   const handlePortClick = (objId: string, portId: string) => {
     if (!isDrawingConnection) return;
-
-    const obj = objects.find(o => o.id === objId);
-    if (!obj) return;
-
-    // Quick compat check
-    const isWater = obj.category === 'Water' || obj.type.startsWith('water.');
-    const isHvac = obj.category === 'HVAC' || obj.type.startsWith('hvac.');
-    const isElec = obj.category === 'Electrical' || obj.category === 'Automation';
-
-    if (drawingConnectionType === 'water' && !isWater) {
-      useStore.getState().addMessage(`[ERROR] Cannot connect water to ${obj.category}`);
-      return;
-    }
-    if (drawingConnectionType === 'hvac_air' && !isHvac) {
-      useStore.getState().addMessage(`[ERROR] Cannot connect HVAC to ${obj.category}`);
-      return;
-    }
-    if (drawingConnectionType === 'electrical_ac' && !isElec && !isHvac && !isWater) { // Hvac and Water might have electrical connections in real world, but let's be strict or just warn
-      // Not strictly blocking all, but simple check
-    }
 
     if (!drawStartPort) {
       setDrawStartPort({ objId, portId });
       useStore.getState().addMessage(`[INFO] Connection started from ${objId}:${portId}`);
     } else {
       if (drawStartPort.objId !== objId) {
-        let defState = 'DEENERGIZED';
-        if (drawingConnectionType === 'water' || drawingConnectionType === 'hvac_air') {
-          defState = 'NO_FLOW';
-        }
         addConnection({
           fromId: drawStartPort.objId,
           fromPort: drawStartPort.portId,
           toId: objId,
           toPort: portId,
           type: drawingConnectionType,
-          editor: { preview_state: defState }
+          editor: { preview_state: 'DEENERGIZED' } // Default state
         });
         useStore.getState().addMessage(`[INFO] Connection created`);
       }

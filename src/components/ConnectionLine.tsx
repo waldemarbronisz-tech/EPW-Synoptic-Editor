@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Group, Path, Circle } from 'react-konva';
 import type { SynopticConnection, SynopticObject } from '../store';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
@@ -60,8 +60,7 @@ export const ConnectionLine: React.FC<ConnectionProps> = ({ conn, fromObj, toObj
   if (conn.type === 'water') strokeColor = '#3498db';
   if (conn.type === 'hvac_air') strokeColor = '#bdc3c7';
 
-  const isEnergizedOrFlowing = conn.editor?.preview_state === 'ENERGIZED' || conn.editor?.preview_state === 'FLOW';
-  if (isEnergizedOrFlowing) {
+  if (conn.editor?.preview_state === 'ENERGIZED' || conn.editor?.preview_state === 'FLOW') {
     strokeWidth = 4;
   }
 
@@ -69,24 +68,6 @@ export const ConnectionLine: React.FC<ConnectionProps> = ({ conn, fromObj, toObj
     strokeColor = '#f1c40f';
     dash = [5, 5];
   }
-
-  const [dashOffset, setDashOffset] = useState(0);
-
-  useEffect(() => {
-    let animationFrame: number;
-    const animate = () => {
-      setDashOffset(prev => (prev - 1) % 20);
-      animationFrame = requestAnimationFrame(animate);
-    };
-
-    if (isEnergizedOrFlowing) {
-      animationFrame = requestAnimationFrame(animate);
-    }
-
-    return () => {
-      if (animationFrame) cancelAnimationFrame(animationFrame);
-    };
-  }, [isEnergizedOrFlowing]);
 
   return (
     <Group onClick={onSelect} onTap={onSelect}>
@@ -99,17 +80,6 @@ export const ConnectionLine: React.FC<ConnectionProps> = ({ conn, fromObj, toObj
         strokeWidth={isSelected ? strokeWidth + 2 : strokeWidth}
         dash={dash}
       />
-
-      {/* Animated flow overlay */}
-      {isEnergizedOrFlowing && (
-        <Path
-          data={path}
-          stroke={conn.type === 'electrical_ac' ? '#f1c40f' : '#ecf0f1'}
-          strokeWidth={strokeWidth - 2}
-          dash={[10, 10]}
-          dashOffset={dashOffset}
-        />
-      )}
 
       {/* Port dots */}
       <Circle x={x1} y={y1} radius={3} fill={strokeColor} />
