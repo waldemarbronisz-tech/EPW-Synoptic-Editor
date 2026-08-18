@@ -6,7 +6,7 @@ describe('Store History and Core Operations', () => {
     useStore.setState({
       objects: [],
       connections: [],
-      history: [{ objects: [], connections: [] }],
+      history: [{ objects: [], connections: [] } as any],
       historyIndex: 0
     });
   });
