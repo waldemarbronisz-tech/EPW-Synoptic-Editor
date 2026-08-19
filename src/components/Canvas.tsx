@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Stage, Layer, Rect, Circle, Group, Transformer, Text } from 'react-konva';
+import { Stage, Layer, Rect, Circle, Group, Transformer } from 'react-konva';
 import { useStore } from '../store';
 import type { SynopticObject } from '../store';
 import { SymbolRenderer } from '../symbols/SymbolRenderer';
@@ -10,15 +10,17 @@ import { ObjectLabelRenderer } from './ObjectLabelRenderer';
 
 const GRID_SIZE = 20;
 
-const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMouseDown, onPortMouseUp }: {
+const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMouseDown, onPortMouseUp, wireDragStart }: {
   obj: SynopticObject,
   isSelected: boolean,
   onSelect: () => void,
   onChange: (newAttrs: Partial<SynopticObject>) => void,
   onPortClick: (objId: string, portId: string) => void,
   onPortMouseDown: (objId: string, portId: string, e: any) => void,
-  onPortMouseUp: (objId: string, portId: string, e: any) => void
+  onPortMouseUp: (objId: string, portId: string, e: any) => void,
+  wireDragStart: any
 }) => {
+  const [isHovered, setIsHovered] = useState(false);
   const shapeRef = useRef<any>(null);
   const trRef = useRef<any>(null);
 
@@ -44,6 +46,8 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
         visible={obj.visible !== false}
         onClick={onSelect}
         onTap={onSelect}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
         onMouseUp={(e) => {
           if (def?.type === 'electrical.busbar') {
             const stage = e.target.getStage();
@@ -105,42 +109,33 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
         }}
       >
         <SymbolRenderer obj={obj} />
+        {/* Render Designation/Name Label */}
         <ObjectLabelRenderer obj={obj} onChange={onChange} />
 
-        {/* Render Designation/Name Label */}
-        {(!obj.type.startsWith('graphics.') && !obj.type.startsWith('measurements.') && !def?.isLine) && (
-          <Text
-            x={0}
-            y={obj.height + 5}
-            width={obj.width}
-            text={obj.designation || obj.name || obj.tag}
-            align="center"
-            fontSize={12}
-            fontFamily="monospace"
-            fill="#2c3e50"
-          />
-        )}
-
         {/* Render Connection Points if Selected */}
-        {isSelected && def?.connectionPoints?.map((cp, idx) => (
+        {(isSelected || isHovered || wireDragStart) && def?.connectionPoints?.map((cp, idx) => (
            <Circle
              key={`cp-${idx}`}
              x={cp.x * obj.width}
              y={cp.y * obj.height}
-             radius={4}
-             fill="#3498db"
+             radius={wireDragStart ? 6 : 4}
+             fill={wireDragStart ? "#e74c3c" : "#3498db"}
              stroke="#2980b9"
              strokeWidth={1}
              shadowColor="rgba(0,0,0,0.5)"
              shadowBlur={2}
-             hitStrokeWidth={10}
+             hitStrokeWidth={15}
              onMouseEnter={(e: any) => {
                 const container = e.target.getStage()?.container();
                 if (container) container.style.cursor = 'crosshair';
+                e.target.scale({ x: 1.5, y: 1.5 });
+                e.target.getLayer()?.batchDraw();
              }}
              onMouseLeave={(e: any) => {
                 const container = e.target.getStage()?.container();
                 if (container) container.style.cursor = 'default';
+                e.target.scale({ x: 1, y: 1 });
+                e.target.getLayer()?.batchDraw();
              }}
              onClick={(e) => {
                  e.cancelBubble = true;
@@ -582,6 +577,7 @@ export const Canvas: React.FC = () => {
               onPortClick={handlePortClick}
               onPortMouseDown={handlePortMouseDown}
               onPortMouseUp={handlePortMouseUp}
+              wireDragStart={wireDragStart}
             />
           ))}
           {selectionBox && (
