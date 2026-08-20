@@ -1,66 +1,46 @@
-# EPW Synoptic Editor - Core Engine Refactor Report
+# EPW Synoptic Editor - Architecture Hardening Report
 
 ## LABEL ENGINE
 **PASS**
-- Centralized `ObjectLabelRenderer.tsx` implemented.
-- `showDesignation` and `showName` independently control visibility.
-- Word wrapping and multiline supported.
-
-**TOP LABEL: PASS**
-**BOTTOM LABEL: PASS**
-**LEFT LABEL: PASS**
-**RIGHT LABEL: PASS**
+- Centralized `ObjectLabelRenderer.tsx` respects independent `showDesignation` and `showName` properties.
+- Labels are detached from bounding box hardcoding, supporting TOP, BOTTOM, LEFT, and RIGHT, and fully parsing Shift+Drag `labelOffsetX/Y` user overrides.
+- Word wrapping and multiline displays cleanly map alongside symbol bounding properties.
 
 ## PORT ENGINE & MODEL
 **PASS**
-- `ConnectionPoint` strictly defines `domain`, `medium`, and `direction`.
-- Audited vertical electrical components (Circuit Breakers, Disconnects, Transformers) guaranteeing `x=0.5` strict centers.
-- Overlapping duplicate ports removed from Registry.
-
-**PORT AUDIT: PASS**
-**PORT COMPATIBILITY: PASS**
+- Replaced ambiguous `ConnectionPoint` properties with strict definitions mapping `domain` (`electrical`, `water`, `hvac`, `data`, `control`), `medium`, and `direction` (`in`, `out`, `passive`).
+- Completely audited the `SymbolRegistry`. Water components correctly parse as `water`, and automation RS485/ETH ports strictly register as `data`. Excess `bidirectional` fallbacks were stripped in favor of accurate definitions.
+- Ports logically scale and maintain geometric rotation transforms inside the rendering loop.
 
 ## CONNECTION DRAG & ROUTING
 **PASS**
-- **Direct Drag Connect:** Users can mouse-down on a symbol's port to spawn a live connection line tracking the cursor. Upon releasing the mouse over a target port, the system verifies `domain` compatibility before snapping.
-- **Routing:** Removed static naive mid-Y line generation with an Orthogonal Router calculating optimal straight lines, singular elbows, and compact S-bends based on dynamic object transforms and scale properties.
-- **Connection Preview:** A live connection line appears during dragging.
-- **Type Inference:** Connection `type` is inferred automatically based on the matched ports.
-- **Move + Auto Reroute:** Re-parented rotation origin to `center` rather than `top-left`. This guarantees orthogonal tracking stays mathematically true when objects are scaled or transformed.
-
-**DIRECT DRAG CONNECT: PASS**
-**CONNECTION PREVIEW: PASS**
-**PORT SNAP: PASS**
-**CONNECTION TYPE INFERENCE: PASS**
-**STRAIGHT ROUTING: PASS**
-**ONE-BEND ROUTING: PASS**
-**TWO-BEND ROUTING: PASS**
-**MOVE + AUTO REROUTE: PASS**
+- Drag-to-connect natively traces an ephemeral cursor wire until released onto an actively resolved port.
+- Connection compatibility is enforced during the mouse-up sequence. The engine outright rejects connections spanning incompatible `domains` (e.g., `water` -> `electrical_ac`), duplicate connections, or invalid `IN` -> `IN` / `OUT` -> `OUT` directions.
+- Single-use port constraints restrict components strictly mapped as standard (non-busbar) elements.
+- The default router utilizes strict orthogonal logic identifying the fastest standard `L` and `S-bends` derived directly from port node geometry.
 
 ## BUSBAR BEHAVIOR
 **PASS**
-- Thinned down the main busbar to an engineering 4px thick line while retaining an invisible wider bounding box to ensure easy interaction.
-- Replaced the hardcoded P1...P5 mapping with semantic `dyn_XX` ports (Dynamic Ports). Connections can attach organically anywhere along the physical width (e.g. `dyn_60` for 60% progression on the busbar). This seamlessly supports complex engineering environments with infinite drops to Q1/Q2/etc.
+- Converted `BusbarSymbol` from a heavy rect block into a 4px precise engineering trace housed in a scaled interactive bounding box.
+- Dynamic attachment natively synthesizes connection endpoints relative to scale (`dyn_XX` percentages), avoiding the hardcoded P1-P5 limits entirely. Infinite parallel node drops are successfully preserved.
 
-**BUSBAR VISUAL: PASS**
-**BUSBAR RESIZE: PASS**
-**BUSBAR DYNAMIC ATTACHMENT: PASS**
-**MULTIPLE BUSBAR TAPS: PASS**
-
-## HISTORY & STATE
+## ARCHITECTURE & SCHEMA PERSISTENCE
 **PASS**
-- Overhauled the previous arbitrary `any` array state with a strict `HistorySnapshot` interface (`objects` and `connections`).
-- This guarantees `UNDO/REDO` loops safely restore exact graph-edges and nodes without polluting transient session variables.
-- Verified test suite confirms exact rollback bounds.
+- Migrated out of unstructured object maps into strict `.epwsyn` format parsing via `ProjectSchema.ts` and `ProjectManager.ts`.
+- Validation natively rejects invalid versions, missing fields, duplicate object/connection IDs, unresolved symbol types, and dangling connection parameters before committing to editor state.
+- Project creation metrics (`created_at`) are structurally sealed against save-loop overwrites, exclusively mutating `modified_at`.
+- Canvas configurations (`width`, `height`, `background`, `gridSize`) gracefully hydrate to standard state formats.
+- `HistorySnapshot` ensures complete isolation across the Undo/Redo tracking timeline.
 
-**UNDO/REDO: PASS**
-**SAVE/OPEN: PASS**
-**REGRESSION TESTS: PASS**
-**PREVIOUS FUNCTIONALITY PRESERVED: PASS**
+## RUNTIME BINDING CONTRACT
+**PASS**
+- Ripped out legacy data-bindings (`runtimeVariable`, `alarm`, `animation`).
+- Converted the internal state mapping into strict typed `bindings` dictionaries targeting `state`, `value`, `command`, `alarm`, and `quality` tracking fields specifically requesting tag identifiers, formats, and `access` constraints.
+- Future Runtime environments inside EPW OS will directly mount against this schema map, preventing coupling conflicts between UI and Logic stacks.
 
-## ARTIFACTS
-- **Final Commit:** `c9eb54c57ef316ffb7f204ec7ff7d83950c1d980`
-- **Tests Added:** `src/tests/store.test.ts`
-- **Run Command:** `npm run build`, `npm run dev`, `npx vitest`
+## TEST SUITE & CI
+**PASS**
+- Configured `.github/workflows/ci.yml` triggering headless CI runs.
+- `vitest` unit-testing scripts established tracking Object generation bounds and `.epwsyn` format parsing (duplicate tracking, validation checks).
 
-All required refactor requests successfully implemented safely.
+All requested acceptance checks successfully verified through manual application usage and automated build tests.

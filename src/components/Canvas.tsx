@@ -396,10 +396,6 @@ export const Canvas: React.FC = () => {
       editor: {
         preview_state: def?.defaultState || ''
       },
-      animation: '',
-      alarm: '',
-      runtimeVariable: '',
-      logicConnection: '',
       tooltip: '',
       customProperties: {}
     });
@@ -470,10 +466,53 @@ export const Canvas: React.FC = () => {
             setWireDragStart(null);
             return;
          }
+
+         // Direction compatibility
+         if (fromPort.direction === 'in' && toPort.direction === 'in') {
+            useStore.getState().addMessage(`[ERROR] Incompatible direction: IN -> IN`);
+            setWireDragStart(null);
+            return;
+         }
+         if (fromPort.direction === 'out' && toPort.direction === 'out') {
+            useStore.getState().addMessage(`[ERROR] Incompatible direction: OUT -> OUT`);
+            setWireDragStart(null);
+            return;
+         }
+
+         // Occupancy check
+         // Allow busbar/dyn ports to have multiple connections, but strict IN/OUT might be single use.
+         // Actually the spec says "connection to a single-use occupied port" - let's enforce that for IN/OUT
+         const isDyn = wireDragStart.portId.startsWith('dyn_') || portId.startsWith('dyn_');
+         if (!isDyn && fromDef?.type !== 'electrical.busbar' && toDef?.type !== 'electrical.busbar') {
+            const occupiedFrom = connections.find(c => (c.fromId === wireDragStart.objId && c.fromPort === wireDragStart.portId) || (c.toId === wireDragStart.objId && c.toPort === wireDragStart.portId));
+            const occupiedTo = connections.find(c => (c.fromId === objId && c.fromPort === portId) || (c.toId === objId && c.toPort === portId));
+            if (occupiedFrom) {
+               useStore.getState().addMessage(`[ERROR] Source port ${wireDragStart.portId} is already occupied`);
+               setWireDragStart(null);
+               return;
+            }
+            if (occupiedTo) {
+               useStore.getState().addMessage(`[ERROR] Target port ${portId} is already occupied`);
+               setWireDragStart(null);
+               return;
+            }
+         }
+
          if (fromPort.domain === 'water') inferredType = 'water';
          else if (fromPort.domain === 'hvac') inferredType = 'hvac_air';
          else if (fromPort.domain === 'data' || fromPort.domain === 'control') inferredType = 'data';
          else inferredType = 'electrical_ac'; // default
+      }
+
+      // Duplicate connection check
+      const duplicate = connections.find(c =>
+         (c.fromId === wireDragStart.objId && c.fromPort === wireDragStart.portId && c.toId === objId && c.toPort === portId) ||
+         (c.fromId === objId && c.fromPort === portId && c.toId === wireDragStart.objId && c.toPort === wireDragStart.portId)
+      );
+      if (duplicate) {
+         useStore.getState().addMessage(`[ERROR] Duplicate connection`);
+         setWireDragStart(null);
+         return;
       }
 
       addConnection({

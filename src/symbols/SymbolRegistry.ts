@@ -4,7 +4,7 @@ export interface ConnectionPoint {
   y: number; // percentage (0 to 1) relative to height
   domain?: 'electrical' | 'water' | 'hvac' | 'data' | 'control';
   medium?: string;
-  direction?: 'in' | 'out' | 'bidirectional';
+  direction?: 'in' | 'out' | 'bidirectional' | 'passive';
 }
 
 export interface SymbolDefinition {
@@ -29,7 +29,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 40,
     allowedStates: ['OPEN', 'CLOSED', 'TRIPPED', 'FAULT'],
     defaultState: 'OPEN',
-    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'bidirectional'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'bidirectional'}]
+    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}]
   },
   'electrical.disconnect_switch': {
     type: 'electrical.disconnect_switch',
@@ -39,7 +39,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 40,
     allowedStates: ['OPEN', 'CLOSED', 'FAULT'],
     defaultState: 'OPEN',
-    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'bidirectional'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'bidirectional'}]
+    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}]
   },
   'electrical.contactor': {
     type: 'electrical.contactor',
@@ -49,7 +49,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 40,
     allowedStates: ['OFF', 'ON', 'FAULT'],
     defaultState: 'OFF',
-    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'bidirectional'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'bidirectional'}, {id: 'COIL', x: 0.8, y: 0.8, domain: 'electrical', direction: 'bidirectional'}]
+    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}, {id: 'COIL', x: 0.8, y: 0.8, domain: 'electrical', direction: 'passive'}]
   },
   'electrical.transformer': {
     type: 'electrical.transformer',
@@ -59,7 +59,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 60,
     allowedStates: ['NORMAL', 'ENERGIZED', 'FAULT'],
     defaultState: 'NORMAL',
-    connectionPoints: [{id: 'PRIMARY', x: 0.5, y: 0, domain: 'electrical', direction: 'bidirectional'}, {id: 'SECONDARY', x: 0.5, y: 1, domain: 'electrical', direction: 'bidirectional'}]
+    connectionPoints: [{id: 'PRIMARY', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'SECONDARY', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}]
   },
   'electrical.relay': {
     type: 'electrical.relay',
@@ -69,7 +69,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 40,
     allowedStates: ['OFF', 'ON', 'FAULT'],
     defaultState: 'OFF',
-    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'bidirectional'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'bidirectional'}, {id: 'COIL', x: 0.2, y: 0.8, domain: 'electrical', direction: 'bidirectional'}]
+    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}, {id: 'COIL', x: 0.2, y: 0.8, domain: 'electrical', direction: 'passive'}]
   },
   'electrical.fuse': {
     type: 'electrical.fuse',
@@ -79,7 +79,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 40,
     allowedStates: ['NORMAL', 'BLOWN'],
     defaultState: 'NORMAL',
-    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'bidirectional'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'bidirectional'}]
+    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}]
   },
   'electrical.busbar': {
     type: 'electrical.busbar',
@@ -99,7 +99,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 30,
     allowedStates: ['OFF', 'ON', 'BLINK', 'FAULT'],
     defaultState: 'OFF',
-    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'bidirectional'}]
+    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}]
   },
   'electrical.generator': {
     type: 'electrical.generator',
@@ -109,7 +109,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 60,
     allowedStates: ['OFF', 'RUNNING', 'FAULT'],
     defaultState: 'OFF',
-    connectionPoints: [{id: 'OUT', x: 0.5, y: 0, domain: 'electrical', direction: 'bidirectional'}]
+    connectionPoints: [{id: 'OUT', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}]
   },
   'electrical.grid_source': {
     type: 'electrical.grid_source',
@@ -119,7 +119,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 60,
     allowedStates: ['ENERGIZED', 'DEENERGIZED', 'FAULT'],
     defaultState: 'ENERGIZED',
-    connectionPoints: [{id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'bidirectional'}]
+    connectionPoints: [{id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}]
   },
   'electrical.motor': {
     type: 'electrical.motor',
@@ -129,7 +129,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 60,
     allowedStates: ['OFF', 'RUNNING', 'FAULT'],
     defaultState: 'OFF',
-    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'bidirectional'}]
+    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}]
   },
   'electrical.generic_load': {
     type: 'electrical.generic_load',
@@ -139,7 +139,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 40,
     allowedStates: ['OFF', 'ON', 'FAULT'],
     defaultState: 'OFF',
-    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'bidirectional'}]
+    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}]
   },
   'electrical.terminal': {
     type: 'electrical.terminal',
@@ -149,7 +149,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 20,
     allowedStates: ['NORMAL', 'FAULT'],
     defaultState: 'NORMAL',
-    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'bidirectional'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'bidirectional'}]
+    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}]
   },
   'electrical.rcd': {
     type: 'electrical.rcd',
@@ -159,7 +159,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 60,
     allowedStates: ['CLOSED', 'OPEN', 'TRIPPED', 'FAULT'],
     defaultState: 'CLOSED',
-    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'bidirectional'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'bidirectional'}]
+    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}]
   },
   'electrical.spd': {
     type: 'electrical.spd',
@@ -169,7 +169,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 60,
     allowedStates: ['NORMAL', 'FAULT'],
     defaultState: 'NORMAL',
-    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'bidirectional'}, {id: 'GND', x: 0.5, y: 1, domain: 'electrical', direction: 'bidirectional'}]
+    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'GND', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}]
   },
   'electrical.cable': {
     type: 'electrical.cable',
@@ -218,7 +218,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 40,
     allowedStates: ['NORMAL', 'FAULT'],
     defaultState: 'NORMAL',
-    connectionPoints: [{id: 'GND', x: 0.5, y: 0, domain: 'electrical', direction: 'bidirectional'}]
+    connectionPoints: [{id: 'GND', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}]
   },
 
   // Water
@@ -260,7 +260,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 40,
     allowedStates: ['CLOSED', 'OPENING', 'OPEN', 'CLOSING', 'FAULT'],
     defaultState: 'CLOSED',
-    connectionPoints: [{id: 'IN', x: 0, y: 0.5, domain: 'electrical', direction: 'bidirectional'}, {id: 'OUT', x: 1, y: 0.5, domain: 'electrical', direction: 'bidirectional'}]
+    connectionPoints: [{id: 'IN', x: 0, y: 0.5, domain: 'water', direction: 'in'}, {id: 'OUT', x: 1, y: 0.5, domain: 'water', direction: 'out'}]
   },
   'water.pump': {
     type: 'water.pump',
@@ -270,7 +270,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 60,
     allowedStates: ['OFF', 'RUNNING', 'FAULT'],
     defaultState: 'OFF',
-    connectionPoints: [{id: 'SUCTION', x: 0, y: 0.5, domain: 'electrical', direction: 'bidirectional'}, {id: 'DISCHARGE', x: 0.6, y: 0, domain: 'electrical', direction: 'bidirectional'}]
+    connectionPoints: [{id: 'IN', x: 0, y: 0.5, domain: 'water', direction: 'in'}, {id: 'OUT', x: 1, y: 0.5, domain: 'water', direction: 'out'}]
   },
   'water.tank': {
     type: 'water.tank',
@@ -280,7 +280,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 120,
     allowedStates: ['NORMAL', 'LOW', 'HIGH', 'FAULT'],
     defaultState: 'NORMAL',
-    connectionPoints: [{id: 'INLET', x: 0, y: 0.2, domain: 'electrical', direction: 'bidirectional'}, {id: 'OUTLET', x: 1, y: 0.8, domain: 'electrical', direction: 'bidirectional'}, {id: 'DRAIN', x: 0.5, y: 1, domain: 'electrical', direction: 'bidirectional'}]
+    connectionPoints: [{id: 'IN', x: 0, y: 0.5, domain: 'water', direction: 'in'}, {id: 'OUT', x: 1, y: 0.5, domain: 'water', direction: 'out'}]
   },
   'water.gate_valve': {
     type: 'water.gate_valve',
@@ -290,7 +290,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 40,
     allowedStates: ['CLOSED', 'OPENING', 'OPEN', 'CLOSING', 'FAULT'],
     defaultState: 'CLOSED',
-    connectionPoints: [{id: 'IN', x: 0, y: 0.5, domain: 'electrical', direction: 'bidirectional'}, {id: 'OUT', x: 1, y: 0.5, domain: 'electrical', direction: 'bidirectional'}]
+    connectionPoints: [{id: 'IN', x: 0, y: 0.5, domain: 'water', direction: 'in'}, {id: 'OUT', x: 1, y: 0.5, domain: 'water', direction: 'out'}]
   },
   'water.ball_valve': {
     type: 'water.ball_valve',
@@ -300,7 +300,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 40,
     allowedStates: ['CLOSED', 'OPENING', 'OPEN', 'CLOSING', 'FAULT'],
     defaultState: 'CLOSED',
-    connectionPoints: [{id: 'IN', x: 0, y: 0.5, domain: 'electrical', direction: 'bidirectional'}, {id: 'OUT', x: 1, y: 0.5, domain: 'electrical', direction: 'bidirectional'}]
+    connectionPoints: [{id: 'IN', x: 0, y: 0.5, domain: 'water', direction: 'in'}, {id: 'OUT', x: 1, y: 0.5, domain: 'water', direction: 'out'}]
   },
   'water.solenoid_valve': {
     type: 'water.solenoid_valve',
@@ -310,7 +310,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 60,
     allowedStates: ['CLOSED', 'OPENING', 'OPEN', 'CLOSING', 'FAULT'],
     defaultState: 'CLOSED',
-    connectionPoints: [{id: 'IN', x: 0, y: 0.7, domain: 'electrical', direction: 'bidirectional'}, {id: 'OUT', x: 1, y: 0.7, domain: 'electrical', direction: 'bidirectional'}]
+    connectionPoints: [{id: 'IN', x: 0, y: 0.5, domain: 'water', direction: 'in'}, {id: 'OUT', x: 1, y: 0.5, domain: 'water', direction: 'out'}]
   },
   'water.drain_valve': {
     type: 'water.drain_valve',
@@ -320,7 +320,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 40,
     allowedStates: ['CLOSED', 'OPEN', 'FAULT'],
     defaultState: 'CLOSED',
-    connectionPoints: [{id: 'IN', x: 0, y: 0.5, domain: 'electrical', direction: 'bidirectional'}, {id: 'OUT', x: 1, y: 0.5, domain: 'electrical', direction: 'bidirectional'}]
+    connectionPoints: [{id: 'IN', x: 0, y: 0.5, domain: 'water', direction: 'in'}, {id: 'OUT', x: 1, y: 0.5, domain: 'water', direction: 'out'}]
   },
   'water.drain': {
     type: 'water.drain',
@@ -330,7 +330,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 20,
     allowedStates: ['NORMAL', 'FAULT'],
     defaultState: 'NORMAL',
-    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'bidirectional'}]
+    connectionPoints: [{id: 'IN', x: 0, y: 0.5, domain: 'water', direction: 'in'}, {id: 'OUT', x: 1, y: 0.5, domain: 'water', direction: 'out'}]
   },
 
   // HVAC
@@ -427,7 +427,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 80,
     allowedStates: ['NORMAL', 'FAULT'],
     defaultState: 'NORMAL',
-    connectionPoints: [{id: 'POWER', x: 0.2, y: 0, domain: 'electrical', direction: 'bidirectional'}, {id: 'RS485', x: 0.8, y: 0, domain: 'electrical', direction: 'bidirectional'}]
+    connectionPoints: [{id: 'ELEC', x: 0.5, y: 0, domain: 'electrical', direction: 'in'}, {id: 'DATA', x: 0.5, y: 1, domain: 'data', direction: 'out'}]
   },
   'automation.ada_outputs': {
     type: 'automation.ada_outputs',
@@ -437,7 +437,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 80,
     allowedStates: ['NORMAL', 'FAULT'],
     defaultState: 'NORMAL',
-    connectionPoints: [{id: 'POWER', x: 0.2, y: 0, domain: 'electrical', direction: 'bidirectional'}, {id: 'RS485', x: 0.8, y: 0, domain: 'electrical', direction: 'bidirectional'}]
+    connectionPoints: [{id: 'POWER', x: 0.2, y: 0, domain: 'electrical', direction: 'in'}, {id: 'RS485', x: 0.8, y: 0, domain: 'data', direction: 'bidirectional'}]
   },
   'automation.epw_core': {
     type: 'automation.epw_core',
@@ -447,7 +447,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 80,
     allowedStates: ['OFF', 'RUNNING', 'FAULT'],
     defaultState: 'RUNNING',
-    connectionPoints: [{id: 'POWER', x: 0.2, y: 0, domain: 'electrical', direction: 'bidirectional'}, {id: 'ETH', x: 0.8, y: 0, domain: 'electrical', direction: 'bidirectional'}]
+    connectionPoints: [{id: 'POWER', x: 0.2, y: 0, domain: 'electrical', direction: 'in'}, {id: 'ETH', x: 0.8, y: 0, domain: 'data', direction: 'bidirectional'}]
   },
   'automation.epm': {
     type: 'automation.epm',
@@ -466,7 +466,7 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
     defaultHeight: 80,
     allowedStates: ['OFF', 'ON', 'FAULT'],
     defaultState: 'ON',
-    connectionPoints: [{id: 'AC_IN', x: 0.5, y: 0, domain: 'electrical', direction: 'bidirectional'}, {id: 'DC_OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'bidirectional'}]
+    connectionPoints: [{id: 'AC_IN', x: 0.5, y: 0, domain: 'electrical', direction: 'in'}, {id: 'DC_OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'out'}]
   },
 
   // Measurements

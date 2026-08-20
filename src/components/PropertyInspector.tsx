@@ -40,14 +40,23 @@ export const PropertyInspector: React.FC = () => {
     }
 
     if (!selectedObj) return;
-    if (name.startsWith('editor.') || name.startsWith('bindings.')) {
-      const [group, key] = name.split('.');
+    if (name.startsWith('editor.')) {
+      const [, key] = name.split('.');
       updateObject(selectedObj.id, {
-        [group]: {
-          ...(selectedObj as any)[group],
-          [key]: finalValue
-        }
+        editor: { ...selectedObj.editor, [key]: finalValue }
       });
+    } else if (name.startsWith('bindings.')) {
+      const parts = name.split('.');
+      const group = parts[1];
+      const key = parts[2];
+
+      const newBindings = { ...(selectedObj.bindings || {}) };
+      newBindings[group as keyof typeof newBindings] = {
+        ...((newBindings as any)[group] || {}),
+        [key]: finalValue
+      };
+
+      updateObject(selectedObj.id, { bindings: newBindings });
     } else {
       updateObject(selectedObj.id, { [name]: finalValue });
     }
@@ -260,16 +269,20 @@ export const PropertyInspector: React.FC = () => {
         <div className="property-group">
           <div className="property-group-title">Bindings</div>
           <div className="property-row">
-            <label>State/Value</label>
-            <input type="text" name="bindings.state" value={selectedObj.bindings?.state || ''} onChange={handleChange} />
+            <label>State</label>
+            <input type="text" name="bindings.state.tag" value={selectedObj.bindings?.state?.tag || ''} onChange={handleChange} />
+          </div>
+          <div className="property-row">
+            <label>Value</label>
+            <input type="text" name="bindings.value.tag" value={selectedObj.bindings?.value?.tag || ''} onChange={handleChange} />
           </div>
           <div className="property-row">
             <label>Alarm</label>
-            <input type="text" name="bindings.alarm" value={selectedObj.bindings?.alarm || ''} onChange={handleChange} />
+            <input type="text" name="bindings.alarm.tag" value={selectedObj.bindings?.alarm?.tag || ''} onChange={handleChange} />
           </div>
           <div className="property-row">
             <label>Command</label>
-            <input type="text" name="bindings.command" value={selectedObj.bindings?.command || ''} onChange={handleChange} />
+            <input type="text" name="bindings.command.tag" value={selectedObj.bindings?.command?.tag || ''} onChange={handleChange} />
           </div>
         </div>
 

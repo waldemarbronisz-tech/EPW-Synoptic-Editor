@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 
+
+export interface HistorySnapshot {
+  objects: SynopticObject[];
+  connections: SynopticConnection[];
+}
 export interface SynopticObject {
   id: string;
   type: string;
@@ -26,12 +31,7 @@ export interface SynopticObject {
   font: string;
   fontSize: number;
 
-  // Logic & Bindings
-  bindings?: {
-    state?: string;
-    command?: string;
-    alarm?: string;
-  };
+
   editor?: {
     preview_state?: string;
     preview_value?: string;
@@ -39,11 +39,14 @@ export interface SynopticObject {
     format?: string;
   };
 
-  // Legacy / Other
-  animation: string;
-  alarm: string;
-  runtimeVariable: string;
-  logicConnection: string;
+  // Runtime Bindings
+  bindings?: {
+    state?: { tag: string; data_type?: string };
+    value?: { tag: string; data_type?: string };
+    command?: { tag: string; data_type?: string; access?: 'WRITE' | 'READ_WRITE' };
+    alarm?: { tag: string; data_type?: string };
+    quality?: { tag: string; data_type?: string };
+  };
   tooltip: string;
 
   // Layout
@@ -71,6 +74,8 @@ export interface SynopticConnection {
   toId: string;
   toPort: string;
   type: string; // e.g. electrical_ac, water, hvac_air
+  waypoints?: { x: number; y: number }[]; // Foundation for manual routing and net branch definitions
+  netId?: string; // Foundation for resolving electrical nets, branches, and junction dots
   editor?: {
     preview_state?: string;
   };
@@ -84,13 +89,24 @@ export interface Message {
 }
 
 interface AppState {
+  projectMetadata: {
+    description: string;
+    created_at: string;
+    modified_at: string;
+  };
+  canvasConfig: {
+    width: number;
+    height: number;
+    background: string;
+    gridSize: number;
+  };
   objects: SynopticObject[];
   connections: SynopticConnection[];
   selectedIds: string[];
   selectedConnectionIds: string[];
   canvasState: CanvasState;
   clipboard: SynopticObject[];
-  history: SynopticObject[][];
+  history: HistorySnapshot[];
   historyIndex: number;
 
   // Project State
@@ -149,13 +165,24 @@ interface AppState {
 }
 
 export const useStore = create<AppState>((set, get) => ({
+  projectMetadata: {
+    description: "",
+    created_at: new Date().toISOString(),
+    modified_at: new Date().toISOString()
+  },
+  canvasConfig: {
+    width: 1920,
+    height: 1080,
+    background: "#ffffff",
+    gridSize: 20
+  },
   objects: [],
   connections: [],
   selectedIds: [],
   selectedConnectionIds: [],
   canvasState: { zoom: 1, panX: 0, panY: 0 },
   clipboard: [],
-  history: [[]],
+  history: [{ objects: [], connections: [] }],
   historyIndex: 0,
 
   projectName: 'New Project',
@@ -199,7 +226,7 @@ export const useStore = create<AppState>((set, get) => ({
     newHistory.push({
       objects: JSON.parse(JSON.stringify(objects)),
       connections: JSON.parse(JSON.stringify(connections))
-    } as any);
+    });
     set({ history: newHistory, historyIndex: newHistory.length - 1, isDirty: true });
   },
 

@@ -30,7 +30,7 @@ const getAbsolutePortCoords = (obj: SynopticObject, portX: number, portY: number
 };
 
 // Simple orthogonal router
-const calculateOrthogonalPath = (x1: number, y1: number, x2: number, y2: number) => {
+const calculateOrthogonalPath = (x1: number, y1: number, x2: number, y2: number, fromPort: any, toPort: any) => {
   const dx = Math.abs(x2 - x1);
   const dy = Math.abs(y2 - y1);
 
@@ -38,14 +38,28 @@ const calculateOrthogonalPath = (x1: number, y1: number, x2: number, y2: number)
   if (dx < 5) return `M ${x1} ${y1} L ${x1} ${y2}`;
   if (dy < 5) return `M ${x1} ${y1} L ${x2} ${y1}`;
 
-  // One bend (L shape)
-  // To decide whether to go Horizontal then Vertical, or Vertical then Horizontal,
-  // we could look at the port direction, but since we don't pass port direction here,
-  // we just pick the one that looks better based on aspect ratio.
-  // In typical diagrams, vertical drops are preferred from top/bottom ports.
-  // Since we don't have port normal vector, we will fallback to a compact two-bend if distance is large, or one bend if close.
+  // Calculate normal vector based on port local percentage coordinates
+  // Assuming a standard unrotated port at top (x=0.5, y=0) has normal (0, -1)
+  // We approximate the normal vector by how close it is to the edges.
+  // But wait, it's easier to just use the port's x/y ratio directly if it's strictly on an edge.
+  const fromDirY = fromPort.y === 0 ? -1 : (fromPort.y === 1 ? 1 : 0);
+  const fromDirX = fromPort.x === 0 ? -1 : (fromPort.x === 1 ? 1 : 0);
+  const toDirY = toPort.y === 0 ? -1 : (toPort.y === 1 ? 1 : 0);
+  const toDirX = toPort.x === 0 ? -1 : (toPort.x === 1 ? 1 : 0);
 
-  // Compact two-bend (S shape)
+  // If both ports are vertically oriented (top/bottom)
+  if (fromDirY !== 0 || toDirY !== 0) {
+     const midY = y1 + (y2 - y1) / 2;
+     return `M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`;
+  }
+
+  // If both ports are horizontally oriented (left/right)
+  if (fromDirX !== 0 || toDirX !== 0) {
+     const midX = x1 + (x2 - x1) / 2;
+     return `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}`;
+  }
+
+  // Fallback to aspect ratio
   if (dy > dx) {
     const midY = y1 + (y2 - y1) / 2;
     return `M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`;
@@ -87,7 +101,7 @@ export const ConnectionLine: React.FC<ConnectionProps> = ({ conn, fromObj, toObj
     y2 = coords.y;
   }
 
-  const path = calculateOrthogonalPath(x1, y1, x2, y2);
+  const path = calculateOrthogonalPath(x1, y1, x2, y2, fromPort, toPort);
 
   // Styling based on type and state
   let strokeColor = '#2c3e50';
