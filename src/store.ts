@@ -7,6 +7,7 @@ export interface HistorySnapshot {
   connections: SynopticConnection[];
 }
 export interface SynopticObject {
+  zIndex?: number;
   id: string;
   type: string;
   category: string;
@@ -346,11 +347,11 @@ export const useStore = create<AppState>((set, get) => ({
   undo: () => {
     const { history, historyIndex } = get();
     if (historyIndex > 0) {
-      const prevState = history[historyIndex - 1] as any;
+      const prevState = history[historyIndex - 1];
       set({
         historyIndex: historyIndex - 1,
-        objects: JSON.parse(JSON.stringify(prevState.objects || prevState)), // backward compat check
-        connections: prevState.connections ? JSON.parse(JSON.stringify(prevState.connections)) : [],
+        objects: JSON.parse(JSON.stringify(prevState.objects || [])),
+        connections: JSON.parse(JSON.stringify(prevState.connections || [])),
         selectedIds: [],
         selectedConnectionIds: [],
         isDirty: true
@@ -361,11 +362,11 @@ export const useStore = create<AppState>((set, get) => ({
   redo: () => {
     const { history, historyIndex } = get();
     if (historyIndex < history.length - 1) {
-      const nextState = history[historyIndex + 1] as any;
+      const nextState = history[historyIndex + 1];
       set({
         historyIndex: historyIndex + 1,
-        objects: JSON.parse(JSON.stringify(nextState.objects || nextState)),
-        connections: nextState.connections ? JSON.parse(JSON.stringify(nextState.connections)) : [],
+        objects: JSON.parse(JSON.stringify(nextState.objects || [])),
+        connections: JSON.parse(JSON.stringify(nextState.connections || [])),
         selectedIds: [],
         selectedConnectionIds: [],
         isDirty: true

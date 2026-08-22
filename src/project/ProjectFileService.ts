@@ -43,6 +43,7 @@ export class ProjectFileService {
   static async saveFile() {
     const state = useStore.getState();
     const data = ProjectManager.getProjectData();
+    if (!data) return; // Validation aborted save
 
     if (state.fileHandle && 'showSaveFilePicker' in window) {
       try {
@@ -62,6 +63,7 @@ export class ProjectFileService {
   static async saveFileAs() {
     const state = useStore.getState();
     const data = ProjectManager.getProjectData();
+    if (!data) return; // Validation aborted save
     const suggestedName = state.fileName || `${state.projectName}.epwsyn`;
 
     if ('showSaveFilePicker' in window) {
@@ -89,7 +91,7 @@ export class ProjectFileService {
       }
     } else {
       // Fallback
-      const blob = new Blob([data], { type: 'application/json' });
+      const blob = new Blob([data as string], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

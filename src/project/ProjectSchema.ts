@@ -48,52 +48,88 @@ export function createEmptyProject(name: string = "New Project"): EPWProjectSche
   };
 }
 
-export function validateProjectSchema(data: any): { valid: boolean; error?: string } {
-  if (!data || typeof data !== 'object') return { valid: false, error: "Data is not an object" };
-  if (data.format !== FORMAT_NAME) return { valid: false, error: `Format must be ${FORMAT_NAME}` };
-  if (typeof data.schema_version !== 'number') return { valid: false, error: "Missing schema_version" };
-  if (data.schema_version > CURRENT_SCHEMA_VERSION) return { valid: false, error: `Unsupported schema version: ${data.schema_version}. Max supported is ${CURRENT_SCHEMA_VERSION}` };
-  if (!data.project || typeof data.project.name !== 'string') return { valid: false, error: "Missing or invalid project.name" };
-  if (!data.canvas || typeof data.canvas.width !== 'number' || typeof data.canvas.height !== 'number') return { valid: false, error: "Missing or invalid canvas config" };
-  if (!Array.isArray(data.objects)) return { valid: false, error: "Objects must be an array" };
+export interface ValidationIssue {
+  severity: 'ERROR' | 'WARNING' | 'INFO';
+  code: string;
+  message: string;
+  objectId?: string;
+}
+
+export interface ValidationResult {
+  valid: boolean;
+  issues: ValidationIssue[];
+}
+
+export function validateProjectSchema(data: any): ValidationResult {
+  const issues: ValidationIssue[] = [];
+
+  if (!data || typeof data !== 'object') {
+     return { valid: false, issues: [{ severity: 'ERROR', code: 'INVALID_FORMAT', message: 'Data is not an object' }] };
+  }
+
+  if (data.format !== FORMAT_NAME) {
+     issues.push({ severity: 'ERROR', code: 'INVALID_FORMAT', message: `Format must be ${FORMAT_NAME}` });
+  }
+
+  if (typeof data.schema_version !== 'number') {
+     issues.push({ severity: 'ERROR', code: 'MISSING_VERSION', message: 'Missing schema_version' });
+  } else if (data.schema_version > CURRENT_SCHEMA_VERSION) {
+     issues.push({ severity: 'ERROR', code: 'UNSUPPORTED_VERSION', message: `Unsupported schema version: ${data.schema_version}. Max is ${CURRENT_SCHEMA_VERSION}` });
+  }
+
+  if (!data.project || typeof data.project.name !== 'string') {
+     issues.push({ severity: 'ERROR', code: 'INVALID_PROJECT_META', message: 'Missing or invalid project.name' });
+  }
+
+  if (!data.canvas || typeof data.canvas.width !== 'number' || typeof data.canvas.height !== 'number') {
+     issues.push({ severity: 'ERROR', code: 'INVALID_CANVAS', message: 'Missing or invalid canvas config' });
+  }
+
+  if (!Array.isArray(data.objects)) {
+     issues.push({ severity: 'ERROR', code: 'INVALID_OBJECTS', message: 'Objects must be an array' });
+     return { valid: false, issues };
+  }
 
   const objectIds = new Set<string>();
   for (const obj of data.objects) {
-    if (!obj.id) return { valid: false, error: "Object missing ID" };
-    if (objectIds.has(obj.id)) return { valid: false, error: `Duplicate object ID: ${obj.id}` };
+    if (!obj.id) {
+       issues.push({ severity: 'ERROR', code: 'MISSING_OBJ_ID', message: 'Object missing ID' });
+       continue;
+    }
+    if (objectIds.has(obj.id)) {
+       issues.push({ severity: 'ERROR', code: 'DUPLICATE_OBJ_ID', objectId: obj.id, message: `Duplicate object ID: ${obj.id}` });
+    }
     objectIds.add(obj.id);
 
-    // Check if symbol type exists
     const def = getSymbolDefinition(obj.type);
-    if (!def) return { valid: false, error: `Unknown symbol type: ${obj.type}` };
+    if (!def) {
+       issues.push({ severity: 'WARNING', code: 'UNKNOWN_SYMBOL', objectId: obj.id, message: `Unknown symbol type: ${obj.type}` });
+    }
   }
 
   const connIds = new Set<string>();
   if (data.connections) {
     for (const conn of data.connections) {
-      if (!conn.id) return { valid: false, error: "Connection missing ID" };
-      if (connIds.has(conn.id)) return { valid: false, error: `Duplicate connection ID: ${conn.id}` };
+      if (!conn.id) {
+         issues.push({ severity: 'ERROR', code: 'MISSING_CONN_ID', message: 'Connection missing ID' });
+         continue;
+      }
+      if (connIds.has(conn.id)) {
+         issues.push({ severity: 'ERROR', code: 'DUPLICATE_CONN_ID', message: `Duplicate connection ID: ${conn.id}` });
+      }
       connIds.add(conn.id);
 
-      // Check dangling references
-      if (!objectIds.has(conn.fromId)) return { valid: false, error: `Dangling connection fromId: ${conn.fromId}` };
-      if (!objectIds.has(conn.toId)) return { valid: false, error: `Dangling connection toId: ${conn.toId}` };
-
-      // Validate ports exist on the symbols
-      const fromObj = data.objects.find((o: any) => o.id === conn.fromId);
-      const toObj = data.objects.find((o: any) => o.id === conn.toId);
-      const fromDef = getSymbolDefinition(fromObj.type);
-      const toDef = getSymbolDefinition(toObj.type);
-
-      const fromPortExists = conn.fromPort.startsWith('dyn_') || fromDef?.connectionPoints?.some(p => p.id === conn.fromPort);
-      const toPortExists = conn.toPort.startsWith('dyn_') || toDef?.connectionPoints?.some(p => p.id === conn.toPort);
-
-      if (!fromPortExists) return { valid: false, error: `Nonexistent port ${conn.fromPort} on object ${conn.fromId}` };
-      if (!toPortExists) return { valid: false, error: `Nonexistent port ${conn.toPort} on object ${conn.toId}` };
+      if (!objectIds.has(conn.fromId)) {
+         issues.push({ severity: 'ERROR', code: 'DANGLING_CONNECTION', message: `Dangling connection fromId: ${conn.fromId}` });
+      }
+      if (!objectIds.has(conn.toId)) {
+         issues.push({ severity: 'ERROR', code: 'DANGLING_CONNECTION', message: `Dangling connection toId: ${conn.toId}` });
+      }
     }
   }
 
-  return { valid: true };
+  const hasErrors = issues.some(i => i.severity === 'ERROR');
+  return { valid: !hasErrors, issues };
 }
 
 export function migrateProject(data: any): EPWProjectSchema {

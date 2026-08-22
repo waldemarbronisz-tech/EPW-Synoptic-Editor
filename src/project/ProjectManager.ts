@@ -1,4 +1,5 @@
-import { validateProjectSchema, createEmptyProject, migrateProject, CURRENT_SCHEMA_VERSION, FORMAT_NAME } from './ProjectSchema';
+import { validateProjectSchema, createEmptyProject, CURRENT_SCHEMA_VERSION, FORMAT_NAME } from './ProjectSchema';
+import { runMigrations } from './Migrations';
 import type { EPWProjectSchema } from './ProjectSchema';
 import { useStore } from '../store';
 
@@ -15,11 +16,12 @@ export class ProjectManager {
       const validation = validateProjectSchema(parsed);
 
       if (!validation.valid) {
-        useStore.getState().addMessage(`[ERROR] Validation failed: ${validation.error}`);
+        const errorIssue = validation.issues.find(i => i.severity === 'ERROR');
+        useStore.getState().addMessage(`[ERROR] Validation failed: ${errorIssue?.message}`);
         return false;
       }
 
-      parsed = migrateProject(parsed);
+      parsed = runMigrations(parsed);
 
       this.loadProjectToStore(parsed, false);
       useStore.getState().setFileName(fileName);
@@ -31,7 +33,7 @@ export class ProjectManager {
     }
   }
 
-  static getProjectData(): string {
+  static getProjectData(): string | null {
     const state = useStore.getState();
     const proj: EPWProjectSchema = {
       format: FORMAT_NAME,
@@ -46,6 +48,12 @@ export class ProjectManager {
       objects: state.objects,
       connections: state.connections || []
     };
+    const validation = validateProjectSchema(proj);
+    if (!validation.valid) {
+       const errorIssue = validation.issues.find(i => i.severity === 'ERROR');
+       useStore.getState().addMessage(`[ERROR] Save Aborted! Validation failed: ${errorIssue?.message}`);
+       return null;
+    }
     return JSON.stringify(proj, null, 2);
   }
 

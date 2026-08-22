@@ -1,4 +1,6 @@
 import React from 'react';
+import { getMediaDefinition } from '../symbols/registry/MediaRegistry';
+
 import { Group, Path, Circle } from 'react-konva';
 import type { SynopticConnection, SynopticObject } from '../store';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
@@ -101,16 +103,23 @@ export const ConnectionLine: React.FC<ConnectionProps> = ({ conn, fromObj, toObj
     y2 = coords.y;
   }
 
-  const path = calculateOrthogonalPath(x1, y1, x2, y2, fromPort, toPort);
+  let path = '';
+  if (conn.waypoints && conn.waypoints.length > 0) {
+     path = `M ${x1} ${y1}`;
+     conn.waypoints.forEach(wp => {
+        path += ` L ${wp.x} ${wp.y}`;
+     });
+     path += ` L ${x2} ${y2}`;
+  } else {
+     path = calculateOrthogonalPath(x1, y1, x2, y2, fromPort, toPort);
+  }
 
   // Styling based on type and state
-  let strokeColor = '#2c3e50';
-  let strokeWidth = 2;
-  let dash: number[] | undefined = undefined;
+  const media = getMediaDefinition(conn.type);
+  let strokeColor = media?.visualStyle.strokeColor || '#2c3e50';
+  let strokeWidth = media?.visualStyle.strokeWidth || 2;
+  let dash = media?.visualStyle.dash;
 
-  if (conn.type === 'electrical_ac') strokeColor = '#e74c3c';
-  if (conn.type === 'water') strokeColor = '#3498db';
-  if (conn.type === 'hvac_air') strokeColor = '#bdc3c7';
 
   if (conn.editor?.preview_state === 'ENERGIZED' || conn.editor?.preview_state === 'FLOW') {
     strokeWidth = 4;

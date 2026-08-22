@@ -8,9 +8,10 @@ import { ConnectionLine } from './ConnectionLine';
 import { ObjectLabelRenderer } from './ObjectLabelRenderer';
 
 
-const GRID_SIZE = 20;
 
-const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMouseDown, onPortMouseUp, wireDragStart }: {
+
+const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMouseDown, onPortMouseUp, wireDragStart, gridSize }: {
+  gridSize: number,
   obj: SynopticObject,
   isSelected: boolean,
   onSelect: () => void,
@@ -84,14 +85,14 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
         }}
         onDragMove={(e) => {
           // Snap during drag for visual feedback (doesn't mutate store yet)
-          e.target.x(Math.round(e.target.x() / GRID_SIZE) * GRID_SIZE);
-          e.target.y(Math.round(e.target.y() / GRID_SIZE) * GRID_SIZE);
+          e.target.x(Math.round(e.target.x() / gridSize) * gridSize);
+          e.target.y(Math.round(e.target.y() / gridSize) * gridSize);
         }}
         onDragEnd={(e) => {
           // Push final position to store history once
           onChange({
-            x: Math.round(e.target.x() / GRID_SIZE) * GRID_SIZE,
-            y: Math.round(e.target.y() / GRID_SIZE) * GRID_SIZE,
+            x: Math.round(e.target.x() / gridSize) * gridSize,
+            y: Math.round(e.target.y() / gridSize) * gridSize,
           });
         }}
         onTransformEnd={() => {
@@ -100,8 +101,8 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
           const scaleY = node.scaleY();
 
           onChange({
-            x: Math.round(node.x() / GRID_SIZE) * GRID_SIZE,
-            y: Math.round(node.y() / GRID_SIZE) * GRID_SIZE,
+            x: Math.round(node.x() / gridSize) * gridSize,
+            y: Math.round(node.y() / gridSize) * gridSize,
             rotation: node.rotation(),
             scaleX: Math.max(0.1, scaleX),
             scaleY: Math.max(0.1, scaleY),
@@ -174,6 +175,7 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
 export const Canvas: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<any>(null);
+  const gridSize = useStore(state => state.canvasConfig.gridSize);
   const { objects, selectedIds, selectObjects, clearSelection, addObject, updateObject, canvasState, setCanvasState } = useStore();
   const [size, setSize] = useState({ width: 800, height: 600 });
 
@@ -367,8 +369,8 @@ export const Canvas: React.FC = () => {
     let y = (pos.y - stageY) / scale;
 
     // Snap to grid
-    x = Math.round(x / GRID_SIZE) * GRID_SIZE;
-    y = Math.round(y / GRID_SIZE) * GRID_SIZE;
+    x = Math.round(x / gridSize) * gridSize;
+    y = Math.round(y / gridSize) * gridSize;
 
     const def = getSymbolDefinition(data.type);
     const width = def?.defaultWidth || 80;
@@ -404,14 +406,14 @@ export const Canvas: React.FC = () => {
   // Draw Grid
   const drawGrid = () => {
     const lines = [];
-    const width = 5000;
-    const height = 5000;
+    const width = useStore.getState().canvasConfig.width;
+    const height = useStore.getState().canvasConfig.height;
 
-    for (let i = 0; i < width / GRID_SIZE; i++) {
+    for (let i = 0; i < width / gridSize; i++) {
       lines.push(
         <Rect
           key={`v${i}`}
-          x={i * GRID_SIZE}
+          x={i * gridSize}
           y={0}
           width={1}
           height={height}
@@ -420,12 +422,12 @@ export const Canvas: React.FC = () => {
         />
       );
     }
-    for (let j = 0; j < height / GRID_SIZE; j++) {
+    for (let j = 0; j < height / gridSize; j++) {
       lines.push(
         <Rect
           key={`h${j}`}
           x={0}
-          y={j * GRID_SIZE}
+          y={j * gridSize}
           width={width}
           height={1}
           fill="rgba(0, 0, 0, 0.1)"
@@ -572,6 +574,7 @@ export const Canvas: React.FC = () => {
         style={{ cursor: selectionStartRef.current ? 'crosshair' : 'default' }}
       >
         <Layer>
+          <Rect x={0} y={0} width={useStore.getState().canvasConfig.width} height={useStore.getState().canvasConfig.height} fill={useStore.getState().canvasConfig.background} />
           {drawGrid()}
         </Layer>
         <Layer>
@@ -606,7 +609,42 @@ export const Canvas: React.FC = () => {
               />
             );
           })()}
-          {objects.map((obj) => (
+                    {/* Topology Junctions */}
+          {(() => {
+             const junctions: {x: number, y: number}[] = [];
+             const pointMap = new Map<string, number>();
+
+             connections.forEach(c => {
+                 const key1 = `${c.fromId}:${c.fromPort}`;
+                 const key2 = `${c.toId}:${c.toPort}`;
+                 pointMap.set(key1, (pointMap.get(key1) || 0) + 1);
+                 pointMap.set(key2, (pointMap.get(key2) || 0) + 1);
+             });
+
+             pointMap.forEach((count, key) => {
+                 if (count > 2) { // 3 or more wires meeting at a port is definitely a junction
+                     const [objId, portId] = key.split(':');
+                     const obj = objects.find(o => o.id === objId);
+                     if (obj) {
+                         const def = getSymbolDefinition(obj.type);
+                         const port = def?.connectionPoints?.find(p => p.id === portId);
+                         if (port) {
+                             const w = obj.width * (obj.scaleX || 1);
+                             const h = obj.height * (obj.scaleY || 1);
+                             const cx = port.x * w - w / 2;
+                             const cy = port.y * h - h / 2;
+                             const rot = obj.rotation || 0;
+                             const radians = rot * (Math.PI / 180);
+                             const rx = cx * Math.cos(radians) - cy * Math.sin(radians);
+                             const ry = cx * Math.sin(radians) + cy * Math.cos(radians);
+                             junctions.push({ x: obj.x + w / 2 + rx, y: obj.y + h / 2 + ry });
+                         }
+                     }
+                 }
+             });
+             return junctions.map((j, idx) => <Circle key={`junc-${idx}`} x={j.x} y={j.y} radius={3} fill="#000" />);
+          })()}
+          {[...objects].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)).map((obj) => (
             <ObjectNode
               key={obj.id}
               obj={obj}
@@ -617,6 +655,7 @@ export const Canvas: React.FC = () => {
               onPortMouseDown={handlePortMouseDown}
               onPortMouseUp={handlePortMouseUp}
               wireDragStart={wireDragStart}
+              gridSize={gridSize}
             />
           ))}
           {selectionBox && (

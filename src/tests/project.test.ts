@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { validateProjectSchema, createEmptyProject, migrateProject } from '../project/ProjectSchema';
+import { validateProjectSchema, createEmptyProject } from '../project/ProjectSchema';
+import { runMigrations } from '../project/Migrations';
 
 describe('Project Schema Validation', () => {
   it('validates a fresh empty project', () => {
@@ -13,7 +14,7 @@ describe('Project Schema Validation', () => {
     proj.schema_version = 999;
     const result = validateProjectSchema(proj);
     expect(result.valid).toBe(false);
-    expect(result.error).toContain('Unsupported schema version');
+    expect(result.issues[0].message).toContain('Unsupported schema version');
   });
 
   it('rejects duplicate object IDs', () => {
@@ -24,7 +25,7 @@ describe('Project Schema Validation', () => {
     ];
     const result = validateProjectSchema(proj);
     expect(result.valid).toBe(false);
-    expect(result.error).toContain('Duplicate object ID');
+    expect(result.issues[0].message).toContain('Duplicate object ID');
   });
 
   it('rejects dangling connections', () => {
@@ -33,12 +34,12 @@ describe('Project Schema Validation', () => {
     proj.connections = [{ id: 'conn1', fromId: 'obj1', fromPort: 'P1', toId: 'obj2', toPort: 'IN', type: 'electrical_ac' }];
     const result = validateProjectSchema(proj);
     expect(result.valid).toBe(false);
-    expect(result.error).toContain('Dangling connection');
+    expect(result.issues[0].message).toContain('Dangling connection');
   });
 
   it('migrates schema non-destructively', () => {
     const proj = createEmptyProject("Test");
-    const migrated = migrateProject(proj);
+    const migrated = runMigrations(proj);
     expect(migrated).toEqual(proj); // For now it's an identity map
   });
 });

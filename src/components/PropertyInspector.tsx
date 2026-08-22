@@ -104,7 +104,7 @@ export const PropertyInspector: React.FC = () => {
             <div className="property-group-title">General</div>
             <div className="property-row">
               <label>Type</label>
-              <select name="type" value={selectedConn.type} onChange={handleConnChange}>
+              <select name="type" value={selectedConn.type} onChange={handleConnChange} onBlur={() => useStore.getState().saveHistory()}>
                 <option value="electrical_ac">Electrical AC</option>
                 <option value="electrical_dc">Electrical DC</option>
                 <option value="water">Water</option>
@@ -132,7 +132,7 @@ export const PropertyInspector: React.FC = () => {
             <div className="property-group-title">Preview</div>
             <div className="property-row">
               <label>State</label>
-              <select name="editor.preview_state" value={selectedConn.editor?.preview_state || ''} onChange={handleConnChange}>
+              <select name="editor.preview_state" value={selectedConn.editor?.preview_state || ''} onChange={handleConnChange} onBlur={() => useStore.getState().saveHistory()}>
                 <option value="DEENERGIZED">Deenergized / No Flow</option>
                 <option value="ENERGIZED">Energized (Elec)</option>
                 <option value="FLOW">Flow (Water/HVAC)</option>
@@ -161,27 +161,27 @@ export const PropertyInspector: React.FC = () => {
           </div>
           <div className="property-row">
             <label>Designation</label>
-            <input type="text" name="designation" value={selectedObj.designation || ''} onChange={handleChange} />
+            <input type="text" name="designation" value={selectedObj.designation || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
           <div className="property-row">
             <label>Name</label>
-            <input type="text" name="name" value={selectedObj.name || ''} onChange={handleChange} />
+            <input type="text" name="name" value={selectedObj.name || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
           <div className="property-row">
             <label>Description</label>
-            <input type="text" name="description" value={selectedObj.description || ''} onChange={handleChange} />
+            <input type="text" name="description" value={selectedObj.description || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
           <div className="property-row">
             <label>Visible</label>
-            <input type="checkbox" name="visible" checked={selectedObj.visible !== false} onChange={handleChange} />
+            <input type="checkbox" name="visible" checked={selectedObj.visible !== false} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
           <div className="property-row">
             <label>Locked</label>
-            <input type="checkbox" name="locked" checked={selectedObj.locked === true} onChange={handleChange} />
+            <input type="checkbox" name="locked" checked={selectedObj.locked === true} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
           <div className="property-row">
             <label>Layer</label>
-            <input type="number" name="layer" value={selectedObj.layer || 1} onChange={handleChange} />
+            <input type="number" name="layer" value={selectedObj.layer || 1} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
         </div>
 
@@ -189,23 +189,23 @@ export const PropertyInspector: React.FC = () => {
           <div className="property-group-title">Layout</div>
           <div className="property-row">
             <label>X</label>
-            <input type="number" name="x" value={Math.round(selectedObj.x)} onChange={handleChange} />
+            <input type="number" name="x" value={Math.round(selectedObj.x)} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
           <div className="property-row">
             <label>Y</label>
-            <input type="number" name="y" value={Math.round(selectedObj.y)} onChange={handleChange} />
+            <input type="number" name="y" value={Math.round(selectedObj.y)} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
           <div className="property-row">
             <label>Rotation</label>
-            <input type="number" name="rotation" value={Math.round(selectedObj.rotation || 0)} onChange={handleChange} />
+            <input type="number" name="rotation" value={Math.round(selectedObj.rotation || 0)} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
           <div className="property-row">
             <label>Scale X</label>
-            <input type="number" name="scaleX" value={selectedObj.scaleX || 1} step="0.1" onChange={handleChange} />
+            <input type="number" name="scaleX" value={selectedObj.scaleX || 1} step="0.1" onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
           <div className="property-row">
             <label>Scale Y</label>
-            <input type="number" name="scaleY" value={selectedObj.scaleY || 1} step="0.1" onChange={handleChange} />
+            <input type="number" name="scaleY" value={selectedObj.scaleY || 1} step="0.1" onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
         </div>
 
@@ -213,27 +213,27 @@ export const PropertyInspector: React.FC = () => {
           <div className="property-group-title">Appearance</div>
           <div className="property-row">
             <label>Fill</label>
-            <input type="color" name="fill" value={selectedObj.fill || '#ffffff'} onChange={handleChange} />
+            <input type="color" name="fill" value={selectedObj.fill || '#ffffff'} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
           <div className="property-row">
             <label>Border</label>
-            <input type="color" name="border" value={selectedObj.border || '#000000'} onChange={handleChange} />
+            <input type="color" name="border" value={selectedObj.border || '#000000'} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
           <div className="property-row">
             <label>Text</label>
-            <input type="text" name="text" value={selectedObj.text || ''} onChange={handleChange} />
+            <input type="text" name="text" value={selectedObj.text || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
           <div className="property-row">
             <label>Font</label>
-            <input type="text" name="font" value={selectedObj.font || 'Arial'} onChange={handleChange} />
+            <input type="text" name="font" value={selectedObj.font || 'Arial'} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
           <div className="property-row">
             <label>Font Size</label>
-            <input type="number" name="fontSize" value={selectedObj.fontSize || 12} onChange={handleChange} />
+            <input type="number" name="fontSize" value={selectedObj.fontSize || 12} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
           <div className="property-row">
             <label>Tooltip</label>
-            <input type="text" name="tooltip" value={selectedObj.tooltip || ''} onChange={handleChange} />
+            <input type="text" name="tooltip" value={selectedObj.tooltip || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
         </div>
 
@@ -241,7 +241,7 @@ export const PropertyInspector: React.FC = () => {
           <div className="property-group-title">Editor Preview</div>
           <div className="property-row">
             <label>State</label>
-            <select name="editor.preview_state" value={selectedObj.editor?.preview_state || ''} onChange={handleChange}>
+            <select name="editor.preview_state" value={selectedObj.editor?.preview_state || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()}>
               <option value="">(Default)</option>
               {getSymbolDefinition(selectedObj.type)?.allowedStates.map(st => (
                 <option key={st} value={st}>{st}</option>
@@ -252,15 +252,15 @@ export const PropertyInspector: React.FC = () => {
             <>
               <div className="property-row">
                 <label>Value</label>
-                <input type="text" name="editor.preview_value" value={selectedObj.editor?.preview_value || ''} onChange={handleChange} />
+                <input type="text" name="editor.preview_value" value={selectedObj.editor?.preview_value || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
               </div>
               <div className="property-row">
                 <label>Unit</label>
-                <input type="text" name="editor.unit" value={selectedObj.editor?.unit || ''} onChange={handleChange} />
+                <input type="text" name="editor.unit" value={selectedObj.editor?.unit || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
               </div>
               <div className="property-row">
                 <label>Format</label>
-                <input type="text" name="editor.format" placeholder="e.g. 0.0" value={selectedObj.editor?.format || ''} onChange={handleChange} />
+                <input type="text" name="editor.format" placeholder="e.g. 0.0" value={selectedObj.editor?.format || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
               </div>
             </>
           ) : null}
@@ -270,19 +270,19 @@ export const PropertyInspector: React.FC = () => {
           <div className="property-group-title">Bindings</div>
           <div className="property-row">
             <label>State</label>
-            <input type="text" name="bindings.state.tag" value={selectedObj.bindings?.state?.tag || ''} onChange={handleChange} />
+            <input type="text" name="bindings.state.tag" value={selectedObj.bindings?.state?.tag || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
           <div className="property-row">
             <label>Value</label>
-            <input type="text" name="bindings.value.tag" value={selectedObj.bindings?.value?.tag || ''} onChange={handleChange} />
+            <input type="text" name="bindings.value.tag" value={selectedObj.bindings?.value?.tag || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
           <div className="property-row">
             <label>Alarm</label>
-            <input type="text" name="bindings.alarm.tag" value={selectedObj.bindings?.alarm?.tag || ''} onChange={handleChange} />
+            <input type="text" name="bindings.alarm.tag" value={selectedObj.bindings?.alarm?.tag || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
           <div className="property-row">
             <label>Command</label>
-            <input type="text" name="bindings.command.tag" value={selectedObj.bindings?.command?.tag || ''} onChange={handleChange} />
+            <input type="text" name="bindings.command.tag" value={selectedObj.bindings?.command?.tag || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
         </div>
 
