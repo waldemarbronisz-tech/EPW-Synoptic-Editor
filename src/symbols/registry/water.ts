@@ -1,36 +1,6 @@
 import type { SymbolDefinition } from '../SymbolRegistry';
 
 export const waterSymbols: Record<string, SymbolDefinition> = {
-  'water.pipe': {
-    type: 'water.pipe',
-    label: 'Pipe',
-    category: 'Water',
-    defaultWidth: 100,
-    defaultHeight: 10,
-    allowedStates: ['INACTIVE', 'FLOW', 'FAULT'],
-    defaultState: 'INACTIVE',
-    isLine: true
-  },
-  'water.pipe_elbow': {
-    type: 'water.pipe_elbow',
-    label: 'Pipe Elbow',
-    category: 'Water',
-    defaultWidth: 40,
-    defaultHeight: 40,
-    allowedStates: ['INACTIVE', 'FLOW', 'FAULT'],
-    defaultState: 'INACTIVE',
-    isLine: true
-  },
-  'water.tee': {
-    type: 'water.tee',
-    label: 'Tee',
-    category: 'Water',
-    defaultWidth: 60,
-    defaultHeight: 40,
-    allowedStates: ['INACTIVE', 'FLOW', 'FAULT'],
-    defaultState: 'INACTIVE',
-    isLine: true
-  },
   'water.valve': {
     type: 'water.valve',
     label: 'Valve',
@@ -112,5 +82,4 @@ export const waterSymbols: Record<string, SymbolDefinition> = {
     connectionPoints: [{id: 'IN', x: 0, y: 0.5, domain: 'water', direction: 'in'}, {id: 'OUT', x: 1, y: 0.5, domain: 'water', direction: 'out'}]
   },
 
-  // HVAC
 };

@@ -13,15 +13,20 @@ export class ProjectManager {
   static loadProject(data: string, fileName: string) {
     try {
       let parsed = JSON.parse(data);
-      const validation = validateProjectSchema(parsed);
 
+      if (!parsed || typeof parsed !== 'object' || parsed.schema_version > CURRENT_SCHEMA_VERSION) {
+         useStore.getState().addMessage(`[ERROR] Unsupported or invalid project schema format`);
+         return false;
+      }
+
+      parsed = runMigrations(parsed);
+
+      const validation = validateProjectSchema(parsed);
       if (!validation.valid) {
         const errorIssue = validation.issues.find(i => i.severity === 'ERROR');
         useStore.getState().addMessage(`[ERROR] Validation failed: ${errorIssue?.message}`);
         return false;
       }
-
-      parsed = runMigrations(parsed);
 
       this.loadProjectToStore(parsed, false);
       useStore.getState().setFileName(fileName);

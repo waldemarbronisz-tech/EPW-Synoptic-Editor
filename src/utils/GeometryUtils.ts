@@ -11,13 +11,18 @@ export const resolveConnectionPoint = (obj: SynopticObject, portId: string): Con
 
   // Dynamic port (busbars, etc)
   if (!port && portId.startsWith('dyn_')) {
-    const pos = parseInt(portId.replace('dyn_', ''), 10) / 100;
+    if (!def.supportsDynamicPorts) return null;
+    const match = portId.match(/^dyn_(\d+)$/);
+    if (!match) return null;
+    let pos = parseInt(match[1], 10);
+    if (isNaN(pos) || pos < 0 || pos > 100) return null;
+    pos = pos / 100;
     const w = def.defaultWidth || 80;
     const h = def.defaultHeight || 80;
     if (w >= h) {
-      port = { id: portId, x: pos, y: 0.5, domain: 'electrical', medium: 'ac', direction: 'passive',};
+      port = { id: portId, x: pos, y: 0.5, domain: 'electrical', medium: 'electrical_ac', direction: 'passive', multiplicity: 'multiple' };
     } else {
-      port = { id: portId, x: 0.5, y: pos, domain: 'electrical', medium: 'ac', direction: 'passive',};
+      port = { id: portId, x: 0.5, y: pos, domain: 'electrical', medium: 'electrical_ac', direction: 'passive', multiplicity: 'multiple' };
     }
   }
 

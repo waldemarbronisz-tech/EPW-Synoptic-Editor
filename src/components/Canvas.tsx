@@ -4,6 +4,7 @@ import { useStore } from '../store';
 import type { SynopticObject } from '../store';
 import { SymbolRenderer } from '../symbols/SymbolRenderer';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
+import { ConnectionService } from '../project/ConnectionService';
 import { ConnectionLine } from './ConnectionLine';
 import { ObjectLabelRenderer } from './ObjectLabelRenderer';
 
@@ -175,7 +176,8 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
 export const Canvas: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<any>(null);
-  const gridSize = useStore(state => state.canvasConfig.gridSize);
+  const canvasConfig = useStore(state => state.canvasConfig);
+  const gridSize = canvasConfig.gridSize;
   const { objects, selectedIds, selectObjects, clearSelection, addObject, updateObject, canvasState, setCanvasState } = useStore();
   const [size, setSize] = useState({ width: 800, height: 600 });
 
@@ -453,79 +455,15 @@ export const Canvas: React.FC = () => {
   };
   const handlePortMouseUp = (objId: string, portId: string, _e: any) => {
     if (wireDragStart && wireDragStart.objId !== objId) {
-
-      const fromObj = objects.find(o => o.id === wireDragStart.objId);
-      const toObj = objects.find(o => o.id === objId);
-      const fromDef = fromObj ? getSymbolDefinition(fromObj.type) : null;
-      const toDef = toObj ? getSymbolDefinition(toObj.type) : null;
-      const fromPort = fromDef?.connectionPoints?.find(p => p.id === wireDragStart.portId);
-      const toPort = toDef?.connectionPoints?.find(p => p.id === portId);
-
-      let inferredType = 'electrical_ac';
-      if (fromPort && toPort) {
-         if (fromPort.domain !== toPort.domain && fromPort.domain && toPort.domain) {
-            useStore.getState().addMessage(`[ERROR] Incompatible connection: ${fromPort.domain} -> ${toPort.domain}`);
-            setWireDragStart(null);
-            return;
-         }
-
-         // Direction compatibility
-         if (fromPort.direction === 'in' && toPort.direction === 'in') {
-            useStore.getState().addMessage(`[ERROR] Incompatible direction: IN -> IN`);
-            setWireDragStart(null);
-            return;
-         }
-         if (fromPort.direction === 'out' && toPort.direction === 'out') {
-            useStore.getState().addMessage(`[ERROR] Incompatible direction: OUT -> OUT`);
-            setWireDragStart(null);
-            return;
-         }
-
-         // Occupancy check
-         // Allow busbar/dyn ports to have multiple connections, but strict IN/OUT might be single use.
-         // Actually the spec says "connection to a single-use occupied port" - let's enforce that for IN/OUT
-         const isDyn = wireDragStart.portId.startsWith('dyn_') || portId.startsWith('dyn_');
-         if (!isDyn && fromDef?.type !== 'electrical.busbar' && toDef?.type !== 'electrical.busbar') {
-            const occupiedFrom = connections.find(c => (c.fromId === wireDragStart.objId && c.fromPort === wireDragStart.portId) || (c.toId === wireDragStart.objId && c.toPort === wireDragStart.portId));
-            const occupiedTo = connections.find(c => (c.fromId === objId && c.fromPort === portId) || (c.toId === objId && c.toPort === portId));
-            if (occupiedFrom) {
-               useStore.getState().addMessage(`[ERROR] Source port ${wireDragStart.portId} is already occupied`);
-               setWireDragStart(null);
-               return;
-            }
-            if (occupiedTo) {
-               useStore.getState().addMessage(`[ERROR] Target port ${portId} is already occupied`);
-               setWireDragStart(null);
-               return;
-            }
-         }
-
-         if (fromPort.domain === 'water') inferredType = 'water';
-         else if (fromPort.domain === 'hvac') inferredType = 'hvac_air';
-         else if (fromPort.domain === 'data' || fromPort.domain === 'control') inferredType = 'data';
-         else inferredType = 'electrical_ac'; // default
-      }
-
-      // Duplicate connection check
-      const duplicate = connections.find(c =>
-         (c.fromId === wireDragStart.objId && c.fromPort === wireDragStart.portId && c.toId === objId && c.toPort === portId) ||
-         (c.fromId === objId && c.fromPort === portId && c.toId === wireDragStart.objId && c.toPort === wireDragStart.portId)
+      const success = ConnectionService.tryCreateConnection(
+        wireDragStart.objId,
+        wireDragStart.portId,
+        objId,
+        portId
       );
-      if (duplicate) {
-         useStore.getState().addMessage(`[ERROR] Duplicate connection`);
-         setWireDragStart(null);
-         return;
+      if (success) {
+        setDrawingMode(false, 'electrical_ac');
       }
-
-      addConnection({
-        fromId: wireDragStart.objId,
-        fromPort: wireDragStart.portId,
-        toId: objId,
-        toPort: portId,
-        type: inferredType
-      });
-      useStore.getState().addMessage(`[INFO] Connected ${wireDragStart.objId}:${wireDragStart.portId} to ${objId}:${portId}`);
-      setDrawingMode(false, 'electrical_ac');
     }
     setWireDragStart(null);
   };
@@ -575,6 +513,7 @@ export const Canvas: React.FC = () => {
       >
         <Layer>
           <Rect x={0} y={0} width={useStore.getState().canvasConfig.width} height={useStore.getState().canvasConfig.height} fill={useStore.getState().canvasConfig.background} />
+          <Rect x={0} y={0} width={canvasConfig.width || 1920} height={canvasConfig.height || 1080} fill={canvasConfig.background || "#ffffff"} />
           {drawGrid()}
         </Layer>
         <Layer>
@@ -643,6 +582,43 @@ export const Canvas: React.FC = () => {
                  }
              });
              return junctions.map((j, idx) => <Circle key={`junc-${idx}`} x={j.x} y={j.y} radius={3} fill="#000" />);
+          })()}
+                    {/* Topology Junctions */}
+          {(() => {
+             const junctions: {x: number, y: number}[] = [];
+             const pointMap = new Map<string, number>();
+
+             connections.forEach(c => {
+                 const key1 = `${c.fromId}:${c.fromPort}`;
+                 const key2 = `${c.toId}:${c.toPort}`;
+                 pointMap.set(key1, (pointMap.get(key1) || 0) + 1);
+                 pointMap.set(key2, (pointMap.get(key2) || 0) + 1);
+             });
+
+             pointMap.forEach((count, key) => {
+                 if (count > 2) {
+                     const [objId, portId] = key.split(':');
+                     const obj = objects.find(o => o.id === objId);
+                     if (obj) {
+                         const def = getSymbolDefinition(obj.type);
+                         const port = def?.connectionPoints?.find(p => p.id === portId) ||
+                                      (portId.startsWith('dyn_') ? { x: parseInt(portId.replace('dyn_',''))/100, y: 0.5 } : null); // Simple dyn fallback
+                         if (port) {
+                             const w = obj.width * (obj.scaleX || 1);
+                             const h = obj.height * (obj.scaleY || 1);
+                             // To keep it simple, just use center bounds approximation for dyn_ busbars if it's horizontal
+                             const cx = (port.x || 0.5) * w - w / 2;
+                             const cy = (port.y || 0.5) * h - h / 2;
+                             const rot = obj.rotation || 0;
+                             const radians = rot * (Math.PI / 180);
+                             const rx = cx * Math.cos(radians) - cy * Math.sin(radians);
+                             const ry = cx * Math.sin(radians) + cy * Math.cos(radians);
+                             junctions.push({ x: obj.x + w / 2 + rx, y: obj.y + h / 2 + ry });
+                         }
+                     }
+                 }
+             });
+             return junctions.map((j, idx) => <Circle key={`junc-${idx}`} x={j.x} y={j.y} radius={4} fill="#000" />);
           })()}
           {[...objects].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)).map((obj) => (
             <ObjectNode

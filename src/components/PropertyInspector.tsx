@@ -180,8 +180,8 @@ export const PropertyInspector: React.FC = () => {
             <input type="checkbox" name="locked" checked={selectedObj.locked === true} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
           <div className="property-row">
-            <label>Layer</label>
-            <input type="number" name="layer" value={selectedObj.layer || 1} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
+            <label>Z-Index</label>
+            <input type="number" name="zIndex" value={selectedObj.zIndex || 0} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
         </div>
 

@@ -376,17 +376,23 @@ export const useStore = create<AppState>((set, get) => ({
 
   bringToFront: () => {
     const { objects, selectedIds } = get();
-    const unselected = objects.filter(obj => !selectedIds.includes(obj.id));
-    const selected = objects.filter(obj => selectedIds.includes(obj.id));
-    set({ objects: [...unselected, ...selected] });
+    if (selectedIds.length === 0) return;
+
+    const maxZ = Math.max(...objects.map(o => o.zIndex || 0), 0);
+    const newObjects = objects.map(o => selectedIds.includes(o.id) ? { ...o, zIndex: maxZ + 1 } : o);
+
+    set({ objects: newObjects, isDirty: true });
     get().saveHistory();
   },
 
   sendToBack: () => {
     const { objects, selectedIds } = get();
-    const unselected = objects.filter(obj => !selectedIds.includes(obj.id));
-    const selected = objects.filter(obj => selectedIds.includes(obj.id));
-    set({ objects: [...selected, ...unselected] });
+    if (selectedIds.length === 0) return;
+
+    const minZ = Math.min(...objects.map(o => o.zIndex || 0), 0);
+    const newObjects = objects.map(o => selectedIds.includes(o.id) ? { ...o, zIndex: minZ - 1 } : o);
+
+    set({ objects: newObjects, isDirty: true });
     get().saveHistory();
   },
 

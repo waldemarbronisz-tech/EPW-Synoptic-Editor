@@ -151,36 +151,6 @@ export const electricalSymbols: Record<string, SymbolDefinition> = {
     defaultState: 'NORMAL',
     connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'GND', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}]
   },
-  'electrical.cable': {
-    type: 'electrical.cable',
-    label: 'Cable',
-    category: 'Electrical',
-    defaultWidth: 100,
-    defaultHeight: 10,
-    allowedStates: ['DEENERGIZED', 'ENERGIZED', 'FAULT'],
-    defaultState: 'DEENERGIZED',
-    isLine: true
-  },
-  'electrical.ac_wire': {
-    type: 'electrical.ac_wire',
-    label: 'AC Wire',
-    category: 'Electrical',
-    defaultWidth: 100,
-    defaultHeight: 5,
-    allowedStates: ['DEENERGIZED', 'ENERGIZED', 'FAULT'],
-    defaultState: 'DEENERGIZED',
-    isLine: true
-  },
-  'electrical.three_phase_line': {
-    type: 'electrical.three_phase_line',
-    label: '3-Phase Line',
-    category: 'Electrical',
-    defaultWidth: 100,
-    defaultHeight: 15,
-    allowedStates: ['DEENERGIZED', 'ENERGIZED', 'FAULT'],
-    defaultState: 'DEENERGIZED',
-    isLine: true
-  },
   'electrical.cable_tray': {
     type: 'electrical.cable_tray',
     label: 'Cable Tray',
