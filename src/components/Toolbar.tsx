@@ -1,0 +1,100 @@
+import React from 'react';
+import { useStore } from '../store';
+import {
+  Undo, Redo, Copy, ClipboardPaste, Trash2,
+  BringToFront, SendToBack, AlignLeft, AlignCenter, AlignRight,
+  AlignVerticalSpaceAround, AlignHorizontalSpaceAround,
+  Lock, Unlock, RotateCcw, RotateCw, PenLine
+} from 'lucide-react';
+
+export const Toolbar: React.FC = () => {
+  const {
+    undo, redo, copySelected, paste, deleteObjects, selectedIds, selectedConnectionIds,
+    bringToFront, sendToBack, alignSelected, distributeSelected,
+    lockSelected, unlockSelected, rotateSelected,
+    isDrawingConnection, drawingConnectionType, setDrawingMode
+  } = useStore();
+
+  return (
+    <div className="toolbar">
+      <div className="toolbar-group">
+        <button title="Undo" onClick={undo}><Undo size={16} /></button>
+        <button title="Redo" onClick={redo}><Redo size={16} /></button>
+      </div>
+
+      <div className="toolbar-divider" />
+
+      <div className="toolbar-group">
+        <button title="Distribute Horizontally" onClick={() => distributeSelected('horizontal')}><AlignHorizontalSpaceAround size={16} /></button>
+        <button title="Distribute Vertically" onClick={() => distributeSelected('vertical')}><AlignVerticalSpaceAround size={16} /></button>
+      </div>
+
+      <div className="toolbar-divider" />
+
+      <div className="toolbar-group">
+        <button title="Copy" onClick={copySelected}><Copy size={16} /></button>
+        <button title="Paste" onClick={paste}><ClipboardPaste size={16} /></button>
+        <button title="Delete" onClick={() => deleteObjects(selectedIds, selectedConnectionIds)}><Trash2 size={16} /></button>
+      </div>
+
+      <div className="toolbar-divider" />
+
+      <div className="toolbar-group">
+        <button
+          title="Draw Electrical Connection"
+          onClick={() => setDrawingMode(isDrawingConnection && drawingConnectionType === 'electrical_ac' ? false : true, 'electrical_ac')}
+          style={{ backgroundColor: isDrawingConnection && drawingConnectionType === 'electrical_ac' ? '#3498db' : 'transparent' }}
+        >
+          <PenLine size={16} color={isDrawingConnection && drawingConnectionType === 'electrical_ac' ? '#e74c3c' : 'inherit'} />
+        </button>
+        <button
+          title="Draw Water Connection"
+          onClick={() => setDrawingMode(isDrawingConnection && drawingConnectionType === 'water' ? false : true, 'water')}
+          style={{ backgroundColor: isDrawingConnection && drawingConnectionType === 'water' ? '#3498db' : 'transparent' }}
+        >
+          <PenLine size={16} color={isDrawingConnection && drawingConnectionType === 'water' ? '#3498db' : 'inherit'} />
+        </button>
+        <button
+          title="Draw HVAC Connection"
+          onClick={() => setDrawingMode(isDrawingConnection && drawingConnectionType === 'hvac_air' ? false : true, 'hvac_air')}
+          style={{ backgroundColor: isDrawingConnection && drawingConnectionType === 'hvac_air' ? '#3498db' : 'transparent' }}
+        >
+          <PenLine size={16} color={isDrawingConnection && drawingConnectionType === 'hvac_air' ? '#95a5a6' : 'inherit'} />
+        </button>
+      </div>
+
+      <div className="toolbar-divider" />
+
+      <div className="toolbar-group">
+        <button title="Bring to Front" onClick={bringToFront}><BringToFront size={16} /></button>
+        <button title="Send to Back" onClick={sendToBack}><SendToBack size={16} /></button>
+      </div>
+
+      <div className="toolbar-divider" />
+
+      <div className="toolbar-group">
+        <button title="Align Left" onClick={() => alignSelected('left')}><AlignLeft size={16} /></button>
+        <button title="Align Center" onClick={() => alignSelected('center')}><AlignCenter size={16} /></button>
+        <button title="Align Right" onClick={() => alignSelected('right')}><AlignRight size={16} /></button>
+      </div>
+
+      <div className="toolbar-group">
+        <button title="Align Middle" onClick={() => alignSelected('middle')}><AlignVerticalSpaceAround size={16} /></button>
+      </div>
+
+      <div className="toolbar-divider" />
+
+      <div className="toolbar-group">
+        <button title="Lock" onClick={lockSelected}><Lock size={16} /></button>
+        <button title="Unlock" onClick={unlockSelected}><Unlock size={16} /></button>
+      </div>
+
+      <div className="toolbar-divider" />
+
+      <div className="toolbar-group">
+        <button title="Rotate Left" onClick={() => rotateSelected('ccw')}><RotateCcw size={16} /></button>
+        <button title="Rotate Right" onClick={() => rotateSelected('cw')}><RotateCw size={16} /></button>
+      </div>
+    </div>
+  );
+};
