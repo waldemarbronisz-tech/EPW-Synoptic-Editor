@@ -2,6 +2,7 @@ import { useStore } from '../store';
 import { resolveConnectionPoint } from '../utils/GeometryUtils';
 import type { SynopticObject } from '../store';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
+import { getMediaDefinition } from '../symbols/registry/MediaRegistry';
 
 export interface ValidationResult {
   valid: boolean;
@@ -48,34 +49,6 @@ export class ConnectionService {
       return { valid: false, code: "MEDIUM_MISMATCH", message: `Cannot connect ${fromPort.medium} to ${toPort.medium}` };
     }
 
-    // Direction validation
-    if (fromPort.direction === 'in' && toPort.direction === 'in') {
-      return { valid: false, code: "DIRECTION_MISMATCH", message: "Cannot connect IN to IN" };
-    }
-    if (fromPort.direction === 'out' && toPort.direction === 'out') {
-      return { valid: false, code: "DIRECTION_MISMATCH", message: "Cannot connect OUT to OUT" };
-    }
-
-    // Multiplicity validation (Single vs Multiple)
-    const fromOccupied = existingConnections.find(c => (c.fromId === fromObj.id && c.fromPort === fromPortId) || (c.toId === fromObj.id && c.toPort === fromPortId));
-    const toOccupied = existingConnections.find(c => (c.fromId === toObj.id && c.fromPort === toPortId) || (c.toId === toObj.id && c.toPort === toPortId));
-
-    if (fromPort.multiplicity !== 'multiple' && fromOccupied) {
-      return { valid: false, code: "PORT_OCCUPIED", message: `Source port ${fromPortId} is already occupied` };
-    }
-    if (toPort.multiplicity !== 'multiple' && toOccupied) {
-      return { valid: false, code: "PORT_OCCUPIED", message: `Target port ${toPortId} is already occupied` };
-    }
-
-    // Duplicate connections check
-    const duplicate = existingConnections.find(c =>
-      (c.fromId === fromObj.id && c.fromPort === fromPortId && c.toId === toObj.id && c.toPort === toPortId) ||
-      (c.fromId === toObj.id && c.fromPort === toPortId && c.toId === fromObj.id && c.toPort === fromPortId)
-    );
-    if (duplicate) {
-      return { valid: false, code: "DUPLICATE_CONNECTION", message: "Connection already exists" };
-    }
-
     // Infer connection type
     let inferredType = 'electrical_ac';
     if (fromPort.medium) inferredType = fromPort.medium;
@@ -83,6 +56,10 @@ export class ConnectionService {
     else if (fromPort.domain === 'water') inferredType = 'water';
     else if (fromPort.domain === 'hvac') inferredType = 'hvac_air';
     else if (fromPort.domain === 'data' || fromPort.domain === 'control') inferredType = 'data'; // fallback
+
+    if (!getMediaDefinition(inferredType) && inferredType !== 'data') {
+        return { valid: false, code: "UNKNOWN_MEDIUM", message: `Medium ${inferredType} is unknown or unsupported.` };
+    }
 
     return { valid: true, inferredType };
   }

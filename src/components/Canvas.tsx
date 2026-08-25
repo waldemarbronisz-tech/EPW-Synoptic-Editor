@@ -447,7 +447,7 @@ export const Canvas: React.FC = () => {
     isDrawingConnection,
     drawingConnectionType,
     setDrawingMode,
-    addConnection
+
   } = useStore();
 
   const handlePortMouseDown = (objId: string, portId: string, _e: any) => {
@@ -475,15 +475,16 @@ export const Canvas: React.FC = () => {
       useStore.getState().addMessage(`[INFO] Connection started from ${objId}:${portId}`);
     } else {
       if (drawStartPort.objId !== objId) {
-        addConnection({
-          fromId: drawStartPort.objId,
-          fromPort: drawStartPort.portId,
-          toId: objId,
-          toPort: portId,
-          type: drawingConnectionType,
-          editor: { preview_state: 'DEENERGIZED' } // Default state
-        });
-        useStore.getState().addMessage(`[INFO] Connection created`);
+        const success = ConnectionService.tryCreateConnection(
+          drawStartPort.objId, drawStartPort.portId,
+          objId, portId,
+          drawingConnectionType
+        );
+        if (success) {
+          useStore.getState().addMessage(`[INFO] Connection created`);
+        } else {
+          useStore.getState().addMessage(`[WARN] Connection failed (invalid rules)`);
+        }
       }
       setDrawStartPort(null);
       setDrawingMode(false);
