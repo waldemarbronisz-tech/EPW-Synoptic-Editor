@@ -2,6 +2,7 @@ import { useStore } from '../store';
 import { resolveConnectionPoint } from '../utils/GeometryUtils';
 import type { SynopticObject } from '../store';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
+import { getMediaDefinition } from '../symbols/registry/MediaRegistry';
 
 export interface ValidationResult {
   valid: boolean;
@@ -42,6 +43,13 @@ export class ConnectionService {
     // Media and Domain compatibility
     if (fromPort.domain !== toPort.domain) {
       return { valid: false, code: "DOMAIN_MISMATCH", message: `Cannot connect ${fromPort.domain} to ${toPort.domain}` };
+    }
+
+    if (fromPort.medium && !getMediaDefinition(fromPort.medium)) {
+      return { valid: false, code: "UNKNOWN_MEDIUM", message: `Unknown medium: ${fromPort.medium}` };
+    }
+    if (toPort.medium && !getMediaDefinition(toPort.medium)) {
+      return { valid: false, code: "UNKNOWN_MEDIUM", message: `Unknown medium: ${toPort.medium}` };
     }
 
     if (fromPort.medium && toPort.medium && fromPort.medium !== toPort.medium) {
