@@ -445,7 +445,6 @@ export const Canvas: React.FC = () => {
     selectedConnectionIds,
     selectConnections,
     isDrawingConnection,
-    drawingConnectionType,
     setDrawingMode,
   } = useStore();
 
@@ -461,7 +460,7 @@ export const Canvas: React.FC = () => {
         portId
       );
       if (success) {
-        setDrawingMode(false, 'electrical_ac');
+        setDrawingMode(false);
       }
     }
     setWireDragStart(null);
@@ -538,7 +537,7 @@ export const Canvas: React.FC = () => {
                   fromPort: wireDragStart.portId,
                   toId: 'cursor',
                   toPort: 'cursor',
-                  type: drawingConnectionType || 'electrical_ac'
+                  type: 'preview'
                 }}
                 fromObj={fromObj}
                 toObj={{...fromObj, width: 0, height: 0, x: mousePos.x, y: mousePos.y, rotation: 0} as any}

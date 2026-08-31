@@ -118,8 +118,7 @@ interface AppState {
 
   // Connection Drawing Mode
   isDrawingConnection: boolean;
-  drawingConnectionType: string;
-  setDrawingMode: (active: boolean, type?: string) => void;
+  setDrawingMode: (active: boolean) => void;
 
   // Actions
   setProjectName: (name: string) => void;
@@ -191,12 +190,10 @@ export const useStore = create<AppState>((set, get) => ({
   isDirty: false,
   messages: [],
   isDrawingConnection: false,
-  drawingConnectionType: 'electrical_ac',
 
-  setDrawingMode: (active, type) => set((state) => ({
-    isDrawingConnection: active,
-    drawingConnectionType: type || state.drawingConnectionType
-  })),
+  setDrawingMode: (active) => set({
+    isDrawingConnection: active
+  }),
 
   setProjectName: (name) => set({ projectName: name, isDirty: true }),
   setFileName: (name) => set({ fileName: name }),
