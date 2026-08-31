@@ -76,7 +76,6 @@ export interface SynopticConnection {
   toPort: string;
   type: string; // e.g. electrical_ac, water, hvac_air
   waypoints?: { x: number; y: number }[]; // Foundation for manual routing and net branch definitions
-  netId?: string; // Foundation for resolving electrical nets, branches, and junction dots
   editor?: {
     preview_state?: string;
   };
