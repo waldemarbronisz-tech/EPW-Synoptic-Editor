@@ -90,11 +90,13 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
           e.target.y(Math.round(e.target.y() / gridSize) * gridSize);
         }}
         onDragEnd={(e) => {
-          // Push final position to store history once
+          // Push final position, then commit exactly one history entry for
+          // the whole drag (updateObject itself no longer touches history).
           onChange({
             x: Math.round(e.target.x() / gridSize) * gridSize,
             y: Math.round(e.target.y() / gridSize) * gridSize,
           });
+          useStore.getState().saveHistory();
         }}
         onTransformEnd={() => {
           const node = shapeRef.current;
@@ -108,6 +110,7 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
             scaleX: Math.max(0.1, scaleX),
             scaleY: Math.max(0.1, scaleY),
           });
+          useStore.getState().saveHistory();
         }}
       >
         <SymbolRenderer obj={obj} />

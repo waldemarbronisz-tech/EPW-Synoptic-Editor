@@ -1,5 +1,6 @@
 import React from 'react';
 import { Group, Text } from 'react-konva';
+import { useStore } from '../store';
 import type { SynopticObject } from '../store';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 
@@ -86,6 +87,9 @@ export const ObjectLabelRenderer: React.FC<ObjectLabelRendererProps> = ({ obj, o
             labelOffsetX: e.target.x(),
             labelOffsetY: e.target.y()
           });
+          // Repositioning the label is a completed user action - commit it
+          // as its own single history entry.
+          useStore.getState().saveHistory();
         }
       }}
       onClick={(e) => {
