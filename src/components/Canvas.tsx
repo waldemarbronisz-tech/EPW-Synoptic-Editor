@@ -476,8 +476,7 @@ export const Canvas: React.FC = () => {
       if (drawStartPort.objId !== objId) {
         const success = ConnectionService.tryCreateConnection(
           drawStartPort.objId, drawStartPort.portId,
-          objId, portId,
-          drawingConnectionType
+          objId, portId
         );
         if (success) {
           useStore.getState().addMessage(`[INFO] Connection created`);

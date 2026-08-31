@@ -43,10 +43,10 @@ describe('Connection Compatibility Validator', () => {
     const toObj = { id: 'obj2', type: 'automation.ada', x: 0, y: 0 } as any;
     
     // We are mocking this to pass standard bounds, the test relies on explicit validation code
-    const spy = vi.spyOn(GeometryUtils, 'resolveConnectionPoint').mockImplementation((obj, portId) => {
-        if (portId === 'ETH') return { id: portId, domain: 'data', medium: 'ethernet', direction: 'passive' };
-        if (portId === 'RS485') return { id: portId, domain: 'data', medium: 'rs485', direction: 'passive' };
-        return { id: portId, domain: 'electrical', direction: 'passive' };
+    const spy = vi.spyOn(GeometryUtils, 'resolveConnectionPoint').mockImplementation((_obj: any, portId: string) => {
+        if (portId === 'ETH') return { id: portId, x: 0, y: 0, domain: 'data', medium: 'ethernet', direction: 'passive' };
+        if (portId === 'RS485') return { id: portId, x: 0, y: 0, domain: 'data', medium: 'rs485', direction: 'passive' };
+        return { id: portId, x: 0, y: 0, domain: 'electrical', direction: 'passive' };
     });
     
     const res = ConnectionService.validateConnection(fromObj, 'ETH', toObj, 'RS485', []);
@@ -59,8 +59,8 @@ describe('Connection Compatibility Validator', () => {
     const fromObj = { id: 'obj1', type: 'electrical.motor', x: 0, y: 0 } as any;
     const toObj = { id: 'obj2', type: 'electrical.motor', x: 0, y: 0 } as any;
     // mock unknown medium
-    const spy = vi.spyOn(GeometryUtils, 'resolveConnectionPoint').mockImplementation((obj, portId) => {
-        return { id: portId, domain: 'electrical', medium: 'magical_unknown_power', direction: 'passive' };
+    const spy = vi.spyOn(GeometryUtils, 'resolveConnectionPoint').mockImplementation((_obj: any, portId: string) => {
+        return { id: portId, x: 0, y: 0, domain: 'electrical', medium: 'magical_unknown_power', direction: 'passive' };
     });
     
     const res = ConnectionService.validateConnection(fromObj, 'IN', toObj, 'IN', []);
