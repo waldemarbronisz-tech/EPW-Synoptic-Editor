@@ -57,7 +57,8 @@ import {
   ScadaPilotLampAdapter,
   ScadaSocketAdapter,
   ScadaIndicatorDiodeAdapter,
-  ScadaMeterAdapter
+  ScadaMeterAdapter,
+  ScadaBoundaryPointAdapter
 } from './scada/ScadaSymbolAdapters';
 
 export interface SymbolProps {
@@ -222,6 +223,8 @@ export const SymbolRenderer: React.FC<{ obj: SynopticObject }> = ({ obj }) => {
       return <ScadaIndicatorDiodeAdapter obj={obj} state={state} />;
     case 'scada.meter':
       return <ScadaMeterAdapter obj={obj} state={state} />;
+    case 'scada.boundary_point':
+      return <ScadaBoundaryPointAdapter obj={obj} state={state} />;
     default:
       return <GenericSymbol obj={obj} state={state} />;
   }

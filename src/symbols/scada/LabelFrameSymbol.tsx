@@ -38,10 +38,16 @@ export function getLabelFrameSize(title: string, description: string): { width: 
 export interface LabelFrameSymbolProps {
   title: string;
   description: string;
+  // Optional override for the frame's rendered width - defaults to the
+  // organic getLabelFrameSize() width when omitted, so every existing
+  // caller is unaffected. Added for BoundaryPointSymbol, which is built
+  // on this component but clamps its width to a min/max range.
+  width?: number;
 }
 
-export const LabelFrameSymbol: React.FC<LabelFrameSymbolProps> = ({ title, description }) => {
-  const { width, height } = getLabelFrameSize(title, description);
+export const LabelFrameSymbol: React.FC<LabelFrameSymbolProps> = ({ title, description, width: widthOverride }) => {
+  const { width: autoWidth, height } = getLabelFrameSize(title, description);
+  const width = widthOverride ?? autoWidth;
 
   return (
     <Group>

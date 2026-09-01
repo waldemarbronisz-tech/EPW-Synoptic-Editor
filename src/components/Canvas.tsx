@@ -10,6 +10,8 @@ import { ObjectLabelRenderer } from './ObjectLabelRenderer';
 import { COLOR_ALARM, COLOR_CANVAS_BACKGROUND, COLOR_OUTLINE, COLOR_WATER, COLOR_WHITE } from '../theme/ScadaTheme';
 import { WireNodeSymbol } from '../symbols/scada/WireNodeSymbol';
 import { getBusbarEdgePorts } from '../symbols/scada/BusbarSymbol';
+import { getBoundaryPointWidth, getBoundaryPortFraction } from '../symbols/scada/BoundaryPointSymbol';
+import { getLabelFrameSize } from '../symbols/scada/LabelFrameSymbol';
 import { snapValue } from '../utils/GridSnap';
 
 // Momentary Alt-key bypass for grid snapping. Deliberately outside React
@@ -230,6 +232,35 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
             onTap={(e) => { e.cancelBubble = true; onPortClick(obj.id, p.portId); }}
           />
         ))}
+
+        {/* Boundary point (scada.boundary_point): exactly one port, on
+            whichever side boundaryPortSide names - shown only on hover
+            (or while a wire is being dragged), same convention as every
+            other port on the canvas. Position uses the same
+            label/sublabel-driven width and portSide fraction the symbol
+            itself renders with (BoundaryPointSymbol), not obj.width, so
+            the hit target always lands exactly on the drawn port. */}
+        {obj.type === 'scada.boundary_point' && (isHovered || wireDragStart) && (() => {
+          const bpWidth = getBoundaryPointWidth(obj.designation || obj.name || 'LABEL', obj.description || obj.text || '');
+          const { height: bpHeight } = getLabelFrameSize(obj.designation || obj.name || 'LABEL', obj.description || obj.text || '');
+          const side = obj.boundaryPortSide === 'BOTTOM' || obj.boundaryPortSide === 'LEFT' || obj.boundaryPortSide === 'RIGHT' ? obj.boundaryPortSide : 'TOP';
+          const { x: fx, y: fy } = getBoundaryPortFraction(side);
+          return (
+            <Circle
+              x={fx * bpWidth}
+              y={fy * bpHeight}
+              radius={wireDragStart ? 6 : 4}
+              fill={wireDragStart ? COLOR_ALARM : COLOR_WATER}
+              stroke={COLOR_OUTLINE}
+              strokeWidth={1}
+              hitStrokeWidth={15}
+              onMouseDown={(e) => { e.cancelBubble = true; onPortMouseDown(obj.id, 'PORT', e); }}
+              onMouseUp={(e) => { e.cancelBubble = true; onPortMouseUp(obj.id, 'PORT', e); }}
+              onClick={(e) => { e.cancelBubble = true; onPortClick(obj.id, 'PORT'); }}
+              onTap={(e) => { e.cancelBubble = true; onPortClick(obj.id, 'PORT'); }}
+            />
+          );
+        })()}
       </Group>
       {isSelected && !obj.locked && (
         <Transformer

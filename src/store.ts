@@ -71,6 +71,16 @@ export interface SynopticObject {
   // this to the device registry is a separate, later task. Optional: only
   // meter objects use it, every other object leaves it undefined.
   meterRows?: MeterRow[];
+
+  // SCADA boundary point (scada.boundary_point): where a schematic
+  // begins or ends (a utility feed, a well, a branch to a sub
+  // installation). Optional: only boundary point objects use these three
+  // - label/sublabel reuse the existing designation/description fields,
+  // same convention as the label frame this symbol is built on. Every
+  // other object leaves these undefined.
+  boundaryDirection?: 'SOURCE' | 'SINK';
+  boundaryMedium?: 'ELECTRICAL' | 'WATER';
+  boundaryPortSide?: 'TOP' | 'BOTTOM' | 'LEFT' | 'RIGHT';
 }
 
 export interface CanvasState {
