@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import type { SynopticObject, SynopticConnection } from '../store';
 import { getBusbarEdgePorts } from '../symbols/scada/BusbarSymbol';
 import { resolveConnectionPoint } from '../utils/GeometryUtils';
+import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 import { resolveObjectLabelText, measureLabelLine, LABEL_MAX_WIDTH } from '../components/ObjectLabelRenderer';
 import { snapValue } from '../utils/GridSnap';
 import { GRID_SIZE, BUSBAR_HEIGHT } from '../theme/ScadaTheme';
@@ -45,16 +46,39 @@ describe('SCADA busbar edge ports (getBusbarEdgePorts)', () => {
     expect(getBusbarEdgePorts(0, 'top')).toEqual([]);
     expect(getBusbarEdgePorts(0, 'bottom')).toEqual([]);
   });
+
+  // Mandatory test from the task spec: a 320-wide busbar at GRID_SIZE 16
+  // must generate 40 ports total (20 top + 20 bottom) - calls the actual
+  // port-generating function itself, not a stand-in constant.
+  it('a 320-wide busbar generates 40 ports total: 20 top and 20 bottom', () => {
+    const width = 320;
+    const top = getBusbarEdgePorts(width, 'top');
+    const bottom = getBusbarEdgePorts(width, 'bottom');
+
+    expect(top.length).toBe(20);
+    expect(bottom.length).toBe(20);
+    expect(top.length + bottom.length).toBe(40);
+    // Ties the count to GRID_SIZE itself, not a hardcoded 20, so this
+    // still catches a regression if GRID_SIZE ever changes.
+    expect(top.length).toBe(Math.floor(width / GRID_SIZE));
+  });
+
+  // Root-cause fix for usterka "szyna zbiorcza nie ma przylaczen": a port
+  // is generated at a custom height too, not hardcoded to BUSBAR_HEIGHT -
+  // electrical.busbar (defaultHeight 10, not 22) now shares this same
+  // mechanism and needs its OWN edge, not scada.busbar's.
+  it('bottom-row ports sit at a caller-supplied height, not always BUSBAR_HEIGHT', () => {
+    const ports = getBusbarEdgePorts(160, 'bottom', 10);
+    expect(ports.every(p => p.y === 10)).toBe(true);
+  });
 });
 
 describe('Dynamic port resolution (GeometryUtils.resolveConnectionPoint)', () => {
   it('resolves a legacy center-row dyn_NN port unchanged (y = 0.5)', () => {
-    // electrical.busbar (the pre-existing symbol) has no
-    // supportsDynamicPorts flag at all - that omission is the exact bug
-    // this whole task exists to fix for the SCADA busbar, and it is left
-    // untouched deliberately. This checks the legacy unprefixed id FORMAT
-    // still resolves correctly on a symbol that does support dynamic
-    // ports, i.e. that adding the top/bottom format did not regress it.
+    // The legacy unprefixed dyn_NN center-row id format must keep
+    // resolving correctly (existing saved projects use it) even though
+    // new connections are generated in the top/bottom edge format now -
+    // this checks adding that format did not regress it.
     const bar = makeBusbar();
     const point = resolveConnectionPoint(bar, 'dyn_50');
     expect(point).not.toBeNull();
@@ -82,6 +106,24 @@ describe('Dynamic port resolution (GeometryUtils.resolveConnectionPoint)', () =>
     const narrowed = makeBusbar({ width: 32 }); // shrunk well below the registry's default of 200
     const point = resolveConnectionPoint(narrowed, 'dyn_top_50');
     expect(point?.x).toBeCloseTo(0.5, 5);
+  });
+
+  // Root-cause fix: electrical.busbar (the plain "Busbar" in the
+  // Electrical category, listed ahead of "Busbar (SCADA)") had no
+  // connectionPoints and no supportsDynamicPorts at all - it reported
+  // zero ports, so no wire could ever attach to it, regardless of what
+  // the newer scada.busbar could do. Now shares the same mechanism.
+  it('electrical.busbar registry entry now supports dynamic ports', () => {
+    const def = getSymbolDefinition('electrical.busbar');
+    expect(def?.supportsDynamicPorts).toBe(true);
+  });
+
+  it('resolves a dyn_top_NN port on an electrical.busbar object too, at its own height', () => {
+    const legacyBar = makeBusbar({ type: 'electrical.busbar', width: 200, height: 10 });
+    const point = resolveConnectionPoint(legacyBar, 'dyn_top_40');
+    expect(point).not.toBeNull();
+    expect(point?.y).toBe(0);
+    expect(point?.x).toBeCloseTo(0.4, 5);
   });
 });
 

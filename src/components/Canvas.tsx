@@ -94,14 +94,15 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
               busPos = Math.max(0, Math.min(1, busPos));
               const posPercent = Math.round(busPos * 100);
 
-              // The SCADA busbar has ports along BOTH its top and bottom
-              // edges, not just a single center row - pick the edge closer
-              // to where the user clicked. Every other dynamic-port symbol
-              // (just the legacy electrical.busbar today) keeps the
-              // original unprefixed, center-row port id untouched.
-              const dynamicPortId = obj.type === 'scada.busbar'
-                ? `dyn_${localY < h / 2 ? 'top' : 'bot'}_${posPercent}`
-                : `dyn_${posPercent}`;
+              // Both busbars (scada.busbar and, since the usterka-1 fix,
+              // electrical.busbar too - every def.supportsDynamicPorts
+              // symbol today is one of these two) have ports along BOTH
+              // their top and bottom edges, not just a single center row -
+              // pick the edge closer to where the user clicked. The
+              // legacy unprefixed dyn_NN center-row format is still
+              // resolved for backward compatibility (resolveConnectionPoint),
+              // it just is not generated for new connections any more.
+              const dynamicPortId = `dyn_${localY < h / 2 ? 'top' : 'bot'}_${posPercent}`;
               onPortMouseUp(obj.id, dynamicPortId, e);
             }
           }
@@ -127,8 +128,8 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
           const scaleX = node.scaleX();
           const scaleY = node.scaleY();
 
-          if (obj.type === 'scada.busbar') {
-            // The busbar's width field is the single source of truth for
+          if (def?.supportsDynamicPorts) {
+            // A busbar's width field is the single source of truth for
             // its size (the dynamic-port math keys on it directly) - fold
             // the drag-resize scale into width instead of leaving it as a
             // separate multiplier, and reset scale to 1 so it stays that
@@ -203,12 +204,16 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
            />
         ))}
 
-        {/* SCADA busbar: ports along both edges, shown only on hover (or
-            while a wire is being dragged) - visible at all times, it would
-            read as a comb rather than a busbar. */}
-        {obj.type === 'scada.busbar' && (isHovered || wireDragStart) && [
-          ...getBusbarEdgePorts(obj.width, 'top').map((p, idx) => ({ ...p, key: `bus-top-${idx}`, portId: `dyn_top_${Math.round((p.x / Math.max(obj.width, 1)) * 100)}` })),
-          ...getBusbarEdgePorts(obj.width, 'bottom').map((p, idx) => ({ ...p, key: `bus-bot-${idx}`, portId: `dyn_bot_${Math.round((p.x / Math.max(obj.width, 1)) * 100)}` }))
+        {/* Busbar (scada.busbar and electrical.busbar - any
+            def.supportsDynamicPorts symbol, all of which are busbars
+            today): ports along both edges, shown only on hover (or while
+            a wire is being dragged) - visible at all times, it would read
+            as a comb rather than a busbar. Height comes from the object's
+            own current height, not a constant borrowed from the other
+            busbar's fixed size. */}
+        {def?.supportsDynamicPorts && (isHovered || wireDragStart) && [
+          ...getBusbarEdgePorts(obj.width, 'top', obj.height).map((p, idx) => ({ ...p, key: `bus-top-${idx}`, portId: `dyn_top_${Math.round((p.x / Math.max(obj.width, 1)) * 100)}` })),
+          ...getBusbarEdgePorts(obj.width, 'bottom', obj.height).map((p, idx) => ({ ...p, key: `bus-bot-${idx}`, portId: `dyn_bot_${Math.round((p.x / Math.max(obj.width, 1)) * 100)}` }))
         ].map(p => (
           <Circle
             key={p.key}

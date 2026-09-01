@@ -218,7 +218,7 @@ export const PropertyInspector: React.FC = () => {
               onChange={(e) => {
                 const newWidth = parseFloat(e.target.value);
                 if (isNaN(newWidth)) return;
-                if (selectedObj.type === 'scada.busbar') {
+                if (getSymbolDefinition(selectedObj.type)?.supportsDynamicPorts) {
                   resizeBusbar(selectedObj.id, newWidth);
                 } else {
                   updateObject(selectedObj.id, { width: newWidth });
