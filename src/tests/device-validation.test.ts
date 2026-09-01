@@ -333,3 +333,199 @@ describe('Device registry validation (validateDeviceRegistry)', () => {
     expect(result.issues).toEqual([]);
   });
 });
+
+describe('Shape validation (validateDeviceRegistry against untrusted input)', () => {
+  it('A. registry === null is an error, not a crash', () => {
+    expect(() => validateDeviceRegistry(null)).not.toThrow();
+    expect(validateDeviceRegistry(null).valid).toBe(false);
+  });
+
+  it('B. registry.devices === null is an error, not a crash', () => {
+    const registry = { locations: [KOT], cards: [], devices: null };
+    expect(() => validateDeviceRegistry(registry)).not.toThrow();
+    const result = validateDeviceRegistry(registry);
+    expect(result.valid).toBe(false);
+    expect(result.issues.some(i => i.code === 'REGISTRY_INVALID_DEVICES')).toBe(true);
+  });
+
+  it('C. registry.devices as an object instead of an array is an error, not a crash', () => {
+    const registry = { locations: [KOT], cards: [], devices: { foo: 'bar' } };
+    expect(() => validateDeviceRegistry(registry)).not.toThrow();
+    const result = validateDeviceRegistry(registry);
+    expect(result.valid).toBe(false);
+    expect(result.issues.some(i => i.code === 'REGISTRY_INVALID_DEVICES')).toBe(true);
+  });
+
+  it('D. registry.locations === undefined is an error, not a crash', () => {
+    const registry = { cards: [], devices: [] };
+    expect(() => validateDeviceRegistry(registry)).not.toThrow();
+    const result = validateDeviceRegistry(registry);
+    expect(result.valid).toBe(false);
+    expect(result.issues.some(i => i.code === 'REGISTRY_INVALID_LOCATIONS')).toBe(true);
+  });
+
+  it('E. a null device inside the devices array is an error, not a crash', () => {
+    const registry = { locations: [KOT], cards: [], devices: [null] };
+    expect(() => validateDeviceRegistry(registry)).not.toThrow();
+    const result = validateDeviceRegistry(registry);
+    expect(result.valid).toBe(false);
+    expect(result.issues.some(i => i.code === 'DEVICE_INVALID_SHAPE')).toBe(true);
+  });
+
+  it('F. behavior "ROBOT" is rejected with DEVICE_UNKNOWN_BEHAVIOR', () => {
+    const registry = {
+      locations: [KOT],
+      cards: [],
+      devices: [{ id: 'KOT_R1', designation: '-R1', name: 'Robot', kind: 'robot', publishToHa: false, behavior: 'ROBOT' }]
+    };
+    const result = validateDeviceRegistry(registry);
+    expect(result.valid).toBe(false);
+    expect(result.issues.some(i => i.code === 'DEVICE_UNKNOWN_BEHAVIOR')).toBe(true);
+  });
+
+  it('G. SWITCHED without a feedback section is an error, not a crash', () => {
+    const device = baseSwitchedDevice() as any;
+    delete device.feedback;
+    const registry = { locations: [KOT], cards: [], devices: [device] };
+    expect(() => validateDeviceRegistry(registry)).not.toThrow();
+    expect(validateDeviceRegistry(registry).valid).toBe(false);
+  });
+
+  it('H. SWITCHED without a command section is an error, not a crash', () => {
+    const device = baseSwitchedDevice() as any;
+    delete device.command;
+    const registry = { locations: [KOT], cards: [], devices: [device] };
+    expect(() => validateDeviceRegistry(registry)).not.toThrow();
+    expect(validateDeviceRegistry(registry).valid).toBe(false);
+  });
+
+  it('I. feedback.mode "TRIPLE" is an error', () => {
+    const device = baseSwitchedDevice() as any;
+    device.feedback = { mode: 'TRIPLE', diClosed: 'ELA1.DI.1' };
+    const registry = { locations: [KOT], cards: [], devices: [device] };
+    expect(validateDeviceRegistry(registry).valid).toBe(false);
+  });
+
+  it('J. command.outputCount 3 is an error', () => {
+    const device = baseSwitchedDevice() as any;
+    device.command = { ...device.command, outputCount: 3 };
+    const registry = { locations: [KOT], cards: [], devices: [device] };
+    expect(validateDeviceRegistry(registry).valid).toBe(false);
+  });
+
+  it('K. MEASURED rangeMin === NaN is an error (typeof NaN is "number")', () => {
+    const device = makeMeasuredDevice('KOT_TT1', '-TT1', 'AIA1.AI.1') as any;
+    device.rangeMin = NaN;
+    const registry = { locations: [KOT], cards: [], devices: [device] };
+    expect(validateDeviceRegistry(registry).valid).toBe(false);
+  });
+
+  it('L. publishToHa as the string "yes" is an error', () => {
+    const device = makeSignalDevice('KOT_SL1', '-SL1', 'ELA1.DI.1') as any;
+    device.publishToHa = 'yes';
+    const registry = { locations: [KOT], cards: [], devices: [device] };
+    expect(validateDeviceRegistry(registry).valid).toBe(false);
+  });
+});
+
+describe('Adversarial gaps (H1-H4 and B5 consistency rules)', () => {
+  it('M. empty designation is rejected with DEVICE_EMPTY_DESIGNATION', () => {
+    const device = baseSwitchedDevice();
+    device.designation = '';
+    expect(validateDeviceFields(device).some(i => i.code === 'DEVICE_EMPTY_DESIGNATION')).toBe(true);
+  });
+
+  it('N. whitespace-only designation is rejected', () => {
+    const device = baseSwitchedDevice();
+    device.designation = '   ';
+    expect(validateDeviceFields(device).some(i => i.code === 'DEVICE_EMPTY_DESIGNATION')).toBe(true);
+  });
+
+  it('O. empty name is rejected with DEVICE_EMPTY_NAME', () => {
+    const device = baseSwitchedDevice();
+    device.name = '';
+    expect(validateDeviceFields(device).some(i => i.code === 'DEVICE_EMPTY_NAME')).toBe(true);
+  });
+
+  it('P. empty kind is rejected with DEVICE_EMPTY_KIND', () => {
+    const device = baseSwitchedDevice();
+    device.kind = '';
+    expect(validateDeviceFields(device).some(i => i.code === 'DEVICE_EMPTY_KIND')).toBe(true);
+  });
+
+  it('Q. confirmTimeoutMs -5000 is rejected', () => {
+    const device = baseSwitchedDevice();
+    device.supervision = { confirmTimeoutMs: -5000, discrepancyAlarm: true };
+    expect(validateDeviceFields(device).some(i => i.code === 'SWITCHED_INVALID_CONFIRM_TIMEOUT')).toBe(true);
+  });
+
+  it('R. confirmTimeoutMs 50 is rejected (below the 100ms floor)', () => {
+    const device = baseSwitchedDevice();
+    device.supervision = { confirmTimeoutMs: 50, discrepancyAlarm: true };
+    expect(validateDeviceFields(device).some(i => i.code === 'SWITCHED_INVALID_CONFIRM_TIMEOUT')).toBe(true);
+  });
+
+  it('S. confirmTimeoutMs 100 is valid (the floor is inclusive)', () => {
+    const device = baseSwitchedDevice();
+    device.supervision = { confirmTimeoutMs: 100, discrepancyAlarm: true };
+    expect(validateDeviceFields(device)).toEqual([]);
+  });
+
+  it('T. two devices on ELA1.DI.12 and ELA1.DI.012 collide exactly once (leading zero must not evade detection)', () => {
+    const registry: DeviceRegistry = {
+      locations: [KOT],
+      cards: [{ id: 'ELA1', model: 'ELA01', channelKind: 'DI', channelCount: 64 }],
+      devices: [
+        makeSignalDevice('KOT_Q1', '-Q1', 'ELA1.DI.12'),
+        makeSignalDevice('KOT_Q2', '-Q2', 'ELA1.DI.012')
+      ]
+    };
+    const result = validateDeviceRegistry(registry);
+    const collisions = result.issues.filter(i => i.code === 'CHANNEL_ADDRESS_COLLISION');
+    expect(collisions.length).toBe(1);
+  });
+
+  it('U. two devices on ELA1.DI.12 and ELA1.DI.13 produce zero collision errors', () => {
+    const registry: DeviceRegistry = {
+      locations: [KOT],
+      cards: [{ id: 'ELA1', model: 'ELA01', channelKind: 'DI', channelCount: 64 }],
+      devices: [
+        makeSignalDevice('KOT_Q1', '-Q1', 'ELA1.DI.12'),
+        makeSignalDevice('KOT_Q2', '-Q2', 'ELA1.DI.13')
+      ]
+    };
+    const result = validateDeviceRegistry(registry);
+    expect(result.issues.some(i => i.code === 'CHANNEL_ADDRESS_COLLISION')).toBe(false);
+  });
+
+  it('V. SIGNAL debounceMs -1 is rejected', () => {
+    const device = makeSignalDevice('KOT_SL1', '-SL1', 'ELA1.DI.1');
+    device.debounceMs = -1;
+    expect(validateDeviceFields(device).some(i => i.code === 'SIGNAL_INVALID_DEBOUNCE')).toBe(true);
+  });
+
+  it('W. MEASURED with an empty unit is rejected', () => {
+    const device = makeMeasuredDevice('KOT_TT1', '-TT1', 'AIA1.AI.1');
+    device.unit = '';
+    expect(validateDeviceFields(device).some(i => i.code === 'MEASURED_EMPTY_UNIT')).toBe(true);
+  });
+
+  it('X. a fully valid registry after all hardening changes has zero errors', () => {
+    const registry: DeviceRegistry = {
+      locations: [KOT, MAG],
+      cards: [
+        { id: 'ELA1', model: 'ELA01', channelKind: 'DI', channelCount: 64 },
+        { id: 'ADA1', model: 'ADA01', channelKind: 'DO', channelCount: 60 },
+        { id: 'AIA1', model: 'AIA01', channelKind: 'AI', channelCount: 16 }
+      ],
+      devices: [
+        makeSwitchedDevice('KOT_KMG1', '-K1', 'ELA1.DI.1', 'ELA1.DI.2', 'ADA1.DO.1', 'ADA1.DO.2'),
+        makeSignalDevice('KOT_SL1', '-SL1', 'ELA1.DI.3'),
+        makeMeasuredDevice('KOT_TT1', '-TT1', 'AIA1.AI.1')
+      ]
+    };
+    const result = validateDeviceRegistry(registry);
+    expect(result.valid).toBe(true);
+    expect(result.issues).toEqual([]);
+  });
+});
