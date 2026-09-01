@@ -63,10 +63,19 @@ function isFiniteNumber(value: unknown): value is number {
 export function parseChannelAddress(addr: string): { card: string; kind: ChannelKind; channel: number } | null {
   if (typeof addr !== 'string') return null;
 
-  const parts = addr.split('.');
+  // Whitespace around the whole address or around any of its three parts
+  // is trimmed before interpretation - a stray leading/trailing space must
+  // not surface as "unknown card" (misleading: the card was fine, the
+  // problem was invisible whitespace). Trimming also means a padded and
+  // an unpadded address parse to the identical {card, kind, channel},
+  // which validateDeviceRegistry's collision key relies on to keep
+  // catching collisions regardless of stray whitespace.
+  const parts = addr.trim().split('.');
   if (parts.length !== 3) return null;
 
-  const [card, kindRaw, channelRaw] = parts;
+  const card = parts[0].trim();
+  const kindRaw = parts[1].trim();
+  const channelRaw = parts[2].trim();
   if (!card) return null;
   if (!(CHANNEL_KINDS as string[]).includes(kindRaw)) return null;
   if (!/^[0-9]+$/.test(channelRaw)) return null;
@@ -351,14 +360,18 @@ function validateDeviceShape(raw: unknown, index: number, issues: ValidationIssu
     case 'SWITCHED': {
       const feedbackOk = isPlainObject(raw.feedback);
       const commandOk = isPlainObject(raw.command);
+      const supervisionOk = isPlainObject(raw.supervision);
       if (!feedbackOk) problems.push('feedback must be an object');
       if (!commandOk) problems.push('command must be an object');
-      if (!isPlainObject(raw.supervision)) problems.push('supervision must be an object');
+      if (!supervisionOk) problems.push('supervision must be an object');
       if (!isPlainObject(raw.safeState)) problems.push('safeState must be an object');
       if (!isBoolean(raw.switchCounter)) problems.push('switchCounter must be a boolean');
 
       if (feedbackOk && !['DUAL', 'SINGLE', 'NONE'].includes((raw.feedback as Record<string, unknown>).mode as string)) {
         problems.push("feedback.mode must be one of 'DUAL','SINGLE','NONE'");
+      }
+      if (supervisionOk && !isBoolean((raw.supervision as Record<string, unknown>).discrepancyAlarm)) {
+        problems.push('supervision.discrepancyAlarm must be a boolean');
       }
       if (commandOk) {
         const command = raw.command as Record<string, unknown>;

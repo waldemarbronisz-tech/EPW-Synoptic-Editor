@@ -529,3 +529,46 @@ describe('Adversarial gaps (H1-H4 and B5 consistency rules)', () => {
     expect(result.issues).toEqual([]);
   });
 });
+
+describe('Part A: discrepancyAlarm shape + channel address whitespace trimming', () => {
+  it('A-a. discrepancyAlarm as the string "yes" is rejected', () => {
+    const device = baseSwitchedDevice() as any;
+    device.supervision = { confirmTimeoutMs: 2000, discrepancyAlarm: 'yes' };
+    const registry = { locations: [KOT], cards: [], devices: [device] };
+    expect(validateDeviceRegistry(registry).valid).toBe(false);
+  });
+
+  it('A-b. discrepancyAlarm as a boolean is valid', () => {
+    const device = baseSwitchedDevice();
+    device.supervision = { confirmTimeoutMs: 2000, discrepancyAlarm: true };
+    const registry: DeviceRegistry = {
+      locations: [KOT],
+      cards: [
+        { id: 'ELA1', model: 'ELA01', channelKind: 'DI', channelCount: 64 },
+        { id: 'ADA1', model: 'ADA01', channelKind: 'DO', channelCount: 60 }
+      ],
+      devices: [device]
+    };
+    expect(validateDeviceRegistry(registry).valid).toBe(true);
+  });
+
+  it('A-c. a channel address with surrounding whitespace parses and validates cleanly', () => {
+    const cards: CardEntry[] = [{ id: 'ELA1', model: 'ELA01', channelKind: 'DI', channelCount: 64 }];
+    expect(parseChannelAddress(' ELA1.DI.12 ')).toEqual({ card: 'ELA1', kind: 'DI', channel: 12 });
+    expect(validateChannelAddress(' ELA1.DI.12 ', cards)).toEqual([]);
+  });
+
+  it("A-d. two devices on ' ELA1.DI.12' and 'ELA1.DI.12' collide exactly once (whitespace must not evade detection)", () => {
+    const registry: DeviceRegistry = {
+      locations: [KOT],
+      cards: [{ id: 'ELA1', model: 'ELA01', channelKind: 'DI', channelCount: 64 }],
+      devices: [
+        makeSignalDevice('KOT_Q1', '-Q1', ' ELA1.DI.12'),
+        makeSignalDevice('KOT_Q2', '-Q2', 'ELA1.DI.12')
+      ]
+    };
+    const result = validateDeviceRegistry(registry);
+    const collisions = result.issues.filter(i => i.code === 'CHANNEL_ADDRESS_COLLISION');
+    expect(collisions.length).toBe(1);
+  });
+});
