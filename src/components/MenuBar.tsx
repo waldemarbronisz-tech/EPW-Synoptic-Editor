@@ -3,7 +3,11 @@ import { useStore } from '../store';
 import { ProjectManager } from '../project/ProjectManager';
 import { ProjectFileService } from '../project/ProjectFileService';
 
-export const MenuBar: React.FC = () => {
+export interface MenuBarProps {
+  onOpenScadaPreview?: () => void;
+}
+
+export const MenuBar: React.FC<MenuBarProps> = ({ onOpenScadaPreview }) => {
   const { undo, redo, copySelected, paste, deleteObjects, selectedIds, isDirty } = useStore();
 
   const handleMenuClick = (action: () => void) => {
@@ -68,6 +72,12 @@ export const MenuBar: React.FC = () => {
           <div className="dropdown-item" onClick={() => handleMenuClick(copySelected)}>Copy</div>
           <div className="dropdown-item" onClick={() => handleMenuClick(paste)}>Paste</div>
           <div className="dropdown-item" onClick={() => handleMenuClick(() => deleteObjects(selectedIds))}>Delete</div>
+        </div>
+      </div>
+      <div className="menu-item">
+        <span>View</span>
+        <div className="dropdown">
+          <div className="dropdown-item" onClick={() => onOpenScadaPreview?.()}>SCADA Style Preview...</div>
         </div>
       </div>
     </div>
