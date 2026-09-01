@@ -64,16 +64,13 @@ export class ConnectionService {
       return { valid: false, code: "DIRECTION_MISMATCH", message: "Cannot connect OUT to OUT" };
     }
 
-    // Multiplicity validation (Single vs Multiple)
-    const fromOccupied = existingConnections.find(c => (c.fromId === fromObj.id && c.fromPort === fromPortId) || (c.toId === fromObj.id && c.toPort === fromPortId));
-    const toOccupied = existingConnections.find(c => (c.fromId === toObj.id && c.fromPort === toPortId) || (c.toId === toObj.id && c.toPort === toPortId));
-
-    if (fromPort.multiplicity !== 'multiple' && fromOccupied) {
-      return { valid: false, code: "PORT_OCCUPIED", message: `Source port ${fromPortId} is already occupied` };
-    }
-    if (toPort.multiplicity !== 'multiple' && toOccupied) {
-      return { valid: false, code: "PORT_OCCUPIED", message: `Target port ${toPortId} is already occupied` };
-    }
+    // Bug fix (usterka: "Source/Target port is already occupied" blocked
+    // any real schematic - several circuits leave one feed, several
+    // wires land on one node). A port now accepts any number of wires;
+    // the multiplicity check that used to reject a second connection on
+    // the same port here has been removed entirely. Every other rule
+    // above and below (domain, medium, direction, self-connection,
+    // duplicates) is unchanged.
 
     // Duplicate connections check
     const duplicate = existingConnections.find(c =>

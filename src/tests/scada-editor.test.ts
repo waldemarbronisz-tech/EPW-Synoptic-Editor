@@ -492,3 +492,56 @@ describe('Boundary point connection validation (ConnectionService)', () => {
     expect(result.inferredType).toBe('water');
   });
 });
+
+// Usterka: "Source/Target port is already occupied" blocked drawing any
+// real schematic (several circuits off one feed, several wires landing
+// on one node). A port must now accept any number of connections, while
+// every other validation rule keeps working exactly as before.
+describe('A port accepts more than one connection (ConnectionService, usterka fix)', () => {
+  it('a second, third and fourth connection to an already-occupied SOURCE port all still validate', () => {
+    const source = makeBoundaryPoint({ id: 'SRC', boundaryDirection: 'SOURCE', boundaryMedium: 'ELECTRICAL' });
+    const sinkB = makeBoundaryPoint({ id: 'B', boundaryDirection: 'SINK', boundaryMedium: 'ELECTRICAL' });
+    const sinkC = makeBoundaryPoint({ id: 'C', boundaryDirection: 'SINK', boundaryMedium: 'ELECTRICAL' });
+
+    const existing = [
+      { id: 'C1', fromId: 'SRC', fromPort: 'PORT', toId: 'A', toPort: 'PORT', type: 'electrical_ac' } as SynopticConnection
+    ];
+
+    // Source port SRC:PORT is already used by C1 above - a second wire
+    // from it (to a different sink) must still succeed.
+    const second = ConnectionService.validateConnection(source, 'PORT', sinkB, 'PORT', existing);
+    expect(second.valid).toBe(true);
+    expect(second.code).toBeUndefined();
+
+    existing.push({ id: 'C2', fromId: 'SRC', fromPort: 'PORT', toId: 'B', toPort: 'PORT', type: 'electrical_ac' } as SynopticConnection);
+
+    const third = ConnectionService.validateConnection(source, 'PORT', sinkC, 'PORT', existing);
+    expect(third.valid).toBe(true);
+  });
+
+  it('a target port with two wires already landed on it still accepts a third', () => {
+    const sink = makeBoundaryPoint({ id: 'SNK', boundaryDirection: 'SINK', boundaryMedium: 'ELECTRICAL' });
+    const sourceC = makeBoundaryPoint({ id: 'C', boundaryDirection: 'SOURCE', boundaryMedium: 'ELECTRICAL' });
+
+    const existing = [
+      { id: 'C1', fromId: 'A', fromPort: 'PORT', toId: 'SNK', toPort: 'PORT', type: 'electrical_ac' } as SynopticConnection,
+      { id: 'C2', fromId: 'B', fromPort: 'PORT', toId: 'SNK', toPort: 'PORT', type: 'electrical_ac' } as SynopticConnection
+    ];
+
+    const result = ConnectionService.validateConnection(sourceC, 'PORT', sink, 'PORT', existing);
+    expect(result.valid).toBe(true);
+  });
+
+  it('every other validation rule still rejects, unaffected by the multiplicity removal', () => {
+    const elec = makeBoundaryPoint({ id: 'E', boundaryMedium: 'ELECTRICAL' });
+    const water = makeBoundaryPoint({ id: 'W', boundaryMedium: 'WATER' });
+    expect(ConnectionService.validateConnection(elec, 'PORT', water, 'PORT', []).code).toBe('DOMAIN_MISMATCH');
+
+    const self = makeBoundaryPoint({ id: 'S' });
+    expect(ConnectionService.validateConnection(self, 'PORT', self, 'PORT', []).code).toBe('SELF_CONNECTION');
+
+    const outA = makeBoundaryPoint({ id: 'OA', boundaryDirection: 'SOURCE' });
+    const outB = makeBoundaryPoint({ id: 'OB', boundaryDirection: 'SOURCE' });
+    expect(ConnectionService.validateConnection(outA, 'PORT', outB, 'PORT', []).code).toBe('DIRECTION_MISMATCH');
+  });
+});

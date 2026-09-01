@@ -13,6 +13,7 @@ import { getBusbarEdgePorts } from '../symbols/scada/BusbarSymbol';
 import { getBoundaryPointWidth, getBoundaryPortFraction } from '../symbols/scada/BoundaryPointSymbol';
 import { getLabelFrameSize } from '../symbols/scada/LabelFrameSymbol';
 import { snapValue } from '../utils/GridSnap';
+import { resolveConnectionPoint, getAbsolutePortPosition } from '../utils/GeometryUtils';
 
 // Momentary Alt-key bypass for grid snapping. Deliberately outside React
 // state: every ObjectNode's drag handlers need the CURRENT key state at
@@ -682,11 +683,29 @@ export const Canvas: React.FC = () => {
               />
             );
           })()}
-                    {/* Topology Junctions: a wire node (from the SCADA library)
-                        wherever three or more conductors meet at the same port.
-                        (This used to be two near-identical copies of the same
-                        block, one of them missing dyn_ port support - collapsed
-                        into one, keeping the more complete version.) */}
+          {[...objects].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)).map((obj) => (
+            <ObjectNode
+              key={obj.id}
+              obj={obj}
+              isSelected={selectedIds.includes(obj.id)}
+              onSelect={() => selectObjects([obj.id], false)}
+              onChange={(newAttrs) => updateObject(obj.id, newAttrs)}
+              onPortClick={handlePortClick}
+              onPortMouseDown={handlePortMouseDown}
+              onPortMouseUp={handlePortMouseUp}
+              wireDragStart={wireDragStart}
+              gridSize={gridSize}
+            />
+          ))}
+          {/* Topology Junctions: a wire node (from the SCADA library)
+              wherever three or more conductors meet at the same port.
+              Rendered AFTER (on top of) every object, not before - a
+              junction lands exactly at a port, which is routinely right
+              at (or inside) the object's own drawn shape, and painting
+              it underneath left it invisible, hidden by the object
+              itself. (This used to be two near-identical copies of the
+              same block, one of them missing dyn_ port support -
+              collapsed into one, keeping the more complete version.) */}
           {(() => {
              const junctions: {x: number, y: number}[] = [];
              const pointMap = new Map<string, number>();
@@ -703,19 +722,20 @@ export const Canvas: React.FC = () => {
                      const [objId, portId] = key.split(':');
                      const obj = objects.find(o => o.id === objId);
                      if (obj) {
-                         const def = getSymbolDefinition(obj.type);
-                         const port = def?.connectionPoints?.find(p => p.id === portId) ||
-                                      (portId.startsWith('dyn_') ? { x: parseInt(portId.replace('dyn_',''))/100, y: 0.5 } : null); // Simple dyn fallback
+                         // Bug fix (usterka: port accepts more than one wire):
+                         // this used to reimplement port resolution by hand,
+                         // with only a crude dyn_NN fallback - it silently
+                         // mispositioned (or skipped entirely) the junction
+                         // dot for the SCADA busbar's dyn_top_NN/dyn_bot_NN
+                         // ports and for the boundary point's PORT id, both
+                         // of which multi-wire ports now routinely use.
+                         // resolveConnectionPoint/getAbsolutePortPosition are
+                         // the one shared, already-correct implementation
+                         // every other port position on the canvas goes
+                         // through - reused here instead of a second copy.
+                         const port = resolveConnectionPoint(obj, portId);
                          if (port) {
-                             const w = obj.width * (obj.scaleX || 1);
-                             const h = obj.height * (obj.scaleY || 1);
-                             const cx = (port.x || 0.5) * w - w / 2;
-                             const cy = (port.y || 0.5) * h - h / 2;
-                             const rot = obj.rotation || 0;
-                             const radians = rot * (Math.PI / 180);
-                             const rx = cx * Math.cos(radians) - cy * Math.sin(radians);
-                             const ry = cx * Math.sin(radians) + cy * Math.cos(radians);
-                             junctions.push({ x: obj.x + w / 2 + rx, y: obj.y + h / 2 + ry });
+                             junctions.push(getAbsolutePortPosition(obj, port));
                          }
                      }
                  }
@@ -728,20 +748,6 @@ export const Canvas: React.FC = () => {
                </Group>
              ));
           })()}
-          {[...objects].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)).map((obj) => (
-            <ObjectNode
-              key={obj.id}
-              obj={obj}
-              isSelected={selectedIds.includes(obj.id)}
-              onSelect={() => selectObjects([obj.id], false)}
-              onChange={(newAttrs) => updateObject(obj.id, newAttrs)}
-              onPortClick={handlePortClick}
-              onPortMouseDown={handlePortMouseDown}
-              onPortMouseUp={handlePortMouseUp}
-              wireDragStart={wireDragStart}
-              gridSize={gridSize}
-            />
-          ))}
           {selectionBox && (
             <Rect
               x={selectionBox.x}
