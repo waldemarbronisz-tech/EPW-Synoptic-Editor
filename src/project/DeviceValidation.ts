@@ -1,0 +1,328 @@
+// Validation for the EPW Device Registry (DeviceSchema.ts). Pure functions,
+// no side effects, no dependency on the app store - callable from any of
+// the three EPW applications that share this contract.
+//
+// Result shape mirrors ProjectSchema.ts's validateProjectSchema convention
+// (severity / code / message), with `deviceId` standing in for that file's
+// `objectId` since issues here are about devices, not synoptic objects.
+//
+// EVERY violation below is an ERROR, never a WARNING. This format is a
+// contract between three applications - a warning would mean a file can be
+// invalid and still be accepted downstream.
+
+import type { CardEntry, ChannelAddress, ChannelKind, Device, DeviceRegistry, LocationEntry } from './DeviceSchema';
+
+export interface ValidationIssue {
+  severity: 'ERROR' | 'WARNING' | 'INFO';
+  code: string;
+  message: string;
+  deviceId?: string;
+}
+
+export interface ValidationResult {
+  valid: boolean;
+  issues: ValidationIssue[];
+}
+
+const CHANNEL_KINDS: ChannelKind[] = ['DI', 'DO', 'AI', 'AO'];
+
+/**
+ * Splits 'ELA1.DI.12' into { card: 'ELA1', kind: 'DI', channel: 12 }.
+ * Returns null for anything not in CARD.KIND.CHANNEL format.
+ */
+export function parseChannelAddress(addr: string): { card: string; kind: ChannelKind; channel: number } | null {
+  if (typeof addr !== 'string') return null;
+
+  const parts = addr.split('.');
+  if (parts.length !== 3) return null;
+
+  const [card, kindRaw, channelRaw] = parts;
+  if (!card) return null;
+  if (!(CHANNEL_KINDS as string[]).includes(kindRaw)) return null;
+  if (!/^[0-9]+$/.test(channelRaw)) return null;
+
+  return { card, kind: kindRaw as ChannelKind, channel: parseInt(channelRaw, 10) };
+}
+
+/**
+ * Device id rules: only A-Z, 0-9 and underscore; exactly one underscore;
+ * the part before it must be a registered location code; the part after
+ * it must be non-empty.
+ */
+export function validateDeviceId(id: string, locations: LocationEntry[]): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+
+  if (typeof id !== 'string' || id.length === 0) {
+    issues.push({ severity: 'ERROR', code: 'DEVICE_ID_EMPTY', message: 'Device id must be a non-empty string' });
+    return issues;
+  }
+
+  if (!/^[A-Z0-9_]+$/.test(id)) {
+    issues.push({ severity: 'ERROR', code: 'DEVICE_ID_INVALID_CHARS', message: `Device id '${id}' must contain only A-Z, 0-9 and underscore`, deviceId: id });
+  }
+
+  const underscoreCount = (id.match(/_/g) || []).length;
+  if (underscoreCount !== 1) {
+    issues.push({ severity: 'ERROR', code: 'DEVICE_ID_UNDERSCORE_COUNT', message: `Device id '${id}' must contain exactly one underscore, found ${underscoreCount}`, deviceId: id });
+    return issues;
+  }
+
+  const [locationCode, suffix] = id.split('_');
+  const knownCodes = new Set(locations.map(l => l.code));
+
+  if (!knownCodes.has(locationCode)) {
+    issues.push({ severity: 'ERROR', code: 'DEVICE_ID_UNKNOWN_LOCATION', message: `Device id '${id}' references unregistered location '${locationCode}'`, deviceId: id });
+  }
+
+  if (!suffix) {
+    issues.push({ severity: 'ERROR', code: 'DEVICE_ID_EMPTY_SUFFIX', message: `Device id '${id}' has an empty part after the underscore`, deviceId: id });
+  }
+
+  return issues;
+}
+
+/**
+ * Channel address rules: must parse (see parseChannelAddress), the card
+ * must exist in the card registry, its channelKind must match the address,
+ * and the channel number must be within 1..channelCount.
+ */
+export function validateChannelAddress(addr: ChannelAddress, cards: CardEntry[]): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const parsed = parseChannelAddress(addr);
+
+  if (!parsed) {
+    issues.push({ severity: 'ERROR', code: 'CHANNEL_ADDRESS_INVALID_FORMAT', message: `Channel address '${addr}' is not in CARD.KIND.CHANNEL format` });
+    return issues;
+  }
+
+  const card = cards.find(c => c.id === parsed.card);
+  if (!card) {
+    issues.push({ severity: 'ERROR', code: 'CHANNEL_ADDRESS_UNKNOWN_CARD', message: `Channel address '${addr}' references unknown card '${parsed.card}'` });
+    return issues;
+  }
+
+  if (card.channelKind !== parsed.kind) {
+    issues.push({ severity: 'ERROR', code: 'CHANNEL_ADDRESS_KIND_MISMATCH', message: `Channel address '${addr}' has kind '${parsed.kind}' but card '${card.id}' is '${card.channelKind}'` });
+  }
+
+  if (parsed.channel < 1 || parsed.channel > card.channelCount) {
+    issues.push({ severity: 'ERROR', code: 'CHANNEL_ADDRESS_OUT_OF_RANGE', message: `Channel address '${addr}' channel ${parsed.channel} is out of range 1..${card.channelCount} for card '${card.id}'` });
+  }
+
+  return issues;
+}
+
+/** Checks that `addr` (if present) is syntactically a channel of `expectedKind`. */
+function checkChannelKind(issues: ValidationIssue[], deviceId: string, fieldLabel: string, addr: ChannelAddress | undefined, expectedKind: ChannelKind): void {
+  if (!addr) return;
+
+  const parsed = parseChannelAddress(addr);
+  if (!parsed) {
+    issues.push({ severity: 'ERROR', code: 'DEVICE_FIELD_INVALID_ADDRESS', message: `Device '${deviceId}' field '${fieldLabel}' address '${addr}' is not a valid channel address`, deviceId });
+    return;
+  }
+
+  if (parsed.kind !== expectedKind) {
+    issues.push({ severity: 'ERROR', code: 'DEVICE_FIELD_WRONG_CHANNEL_KIND', message: `Device '${deviceId}' field '${fieldLabel}' must be a ${expectedKind} channel, got '${parsed.kind}' ('${addr}')`, deviceId });
+  }
+}
+
+/**
+ * Checks field presence/absence rules that depend on the device's behavior
+ * and mode (feedback.mode, command.outputCount, command.style), and that
+ * every channel address field has the channel kind its role requires.
+ */
+export function validateDeviceFields(device: Device): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const id = device.id;
+
+  switch (device.behavior) {
+    case 'SWITCHED': {
+      const { feedback, command } = device;
+
+      if (feedback.mode === 'DUAL') {
+        if (!feedback.diClosed) issues.push({ severity: 'ERROR', code: 'SWITCHED_DUAL_MISSING_DICLOSED', message: `Device '${id}': feedback.mode DUAL requires diClosed`, deviceId: id });
+        if (!feedback.diOpen) issues.push({ severity: 'ERROR', code: 'SWITCHED_DUAL_MISSING_DIOPEN', message: `Device '${id}': feedback.mode DUAL requires diOpen`, deviceId: id });
+        if (feedback.invert !== undefined) issues.push({ severity: 'ERROR', code: 'SWITCHED_DUAL_FORBIDDEN_INVERT', message: `Device '${id}': feedback.invert is not allowed when feedback.mode is DUAL`, deviceId: id });
+      } else if (feedback.mode === 'SINGLE') {
+        if (!feedback.diClosed) issues.push({ severity: 'ERROR', code: 'SWITCHED_SINGLE_MISSING_DICLOSED', message: `Device '${id}': feedback.mode SINGLE requires diClosed`, deviceId: id });
+        if (feedback.diOpen) issues.push({ severity: 'ERROR', code: 'SWITCHED_SINGLE_FORBIDDEN_DIOPEN', message: `Device '${id}': feedback.diOpen is not allowed when feedback.mode is SINGLE`, deviceId: id });
+      } else if (feedback.mode === 'NONE') {
+        if (feedback.diClosed) issues.push({ severity: 'ERROR', code: 'SWITCHED_NONE_FORBIDDEN_DICLOSED', message: `Device '${id}': feedback.diClosed is not allowed when feedback.mode is NONE`, deviceId: id });
+        if (feedback.diOpen) issues.push({ severity: 'ERROR', code: 'SWITCHED_NONE_FORBIDDEN_DIOPEN', message: `Device '${id}': feedback.diOpen is not allowed when feedback.mode is NONE`, deviceId: id });
+      }
+
+      if (command.outputCount === 2 && !command.doOpen) {
+        issues.push({ severity: 'ERROR', code: 'SWITCHED_OUTPUT2_MISSING_DOOPEN', message: `Device '${id}': command.outputCount 2 requires command.doOpen`, deviceId: id });
+      }
+      if (command.outputCount === 1 && command.doOpen) {
+        issues.push({ severity: 'ERROR', code: 'SWITCHED_OUTPUT1_FORBIDDEN_DOOPEN', message: `Device '${id}': command.doOpen is not allowed when command.outputCount is 1`, deviceId: id });
+      }
+
+      if (command.style === 'PULSE') {
+        if (typeof command.pulseMs !== 'number' || !(command.pulseMs > 0)) {
+          issues.push({ severity: 'ERROR', code: 'SWITCHED_PULSE_MISSING_PULSEMS', message: `Device '${id}': command.style PULSE requires command.pulseMs greater than zero`, deviceId: id });
+        }
+      } else if (command.style === 'MAINTAINED') {
+        if (command.pulseMs !== undefined) {
+          issues.push({ severity: 'ERROR', code: 'SWITCHED_MAINTAINED_FORBIDDEN_PULSEMS', message: `Device '${id}': command.pulseMs is not allowed when command.style is MAINTAINED`, deviceId: id });
+        }
+      }
+
+      checkChannelKind(issues, id, 'command.doClose', command.doClose, 'DO');
+      checkChannelKind(issues, id, 'command.doOpen', command.doOpen, 'DO');
+      checkChannelKind(issues, id, 'feedback.diClosed', feedback.diClosed, 'DI');
+      checkChannelKind(issues, id, 'feedback.diOpen', feedback.diOpen, 'DI');
+      checkChannelKind(issues, id, 'extraInputs.diFault', device.extraInputs?.diFault, 'DI');
+      break;
+    }
+
+    case 'SIGNAL': {
+      checkChannelKind(issues, id, 'feedback.di', device.feedback.di, 'DI');
+      break;
+    }
+
+    case 'MEASURED': {
+      checkChannelKind(issues, id, 'input', device.input, 'AI');
+      if (!(device.rangeMin < device.rangeMax)) {
+        issues.push({ severity: 'ERROR', code: 'MEASURED_INVALID_RANGE', message: `Device '${id}': rangeMin must be less than rangeMax`, deviceId: id });
+      }
+      if (!(device.deadband >= 0)) {
+        issues.push({ severity: 'ERROR', code: 'MEASURED_INVALID_DEADBAND', message: `Device '${id}': deadband must be >= 0`, deviceId: id });
+      }
+      break;
+    }
+
+    case 'MODULATED': {
+      checkChannelKind(issues, id, 'setpointOutput', device.setpointOutput, 'AO');
+      if (device.feedbackInput) {
+        checkChannelKind(issues, id, 'feedbackInput', device.feedbackInput, 'AI');
+      }
+      if (!(device.rangeMin < device.rangeMax)) {
+        issues.push({ severity: 'ERROR', code: 'MODULATED_INVALID_RANGE', message: `Device '${id}': rangeMin must be less than rangeMax`, deviceId: id });
+      }
+      if (!(device.startupValue >= device.rangeMin && device.startupValue <= device.rangeMax)) {
+        issues.push({ severity: 'ERROR', code: 'MODULATED_STARTUP_OUT_OF_RANGE', message: `Device '${id}': startupValue must be within rangeMin..rangeMax`, deviceId: id });
+      }
+      if (!(device.safeValue >= device.rangeMin && device.safeValue <= device.rangeMax)) {
+        issues.push({ severity: 'ERROR', code: 'MODULATED_SAFE_OUT_OF_RANGE', message: `Device '${id}': safeValue must be within rangeMin..rangeMax`, deviceId: id });
+      }
+      break;
+    }
+  }
+
+  return issues;
+}
+
+/** Every channel address field a device declares, with a label for messages. */
+function getDeviceChannelAddresses(device: Device): { field: string; addr: ChannelAddress }[] {
+  const result: { field: string; addr: ChannelAddress }[] = [];
+
+  switch (device.behavior) {
+    case 'SWITCHED':
+      if (device.feedback.diClosed) result.push({ field: 'feedback.diClosed', addr: device.feedback.diClosed });
+      if (device.feedback.diOpen) result.push({ field: 'feedback.diOpen', addr: device.feedback.diOpen });
+      if (device.extraInputs?.diFault) result.push({ field: 'extraInputs.diFault', addr: device.extraInputs.diFault });
+      result.push({ field: 'command.doClose', addr: device.command.doClose });
+      if (device.command.doOpen) result.push({ field: 'command.doOpen', addr: device.command.doOpen });
+      break;
+    case 'SIGNAL':
+      result.push({ field: 'feedback.di', addr: device.feedback.di });
+      break;
+    case 'MEASURED':
+      result.push({ field: 'input', addr: device.input });
+      break;
+    case 'MODULATED':
+      result.push({ field: 'setpointOutput', addr: device.setpointOutput });
+      if (device.feedbackInput) result.push({ field: 'feedbackInput', addr: device.feedbackInput });
+      break;
+  }
+
+  return result;
+}
+
+/**
+ * Validates a whole device registry: every device against validateDeviceId,
+ * validateChannelAddress and validateDeviceFields, plus cross-device rules:
+ * id uniqueness, designation uniqueness within a location, channel address
+ * collisions across all devices, and location/card registry integrity.
+ */
+export function validateDeviceRegistry(registry: DeviceRegistry): ValidationResult {
+  const issues: ValidationIssue[] = [];
+  const { locations, cards, devices } = registry;
+
+  const seenLocationCodes = new Set<string>();
+  for (const loc of locations) {
+    if (!/^[A-Z0-9]+$/.test(loc.code)) {
+      issues.push({ severity: 'ERROR', code: 'LOCATION_INVALID_CODE', message: `Location code '${loc.code}' must contain only A-Z and 0-9` });
+    }
+    if (seenLocationCodes.has(loc.code)) {
+      issues.push({ severity: 'ERROR', code: 'LOCATION_DUPLICATE_CODE', message: `Duplicate location code '${loc.code}'` });
+    }
+    seenLocationCodes.add(loc.code);
+  }
+
+  const seenCardIds = new Set<string>();
+  for (const card of cards) {
+    if (!/^[A-Z0-9]+$/.test(card.id)) {
+      issues.push({ severity: 'ERROR', code: 'CARD_INVALID_ID', message: `Card id '${card.id}' must contain only A-Z and 0-9` });
+    }
+    if (seenCardIds.has(card.id)) {
+      issues.push({ severity: 'ERROR', code: 'CARD_DUPLICATE_ID', message: `Duplicate card id '${card.id}'` });
+    }
+    seenCardIds.add(card.id);
+    if (!(card.channelCount > 0)) {
+      issues.push({ severity: 'ERROR', code: 'CARD_INVALID_CHANNEL_COUNT', message: `Card '${card.id}' channelCount must be greater than zero` });
+    }
+  }
+
+  const seenDeviceIds = new Set<string>();
+  const designationsByLocation = new Map<string, Map<string, string>>();
+  const channelUsage = new Map<string, { deviceId: string; field: string }>();
+
+  for (const device of devices) {
+    issues.push(...validateDeviceId(device.id, locations));
+    issues.push(...validateDeviceFields(device));
+
+    if (seenDeviceIds.has(device.id)) {
+      issues.push({ severity: 'ERROR', code: 'DEVICE_DUPLICATE_ID', message: `Duplicate device id '${device.id}'`, deviceId: device.id });
+    }
+    seenDeviceIds.add(device.id);
+
+    const underscoreIdx = device.id.indexOf('_');
+    const locationPrefix = underscoreIdx >= 0 ? device.id.slice(0, underscoreIdx) : device.id;
+    if (!designationsByLocation.has(locationPrefix)) {
+      designationsByLocation.set(locationPrefix, new Map());
+    }
+    const designationMap = designationsByLocation.get(locationPrefix)!;
+    if (designationMap.has(device.designation)) {
+      issues.push({
+        severity: 'ERROR',
+        code: 'DEVICE_DUPLICATE_DESIGNATION_IN_LOCATION',
+        message: `Duplicate designation '${device.designation}' in location '${locationPrefix}' (devices '${designationMap.get(device.designation)}' and '${device.id}')`,
+        deviceId: device.id
+      });
+    } else {
+      designationMap.set(device.designation, device.id);
+    }
+
+    for (const { field, addr } of getDeviceChannelAddresses(device)) {
+      issues.push(...validateChannelAddress(addr, cards));
+
+      const existing = channelUsage.get(addr);
+      if (existing) {
+        issues.push({
+          severity: 'ERROR',
+          code: 'CHANNEL_ADDRESS_COLLISION',
+          message: `Channel address '${addr}' is used by both '${existing.deviceId}' (${existing.field}) and '${device.id}' (${field})`,
+          deviceId: device.id
+        });
+      } else {
+        channelUsage.set(addr, { deviceId: device.id, field });
+      }
+    }
+  }
+
+  const hasErrors = issues.some(i => i.severity === 'ERROR');
+  return { valid: !hasErrors, issues };
+}
