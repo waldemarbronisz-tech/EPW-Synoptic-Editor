@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import type { SynopticObject, SynopticConnection } from '../store';
 import { getBusbarEdgePorts } from '../symbols/scada/BusbarSymbol';
 import { resolveConnectionPoint } from '../utils/GeometryUtils';
+import { resolveObjectLabelText } from '../components/ObjectLabelRenderer';
 import { GRID_SIZE, BUSBAR_HEIGHT } from '../theme/ScadaTheme';
 
 function makeBusbar(overrides: Partial<SynopticObject> = {}): SynopticObject {
@@ -156,5 +157,60 @@ describe('Busbar resize reattachment (store.resizeBusbar)', () => {
     useStore.getState().resizeBusbar('BUS1', 32);
 
     expect(useStore.getState().connections[0].toPort).toBe('dyn_top_90');
+  });
+});
+
+function makeDevice(overrides: Partial<SynopticObject> = {}): SynopticObject {
+  return {
+    id: 'obj-uuid-123',
+    type: 'electrical.circuit_breaker',
+    category: 'Electrical',
+    x: 0, y: 0,
+    rotation: 0, scaleX: 1, scaleY: 1,
+    visible: true, locked: false, layer: 1,
+    tag: 'electrical.circuit_breaker_1', // the exact kind of type-derived tag the label must never show
+    description: '', color: '#000', fill: '#000', border: '#000',
+    text: '', font: 'Arial', fontSize: 12, tooltip: '',
+    width: 40, height: 40,
+    customProperties: {},
+    ...overrides
+  };
+}
+
+describe('Object label text (resolveObjectLabelText)', () => {
+  it('shows the designation when present', () => {
+    const obj = makeDevice({ designation: '-K1' });
+    expect(resolveObjectLabelText(obj).primary).toBe('-K1');
+  });
+
+  it('falls back to the object id when designation is empty, never the type-derived tag', () => {
+    const obj = makeDevice({ designation: '' });
+    const { primary } = resolveObjectLabelText(obj);
+    expect(primary).toBe('obj-uuid-123');
+    expect(primary).not.toContain('electrical.circuit_breaker');
+    expect(primary).not.toBe(obj.type);
+    expect(primary).not.toBe(obj.tag);
+  });
+
+  it('never falls back to the type identifier or the tag under any field combination', () => {
+    const obj = makeDevice({ designation: '', name: '' });
+    const { primary, secondary } = resolveObjectLabelText(obj);
+    expect(primary).not.toContain('electrical.');
+    expect(secondary).not.toContain('electrical.');
+  });
+
+  it('shows the name as the secondary line when showName is on', () => {
+    const obj = makeDevice({ designation: '-K1', name: 'Stycznik grzalki', showName: true });
+    expect(resolveObjectLabelText(obj).secondary).toBe('Stycznik grzalki');
+  });
+
+  it('hides the secondary line when showName is off', () => {
+    const obj = makeDevice({ designation: '-K1', name: 'Stycznik grzalki', showName: false });
+    expect(resolveObjectLabelText(obj).secondary).toBe('');
+  });
+
+  it('hides the primary line when showDesignation is off, even with a designation set', () => {
+    const obj = makeDevice({ designation: '-K1', showDesignation: false });
+    expect(resolveObjectLabelText(obj).primary).toBe('');
   });
 });
