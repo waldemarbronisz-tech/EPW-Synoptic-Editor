@@ -9,8 +9,17 @@
 // EVERY violation below is an ERROR, never a WARNING. This format is a
 // contract between three applications - a warning would mean a file can be
 // invalid and still be accepted downstream.
+//
+// validateDeviceRegistry takes `unknown`, not DeviceRegistry: it validates
+// JSON loaded from disk - hand-edited, migrated from an older version, or
+// corrupted. TypeScript's types protect code, not data read from a file.
+// A shape-checking pass runs BEFORE any business rule: if a value does not
+// have the right shape, it is reported once, clearly, and excluded from
+// further rule checks for that item - one readable error instead of a
+// cascade of secondary ones. The validator must never throw on any input;
+// a malformed file must produce a message, not a crash.
 
-import type { CardEntry, ChannelAddress, ChannelKind, Device, DeviceRegistry, LocationEntry } from './DeviceSchema';
+import type { CardEntry, ChannelAddress, ChannelKind, Device, DeviceBehavior, LocationEntry } from './DeviceSchema';
 
 export interface ValidationIssue {
   severity: 'ERROR' | 'WARNING' | 'INFO';
@@ -25,6 +34,27 @@ export interface ValidationResult {
 }
 
 const CHANNEL_KINDS: ChannelKind[] = ['DI', 'DO', 'AI', 'AO'];
+const DEVICE_BEHAVIORS: DeviceBehavior[] = ['SWITCHED', 'SIGNAL', 'MEASURED', 'MODULATED'];
+
+// ---- shape primitives --------------------------------------------------
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isString(value: unknown): value is string {
+  return typeof value === 'string';
+}
+
+function isBoolean(value: unknown): value is boolean {
+  return typeof value === 'boolean';
+}
+
+// NaN and Infinity both satisfy `typeof x === 'number'` - Number.isFinite
+// is what actually rejects them.
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
 
 /**
  * Splits 'ELA1.DI.12' into { card: 'ELA1', kind: 'DI', channel: 12 }.
@@ -214,6 +244,156 @@ export function validateDeviceFields(device: Device): ValidationIssue[] {
   return issues;
 }
 
+// ---- shape validation ---------------------------------------------------
+// Each function below checks ONE item's shape against the exact fields its
+// behavior requires. On success it returns a properly-typed value; on
+// failure it pushes ONE issue describing everything wrong with that item
+// and returns null, so the caller skips business-rule checks for it
+// entirely rather than cascading secondary errors.
+
+function validateLocationShape(raw: unknown, index: number, issues: ValidationIssue[]): LocationEntry | null {
+  if (!isPlainObject(raw)) {
+    issues.push({ severity: 'ERROR', code: 'LOCATION_INVALID_SHAPE', message: `Location at index ${index} must be an object` });
+    return null;
+  }
+
+  const problems: string[] = [];
+  if (!isString(raw.code)) problems.push('code must be a string');
+  if (!isString(raw.description)) problems.push('description must be a string');
+
+  if (problems.length > 0) {
+    issues.push({ severity: 'ERROR', code: 'LOCATION_INVALID_SHAPE', message: `Location at index ${index}: ${problems.join('; ')}` });
+    return null;
+  }
+
+  return { code: raw.code as string, description: raw.description as string };
+}
+
+function validateCardShape(raw: unknown, index: number, issues: ValidationIssue[]): CardEntry | null {
+  if (!isPlainObject(raw)) {
+    issues.push({ severity: 'ERROR', code: 'CARD_INVALID_SHAPE', message: `Card at index ${index} must be an object` });
+    return null;
+  }
+
+  const problems: string[] = [];
+  if (!isString(raw.id)) problems.push('id must be a string');
+  if (!isString(raw.model)) problems.push('model must be a string');
+  if (!isFiniteNumber(raw.channelCount)) problems.push('channelCount must be a finite number');
+  if (!(CHANNEL_KINDS as string[]).includes(raw.channelKind as string)) problems.push("channelKind must be one of 'DI','DO','AI','AO'");
+
+  if (problems.length > 0) {
+    issues.push({ severity: 'ERROR', code: 'CARD_INVALID_SHAPE', message: `Card at index ${index}: ${problems.join('; ')}` });
+    return null;
+  }
+
+  return { id: raw.id as string, model: raw.model as string, channelKind: raw.channelKind as ChannelKind, channelCount: raw.channelCount as number };
+}
+
+function validateDeviceShape(raw: unknown, index: number, issues: ValidationIssue[]): Device | null {
+  if (!isPlainObject(raw)) {
+    issues.push({ severity: 'ERROR', code: 'DEVICE_INVALID_SHAPE', message: `Device at index ${index} must be an object` });
+    return null;
+  }
+
+  const idForMessages = isString(raw.id) ? raw.id : `#${index}`;
+  const problems: string[] = [];
+
+  if (!isString(raw.id)) problems.push('id must be a string');
+  if (!isString(raw.designation)) problems.push('designation must be a string');
+  if (!isString(raw.name)) problems.push('name must be a string');
+  if (!isString(raw.kind)) problems.push('kind must be a string');
+  if (!isBoolean(raw.publishToHa)) problems.push('publishToHa must be a boolean');
+
+  if (!(DEVICE_BEHAVIORS as string[]).includes(raw.behavior as string)) {
+    if (problems.length > 0) {
+      issues.push({ severity: 'ERROR', code: 'DEVICE_INVALID_SHAPE', message: `Device '${idForMessages}': ${problems.join('; ')}`, deviceId: isString(raw.id) ? raw.id : undefined });
+    }
+    issues.push({
+      severity: 'ERROR',
+      code: 'DEVICE_UNKNOWN_BEHAVIOR',
+      message: `Device '${idForMessages}': unknown behavior '${String(raw.behavior)}', expected one of SWITCHED, SIGNAL, MEASURED, MODULATED`,
+      deviceId: isString(raw.id) ? raw.id : undefined
+    });
+    return null;
+  }
+
+  const behavior = raw.behavior as DeviceBehavior;
+
+  switch (behavior) {
+    case 'SWITCHED': {
+      const feedbackOk = isPlainObject(raw.feedback);
+      const commandOk = isPlainObject(raw.command);
+      if (!feedbackOk) problems.push('feedback must be an object');
+      if (!commandOk) problems.push('command must be an object');
+      if (!isPlainObject(raw.supervision)) problems.push('supervision must be an object');
+      if (!isPlainObject(raw.safeState)) problems.push('safeState must be an object');
+      if (!isBoolean(raw.switchCounter)) problems.push('switchCounter must be a boolean');
+
+      if (feedbackOk && !['DUAL', 'SINGLE', 'NONE'].includes((raw.feedback as Record<string, unknown>).mode as string)) {
+        problems.push("feedback.mode must be one of 'DUAL','SINGLE','NONE'");
+      }
+      if (commandOk) {
+        const command = raw.command as Record<string, unknown>;
+        if (command.outputCount !== 1 && command.outputCount !== 2) {
+          problems.push('command.outputCount must be 1 or 2');
+        }
+        if (!['MAINTAINED', 'PULSE'].includes(command.style as string)) {
+          problems.push("command.style must be one of 'MAINTAINED','PULSE'");
+        }
+      }
+      if (isPlainObject(raw.safeState)) {
+        const safeState = raw.safeState as Record<string, unknown>;
+        if (!['NO_CHANGE', 'OPEN', 'CLOSE'].includes(safeState.onStartup as string)) {
+          problems.push("safeState.onStartup must be one of 'NO_CHANGE','OPEN','CLOSE'");
+        }
+        if (!['NO_CHANGE', 'OPEN', 'CLOSE'].includes(safeState.onLinkLoss as string)) {
+          problems.push("safeState.onLinkLoss must be one of 'NO_CHANGE','OPEN','CLOSE'");
+        }
+      }
+      break;
+    }
+
+    case 'SIGNAL': {
+      if (!isPlainObject(raw.feedback)) problems.push('feedback must be an object');
+      if (!['HIGH', 'LOW'].includes(raw.alarmState as string)) problems.push("alarmState must be one of 'HIGH','LOW'");
+      if (!isFiniteNumber(raw.debounceMs)) problems.push('debounceMs must be a finite number');
+      break;
+    }
+
+    case 'MEASURED': {
+      if (!isString(raw.input)) problems.push('input must be a string');
+      if (!isString(raw.unit)) problems.push('unit must be a string');
+      if (!isString(raw.format)) problems.push('format must be a string');
+      if (!isFiniteNumber(raw.rangeMin)) problems.push('rangeMin must be a finite number');
+      if (!isFiniteNumber(raw.rangeMax)) problems.push('rangeMax must be a finite number');
+      if (!isFiniteNumber(raw.deadband)) problems.push('deadband must be a finite number');
+      break;
+    }
+
+    case 'MODULATED': {
+      if (!isString(raw.setpointOutput)) problems.push('setpointOutput must be a string');
+      if (!isString(raw.unit)) problems.push('unit must be a string');
+      if (!isFiniteNumber(raw.rangeMin)) problems.push('rangeMin must be a finite number');
+      if (!isFiniteNumber(raw.rangeMax)) problems.push('rangeMax must be a finite number');
+      if (!isFiniteNumber(raw.startupValue)) problems.push('startupValue must be a finite number');
+      if (!isFiniteNumber(raw.safeValue)) problems.push('safeValue must be a finite number');
+      break;
+    }
+  }
+
+  if (problems.length > 0) {
+    issues.push({ severity: 'ERROR', code: 'DEVICE_INVALID_SHAPE', message: `Device '${idForMessages}': ${problems.join('; ')}`, deviceId: isString(raw.id) ? raw.id : undefined });
+    return null;
+  }
+
+  // Every field this behavior requires has been shape-checked above; fields
+  // not listed by the task's shape contract (e.g. feedback.diClosed,
+  // command.pulseMs) are left to validateDeviceFields, which already
+  // tolerates missing/wrong-typed optional channel addresses without
+  // throwing (parseChannelAddress rejects non-strings outright).
+  return raw as unknown as Device;
+}
+
 /** Every channel address field a device declares, with a label for messages. */
 function getDeviceChannelAddresses(device: Device): { field: string; addr: ChannelAddress }[] {
   const result: { field: string; addr: ChannelAddress }[] = [];
@@ -242,14 +422,42 @@ function getDeviceChannelAddresses(device: Device): { field: string; addr: Chann
 }
 
 /**
- * Validates a whole device registry: every device against validateDeviceId,
- * validateChannelAddress and validateDeviceFields, plus cross-device rules:
- * id uniqueness, designation uniqueness within a location, channel address
- * collisions across all devices, and location/card registry integrity.
+ * Validates a whole device registry loaded from an untrusted source (JSON
+ * from disk: hand-edited, migrated, or corrupted). Shape is checked first,
+ * item by item; anything with the wrong shape is reported once and
+ * excluded from the business-rule checks below (id uniqueness, designation
+ * uniqueness within a location, channel address collisions across all
+ * devices, location/card registry integrity).
  */
-export function validateDeviceRegistry(registry: DeviceRegistry): ValidationResult {
+export function validateDeviceRegistry(registry: unknown): ValidationResult {
   const issues: ValidationIssue[] = [];
-  const { locations, cards, devices } = registry;
+
+  if (!isPlainObject(registry)) {
+    issues.push({ severity: 'ERROR', code: 'REGISTRY_INVALID_SHAPE', message: 'Device registry must be an object' });
+    return { valid: false, issues };
+  }
+
+  const locationsRaw = registry.locations;
+  const cardsRaw = registry.cards;
+  const devicesRaw = registry.devices;
+
+  const locationsOk = Array.isArray(locationsRaw);
+  const cardsOk = Array.isArray(cardsRaw);
+  const devicesOk = Array.isArray(devicesRaw);
+
+  if (!locationsOk) issues.push({ severity: 'ERROR', code: 'REGISTRY_INVALID_LOCATIONS', message: 'registry.locations must be an array' });
+  if (!cardsOk) issues.push({ severity: 'ERROR', code: 'REGISTRY_INVALID_CARDS', message: 'registry.cards must be an array' });
+  if (!devicesOk) issues.push({ severity: 'ERROR', code: 'REGISTRY_INVALID_DEVICES', message: 'registry.devices must be an array' });
+
+  const locations: LocationEntry[] = locationsOk
+    ? (locationsRaw as unknown[]).map((raw, i) => validateLocationShape(raw, i, issues)).filter((l): l is LocationEntry => l !== null)
+    : [];
+  const cards: CardEntry[] = cardsOk
+    ? (cardsRaw as unknown[]).map((raw, i) => validateCardShape(raw, i, issues)).filter((c): c is CardEntry => c !== null)
+    : [];
+  const devices: Device[] = devicesOk
+    ? (devicesRaw as unknown[]).map((raw, i) => validateDeviceShape(raw, i, issues)).filter((d): d is Device => d !== null)
+    : [];
 
   const seenLocationCodes = new Set<string>();
   for (const loc of locations) {
