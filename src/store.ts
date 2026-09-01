@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { COLOR_CANVAS_BACKGROUND, GRID_SIZE } from './theme/ScadaTheme';
+import type { MeterRow } from './symbols/scada/MeterSymbol';
 
 // Cap on how many undo/redo snapshots are kept; each entry is a full deep
 // copy of objects+connections, so this bounds both memory and undo depth.
@@ -65,6 +66,11 @@ export interface SynopticObject {
   labelPosition?: 'TOP' | 'BOTTOM' | 'LEFT' | 'RIGHT';
   labelOffsetX?: number;
   labelOffsetY?: number;
+
+  // SCADA meter (scada.meter): rows are edited by hand for now - wiring
+  // this to the device registry is a separate, later task. Optional: only
+  // meter objects use it, every other object leaves it undefined.
+  meterRows?: MeterRow[];
 }
 
 export interface CanvasState {

@@ -29,6 +29,7 @@ import { automationSymbols } from './registry/automation';
 import { instrumentationSymbols } from './registry/instrumentation';
 import { measurementsSymbols } from './registry/measurements';
 import { graphicsSymbols } from './registry/graphics';
+import { scadaSymbols } from './registry/scada';
 
 export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
   ...electricalSymbols,
@@ -37,7 +38,8 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
   ...automationSymbols,
   ...instrumentationSymbols,
   ...measurementsSymbols,
-  ...graphicsSymbols
+  ...graphicsSymbols,
+  ...scadaSymbols
 };
 
 export const getSymbolDefinition = (type: string): SymbolDefinition | undefined => {

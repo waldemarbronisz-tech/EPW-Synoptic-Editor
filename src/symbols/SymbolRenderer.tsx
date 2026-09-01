@@ -48,6 +48,17 @@ import { ADAOutputsSymbol } from './automation/ADAOutputsSymbol';
 import { EPWCoreSymbol } from './automation/EPWCoreSymbol';
 import { EPMSymbol } from './automation/EPMSymbol';
 import { PSU24VSymbol } from './automation/PSU24VSymbol';
+import {
+  ScadaLoadSwitchAdapter,
+  ScadaBusbarAdapter,
+  ScadaWireNodeAdapter,
+  ScadaLabelFrameAdapter,
+  ScadaMotorAdapter,
+  ScadaPilotLampAdapter,
+  ScadaSocketAdapter,
+  ScadaIndicatorDiodeAdapter,
+  ScadaMeterAdapter
+} from './scada/ScadaSymbolAdapters';
 
 export interface SymbolProps {
   obj: SynopticObject;
@@ -193,6 +204,24 @@ export const SymbolRenderer: React.FC<{ obj: SynopticObject }> = ({ obj }) => {
       return <EPMSymbol obj={obj} state={state} />;
     case 'automation.psu_24v':
       return <PSU24VSymbol obj={obj} state={state} />;
+    case 'scada.load_switch':
+      return <ScadaLoadSwitchAdapter obj={obj} state={state} />;
+    case 'scada.busbar':
+      return <ScadaBusbarAdapter obj={obj} state={state} />;
+    case 'scada.wire_node':
+      return <ScadaWireNodeAdapter obj={obj} state={state} />;
+    case 'scada.label_frame':
+      return <ScadaLabelFrameAdapter obj={obj} state={state} />;
+    case 'scada.motor':
+      return <ScadaMotorAdapter obj={obj} state={state} />;
+    case 'scada.pilot_lamp':
+      return <ScadaPilotLampAdapter obj={obj} state={state} />;
+    case 'scada.socket':
+      return <ScadaSocketAdapter obj={obj} state={state} />;
+    case 'scada.indicator_diode':
+      return <ScadaIndicatorDiodeAdapter obj={obj} state={state} />;
+    case 'scada.meter':
+      return <ScadaMeterAdapter obj={obj} state={state} />;
     default:
       return <GenericSymbol obj={obj} state={state} />;
   }
