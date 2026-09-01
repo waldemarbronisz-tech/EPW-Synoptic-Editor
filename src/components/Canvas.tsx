@@ -8,6 +8,7 @@ import { ConnectionService } from '../project/ConnectionService';
 import { ConnectionLine } from './ConnectionLine';
 import { ObjectLabelRenderer } from './ObjectLabelRenderer';
 import { COLOR_OUTLINE } from '../theme/ScadaTheme';
+import { WireNodeSymbol } from '../symbols/scada/WireNodeSymbol';
 
 
 
@@ -559,7 +560,11 @@ export const Canvas: React.FC = () => {
               />
             );
           })()}
-                    {/* Topology Junctions */}
+                    {/* Topology Junctions: a wire node (from the SCADA library)
+                        wherever three or more conductors meet at the same port.
+                        (This used to be two near-identical copies of the same
+                        block, one of them missing dyn_ port support - collapsed
+                        into one, keeping the more complete version.) */}
           {(() => {
              const junctions: {x: number, y: number}[] = [];
              const pointMap = new Map<string, number>();
@@ -577,47 +582,11 @@ export const Canvas: React.FC = () => {
                      const obj = objects.find(o => o.id === objId);
                      if (obj) {
                          const def = getSymbolDefinition(obj.type);
-                         const port = def?.connectionPoints?.find(p => p.id === portId);
-                         if (port) {
-                             const w = obj.width * (obj.scaleX || 1);
-                             const h = obj.height * (obj.scaleY || 1);
-                             const cx = port.x * w - w / 2;
-                             const cy = port.y * h - h / 2;
-                             const rot = obj.rotation || 0;
-                             const radians = rot * (Math.PI / 180);
-                             const rx = cx * Math.cos(radians) - cy * Math.sin(radians);
-                             const ry = cx * Math.sin(radians) + cy * Math.cos(radians);
-                             junctions.push({ x: obj.x + w / 2 + rx, y: obj.y + h / 2 + ry });
-                         }
-                     }
-                 }
-             });
-             return junctions.map((j, idx) => <Circle key={`junc-${idx}`} x={j.x} y={j.y} radius={3} fill="#000" />);
-          })()}
-                    {/* Topology Junctions */}
-          {(() => {
-             const junctions: {x: number, y: number}[] = [];
-             const pointMap = new Map<string, number>();
-
-             connections.forEach(c => {
-                 const key1 = `${c.fromId}:${c.fromPort}`;
-                 const key2 = `${c.toId}:${c.toPort}`;
-                 pointMap.set(key1, (pointMap.get(key1) || 0) + 1);
-                 pointMap.set(key2, (pointMap.get(key2) || 0) + 1);
-             });
-
-             pointMap.forEach((count, key) => {
-                 if (count > 2) {
-                     const [objId, portId] = key.split(':');
-                     const obj = objects.find(o => o.id === objId);
-                     if (obj) {
-                         const def = getSymbolDefinition(obj.type);
                          const port = def?.connectionPoints?.find(p => p.id === portId) ||
                                       (portId.startsWith('dyn_') ? { x: parseInt(portId.replace('dyn_',''))/100, y: 0.5 } : null); // Simple dyn fallback
                          if (port) {
                              const w = obj.width * (obj.scaleX || 1);
                              const h = obj.height * (obj.scaleY || 1);
-                             // To keep it simple, just use center bounds approximation for dyn_ busbars if it's horizontal
                              const cx = (port.x || 0.5) * w - w / 2;
                              const cy = (port.y || 0.5) * h - h / 2;
                              const rot = obj.rotation || 0;
@@ -629,7 +598,13 @@ export const Canvas: React.FC = () => {
                      }
                  }
              });
-             return junctions.map((j, idx) => <Circle key={`junc-${idx}`} x={j.x} y={j.y} radius={4} fill="#000" />);
+             // WireNodeSymbol draws itself centered on its own local (75,75) -
+             // offset the wrapping Group so that point lands on the junction.
+             return junctions.map((j, idx) => (
+               <Group key={`junc-${idx}`} x={j.x - 75} y={j.y - 75} listening={false}>
+                 <WireNodeSymbol />
+               </Group>
+             ));
           })()}
           {[...objects].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)).map((obj) => (
             <ObjectNode

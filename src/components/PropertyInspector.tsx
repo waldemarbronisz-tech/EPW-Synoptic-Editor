@@ -132,11 +132,9 @@ export const PropertyInspector: React.FC = () => {
             <div className="property-group-title">Preview</div>
             <div className="property-row">
               <label>State</label>
-              <select name="editor.preview_state" value={selectedConn.editor?.preview_state || ''} onChange={handleConnChange} onBlur={() => useStore.getState().saveHistory()}>
-                <option value="DEENERGIZED">Deenergized / No Flow</option>
-                <option value="ENERGIZED">Energized (Elec)</option>
-                <option value="FLOW">Flow (Water/HVAC)</option>
-                <option value="FAULT">Fault</option>
+              <select name="editor.preview_state" value={selectedConn.editor?.preview_state || 'ENERGIZED'} onChange={handleConnChange} onBlur={() => useStore.getState().saveHistory()}>
+                <option value="ENERGIZED">Energized</option>
+                <option value="DEENERGIZED">De-energized</option>
               </select>
             </div>
           </div>
