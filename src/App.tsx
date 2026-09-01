@@ -5,11 +5,13 @@ import { Toolbox } from './components/Toolbox';
 import { Canvas } from './components/Canvas';
 import { PropertyInspector } from './components/PropertyInspector';
 import { MessagesPanel } from './components/MessagesPanel';
+import { ScadaStylePreview } from './components/ScadaStylePreview';
 import { useStore } from './store';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 function App() {
   const { projectName, fileName, isDirty } = useStore();
+  const [showScadaPreview, setShowScadaPreview] = useState(false);
 
   useEffect(() => {
     const titleName = fileName || `${projectName}.epwsyn`;
@@ -19,7 +21,8 @@ function App() {
 
   return (
     <div className="app-container">
-      <MenuBar />
+      <MenuBar onOpenScadaPreview={() => setShowScadaPreview(true)} />
+      {showScadaPreview && <ScadaStylePreview onClose={() => setShowScadaPreview(false)} />}
       <Toolbar />
 
       <div className="main-workspace">

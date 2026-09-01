@@ -1,0 +1,53 @@
+// SCADA-style symbol 4/9: label frame, for marking power feeds and loads
+// (e.g. "ZASILANIE / 230V AC", "DOM", "WARSZTAT"). Width hugs the text.
+// One port, no states.
+
+import React from 'react';
+import { Group, Rect, Text } from 'react-konva';
+import { COLOR_OUTLINE, COLOR_PANEL } from '../../theme/ScadaTheme';
+
+// oxlint-disable-next-line react/only-export-components -- one file per symbol is required; this state list belongs beside its component.
+export const LABEL_FRAME_STATES: string[] = [];
+
+const PADDING_X = 14;
+const PADDING_Y = 10;
+const TITLE_FONT_SIZE = 16;
+const DESC_FONT_SIZE = 12;
+const LINE_GAP = 4;
+const FRAME_OUTLINE_WIDTH = 4; // per this symbol's own spec, not OUTLINE_WIDTH
+
+/**
+ * No real canvas is available at layout time (this runs the same way in
+ * tests, without font metrics), so width is estimated from character
+ * count rather than measured - close enough for a frame that hugs its
+ * text without needing to be pixel-exact.
+ */
+function estimateTextWidth(text: string, fontSize: number): number {
+  return text.length * fontSize * 0.62;
+}
+
+// oxlint-disable-next-line react/only-export-components -- one file per symbol is required; this helper belongs beside its component.
+export function getLabelFrameSize(title: string, description: string): { width: number; height: number } {
+  const titleWidth = estimateTextWidth(title, TITLE_FONT_SIZE);
+  const descWidth = estimateTextWidth(description, DESC_FONT_SIZE);
+  const width = Math.max(titleWidth, descWidth) + PADDING_X * 2;
+  const height = PADDING_Y * 2 + TITLE_FONT_SIZE + LINE_GAP + DESC_FONT_SIZE;
+  return { width, height };
+}
+
+export interface LabelFrameSymbolProps {
+  title: string;
+  description: string;
+}
+
+export const LabelFrameSymbol: React.FC<LabelFrameSymbolProps> = ({ title, description }) => {
+  const { width, height } = getLabelFrameSize(title, description);
+
+  return (
+    <Group>
+      <Rect x={0} y={0} width={width} height={height} fill={COLOR_PANEL} stroke={COLOR_OUTLINE} strokeWidth={FRAME_OUTLINE_WIDTH} />
+      <Text x={PADDING_X} y={PADDING_Y} text={title} fontSize={TITLE_FONT_SIZE} fontStyle="bold" fill={COLOR_OUTLINE} />
+      <Text x={PADDING_X} y={PADDING_Y + TITLE_FONT_SIZE + LINE_GAP} text={description} fontSize={DESC_FONT_SIZE} fill={COLOR_OUTLINE} />
+    </Group>
+  );
+};
