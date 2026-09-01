@@ -3,7 +3,7 @@ import { useStore } from '../store';
 import type { SynopticObject, SynopticConnection } from '../store';
 import { getBusbarEdgePorts } from '../symbols/scada/BusbarSymbol';
 import { resolveConnectionPoint } from '../utils/GeometryUtils';
-import { resolveObjectLabelText } from '../components/ObjectLabelRenderer';
+import { resolveObjectLabelText, measureLabelLine, LABEL_MAX_WIDTH } from '../components/ObjectLabelRenderer';
 import { snapValue } from '../utils/GridSnap';
 import { GRID_SIZE, BUSBAR_HEIGHT } from '../theme/ScadaTheme';
 
@@ -184,10 +184,11 @@ describe('Object label text (resolveObjectLabelText)', () => {
     expect(resolveObjectLabelText(obj).primary).toBe('-K1');
   });
 
-  it('falls back to the object id when designation is empty, never the type-derived tag', () => {
+  it('draws no primary line at all when designation is empty - bug fix: the previous task wrongly fell back to the object id (a UUID), which is exactly usterka 1', () => {
     const obj = makeDevice({ designation: '' });
     const { primary } = resolveObjectLabelText(obj);
-    expect(primary).toBe('obj-uuid-123');
+    expect(primary).toBe('');
+    expect(primary).not.toBe(obj.id);
     expect(primary).not.toContain('electrical.circuit_breaker');
     expect(primary).not.toBe(obj.type);
     expect(primary).not.toBe(obj.tag);
@@ -213,6 +214,38 @@ describe('Object label text (resolveObjectLabelText)', () => {
   it('hides the primary line when showDesignation is off, even with a designation set', () => {
     const obj = makeDevice({ designation: '-K1', showDesignation: false });
     expect(resolveObjectLabelText(obj).primary).toBe('');
+  });
+
+  it('produces neither line for a device with no designation and no name - the object stands unlabeled', () => {
+    const obj = makeDevice({ designation: '', name: '' });
+    const { primary, secondary } = resolveObjectLabelText(obj);
+    expect(primary).toBe('');
+    expect(secondary).toBe('');
+  });
+});
+
+describe('Label width capping (measureLabelLine / LABEL_MAX_WIDTH)', () => {
+  it('shrinks to fit short text, well under the cap', () => {
+    const line = measureLabelLine('-K1', 12, LABEL_MAX_WIDTH - 8);
+    expect(line.lines).toBe(1);
+    expect(line.width).toBeLessThan(LABEL_MAX_WIDTH - 8);
+  });
+
+  it('caps a long designation at the max width and reserves a second line', () => {
+    // Long enough that the character-count estimate exceeds any
+    // reasonable single-line budget - exactly the UUID-length case
+    // usterka 1 was reported against.
+    const longText = 'ae77a756-08cb-42d9-b3ff-ef0243a4818d';
+    const maxTextWidth = LABEL_MAX_WIDTH - 8;
+    const line = measureLabelLine(longText, 12, maxTextWidth);
+    expect(line.width).toBeLessThanOrEqual(maxTextWidth);
+    expect(line.lines).toBe(2);
+  });
+
+  it('returns zero size for empty text, so an unused line takes no space', () => {
+    const line = measureLabelLine('', 12, LABEL_MAX_WIDTH);
+    expect(line.width).toBe(0);
+    expect(line.height).toBe(0);
   });
 });
 

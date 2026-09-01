@@ -16,6 +16,15 @@ const SECONDARY_FONT_SIZE = 9;
 const PADDING_X = 4;
 const PADDING_Y = 2;
 const LINE_GAP = 1;
+const LINE_HEIGHT_FACTOR = 1.15;
+
+// Bug fix (previous task's spec was wrong): a label is only ever drawn
+// from user-entered data. There is no placeholder - an unlabeled symbol
+// stays unlabeled. The box is also capped at this width; text that
+// doesn't fit wraps onto at most two lines and is ellipsis-truncated
+// beyond that (Konva's own wrap+ellipsis, not a hand-rolled line-breaker).
+// oxlint-disable-next-line react/only-export-components -- kept beside the component it belongs to, for testability without rendering Konva.
+export const LABEL_MAX_WIDTH = 160;
 
 /** No real canvas font metrics at layout time - a character-count estimate, same technique as LabelFrameSymbol. */
 function estimateTextWidth(text: string, fontSize: number): number {
@@ -25,18 +34,37 @@ function estimateTextWidth(text: string, fontSize: number): number {
 /**
  * The label's actual text content, kept as a standalone pure function so
  * it is testable without rendering Konva. Primary line: designation,
- * falling back to the object's own id - NEVER the type identifier (e.g.
- * 'electrical.rcd') and never the auto-generated, type-derived tag
- * either. Secondary line: name, shown only when toggled on.
+ * shown only when the user has actually typed one - NEVER a fallback to
+ * the object's id, the type identifier (e.g. 'electrical.rcd') or the
+ * auto-generated, type-derived tag. An object with no designation has no
+ * primary line at all. Secondary line: name, shown only when toggled on
+ * AND non-empty.
  */
 // oxlint-disable-next-line react/only-export-components -- kept beside the component it belongs to, for testability without rendering Konva.
 export function resolveObjectLabelText(obj: SynopticObject): { primary: string; secondary: string } {
   const showDesignation = obj.showDesignation !== false;
   const showName = obj.showName !== false;
   return {
-    primary: showDesignation ? (obj.designation || obj.id) : '',
+    primary: showDesignation ? (obj.designation || '') : '',
     secondary: showName ? (obj.name || '') : ''
   };
+}
+
+/**
+ * Sizing for one line of label text, capped at LABEL_MAX_WIDTH: the width
+ * shrinks to fit short text, and text too wide to fit on one line reserves
+ * a second line's worth of height instead (Konva's wrap="word" then
+ * actually breaks it there, with ellipsis={true} truncating anything
+ * beyond that). Returns zero size for empty text so an unused line takes
+ * up no space in the label box.
+ */
+// oxlint-disable-next-line react/only-export-components -- kept beside the component it belongs to, for testability without rendering Konva.
+export function measureLabelLine(text: string, fontSize: number, maxWidth: number): { width: number; height: number; lines: 1 | 2 } {
+  if (!text) return { width: 0, height: 0, lines: 1 };
+  const estWidth = estimateTextWidth(text, fontSize);
+  const lineHeight = fontSize * LINE_HEIGHT_FACTOR;
+  const lines = estWidth > maxWidth ? 2 : 1;
+  return { width: Math.min(estWidth, maxWidth), height: lineHeight * lines, lines };
 }
 
 export const ObjectLabelRenderer: React.FC<ObjectLabelRendererProps> = ({ obj, onChange }) => {
@@ -68,16 +96,23 @@ export const ObjectLabelRenderer: React.FC<ObjectLabelRendererProps> = ({ obj, o
 
   const pos = obj.labelPosition || 'BOTTOM';
 
+  // Nominal reference frame the label centers/anchors itself in - capped
+  // at LABEL_MAX_WIDTH so a wide symbol doesn't stretch it past the
+  // required maximum. For TOP/BOTTOM, baseX is always -boxWidth/2 so this
+  // frame stays centered on the symbol's own center (x=0 locally)
+  // regardless of how wide it ends up.
+  const boxWidth = pos === 'LEFT' || pos === 'RIGHT' ? 80 : Math.min(w * 2, LABEL_MAX_WIDTH);
+
   if (pos === 'TOP') {
-    baseX = -w;
+    baseX = -boxWidth / 2;
     baseY = -h / 2 - margin - 20;
     align = 'center';
   } else if (pos === 'BOTTOM') {
-    baseX = -w;
+    baseX = -boxWidth / 2;
     baseY = h / 2 + margin;
     align = 'center';
   } else if (pos === 'LEFT') {
-    baseX = -w - 80 - margin;
+    baseX = -w - boxWidth - margin;
     baseY = -10;
     align = 'right';
   } else if (pos === 'RIGHT') {
@@ -87,16 +122,16 @@ export const ObjectLabelRenderer: React.FC<ObjectLabelRendererProps> = ({ obj, o
   }
 
   const counterRot = -(obj.rotation || 0);
-  const boxWidth = pos === 'LEFT' || pos === 'RIGHT' ? 80 : w * 2;
 
-  const primaryWidth = primaryText ? estimateTextWidth(primaryText, PRIMARY_FONT_SIZE) : 0;
-  const secondaryWidth = secondaryText ? estimateTextWidth(secondaryText, SECONDARY_FONT_SIZE) : 0;
-  const bgWidth = Math.min(boxWidth, Math.max(primaryWidth, secondaryWidth) + PADDING_X * 2);
+  const maxTextWidth = boxWidth - PADDING_X * 2;
+  const primaryLine = measureLabelLine(primaryText, PRIMARY_FONT_SIZE, maxTextWidth);
+  const secondaryLine = measureLabelLine(secondaryText, SECONDARY_FONT_SIZE, maxTextWidth);
+  const bgWidth = Math.min(boxWidth, Math.max(primaryLine.width, secondaryLine.width) + PADDING_X * 2);
   const bgHeight =
     PADDING_Y * 2 +
-    (primaryText ? PRIMARY_FONT_SIZE : 0) +
+    primaryLine.height +
     (primaryText && secondaryText ? LINE_GAP : 0) +
-    (secondaryText ? SECONDARY_FONT_SIZE : 0);
+    secondaryLine.height;
 
   const commitEdit = (value: string) => {
     setEditPos(null);
@@ -163,9 +198,13 @@ export const ObjectLabelRenderer: React.FC<ObjectLabelRendererProps> = ({ obj, o
             x={0}
             y={PADDING_Y}
             width={boxWidth}
+            height={primaryLine.height}
             text={primaryText}
             align={align}
             fontSize={PRIMARY_FONT_SIZE}
+            lineHeight={LINE_HEIGHT_FACTOR}
+            wrap="word"
+            ellipsis={true}
             fontStyle="bold"
             fill={COLOR_OUTLINE}
           />
@@ -173,11 +212,15 @@ export const ObjectLabelRenderer: React.FC<ObjectLabelRendererProps> = ({ obj, o
         {secondaryText && (
           <Text
             x={0}
-            y={PADDING_Y + (primaryText ? PRIMARY_FONT_SIZE + LINE_GAP : 0)}
+            y={PADDING_Y + (primaryText ? primaryLine.height + LINE_GAP : 0)}
             width={boxWidth}
+            height={secondaryLine.height}
             text={secondaryText}
             align={align}
             fontSize={SECONDARY_FONT_SIZE}
+            lineHeight={LINE_HEIGHT_FACTOR}
+            wrap="word"
+            ellipsis={true}
             fill={COLOR_OUTLINE}
           />
         )}
