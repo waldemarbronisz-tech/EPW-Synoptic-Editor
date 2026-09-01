@@ -4,6 +4,7 @@ import type { SynopticObject, SynopticConnection } from '../store';
 import { getBusbarEdgePorts } from '../symbols/scada/BusbarSymbol';
 import { resolveConnectionPoint } from '../utils/GeometryUtils';
 import { resolveObjectLabelText } from '../components/ObjectLabelRenderer';
+import { snapValue } from '../utils/GridSnap';
 import { GRID_SIZE, BUSBAR_HEIGHT } from '../theme/ScadaTheme';
 
 function makeBusbar(overrides: Partial<SynopticObject> = {}): SynopticObject {
@@ -212,5 +213,36 @@ describe('Object label text (resolveObjectLabelText)', () => {
   it('hides the primary line when showDesignation is off, even with a designation set', () => {
     const obj = makeDevice({ designation: '-K1', showDesignation: false });
     expect(resolveObjectLabelText(obj).primary).toBe('');
+  });
+});
+
+describe('Grid snapping (GridSnap.snapValue / shouldSnapToGrid)', () => {
+  beforeEach(() => {
+    useStore.setState({ snapToGridEnabled: true });
+  });
+
+  it('rounds a value to the nearest grid node when snapping is on and Alt is not held', () => {
+    expect(snapValue(37, 16, false)).toBe(32); // nearest multiple of 16
+    expect(snapValue(40, 16, false)).toBe(48);
+  });
+
+  it('holding Alt bypasses snapping even though the toggle is on', () => {
+    expect(snapValue(37, 16, true)).toBe(37);
+  });
+
+  it('turning the persistent toggle off bypasses snapping even without Alt', () => {
+    useStore.setState({ snapToGridEnabled: false });
+    expect(snapValue(37, 16, false)).toBe(37);
+  });
+
+  it('the View menu toggle defaults to on', () => {
+    useStore.setState({ snapToGridEnabled: true }); // reset from prior test in this file
+    expect(useStore.getState().snapToGridEnabled).toBe(true);
+  });
+
+  it('toggleSnapToGrid flips the persistent setting', () => {
+    const before = useStore.getState().snapToGridEnabled;
+    useStore.getState().toggleSnapToGrid();
+    expect(useStore.getState().snapToGridEnabled).toBe(!before);
   });
 });

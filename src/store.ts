@@ -131,6 +131,12 @@ interface AppState {
   isDrawingConnection: boolean;
   setDrawingMode: (active: boolean) => void;
 
+  // Grid snapping: a persistent toggle (View menu, default on) separate
+  // from the momentary Alt-key bypass, which lives outside the store
+  // entirely (Canvas.tsx tracks the live key state directly).
+  snapToGridEnabled: boolean;
+  toggleSnapToGrid: () => void;
+
   // Actions
   setProjectName: (name: string) => void;
   setFileName: (name: string | null) => void;
@@ -202,10 +208,13 @@ export const useStore = create<AppState>((set, get) => ({
   isDirty: false,
   messages: [],
   isDrawingConnection: false,
+  snapToGridEnabled: true,
 
   setDrawingMode: (active) => set({
     isDrawingConnection: active
   }),
+
+  toggleSnapToGrid: () => set((state) => ({ snapToGridEnabled: !state.snapToGridEnabled })),
 
   setProjectName: (name) => set({ projectName: name, isDirty: true }),
   setFileName: (name) => set({ fileName: name }),

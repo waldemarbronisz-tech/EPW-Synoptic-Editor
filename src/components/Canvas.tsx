@@ -10,6 +10,14 @@ import { ObjectLabelRenderer } from './ObjectLabelRenderer';
 import { COLOR_OUTLINE, COLOR_WHITE } from '../theme/ScadaTheme';
 import { WireNodeSymbol } from '../symbols/scada/WireNodeSymbol';
 import { getBusbarEdgePorts } from '../symbols/scada/BusbarSymbol';
+import { snapValue } from '../utils/GridSnap';
+
+// Momentary Alt-key bypass for grid snapping. Deliberately outside React
+// state: every ObjectNode's drag handlers need the CURRENT key state at
+// the instant a drag ends, not a value captured in a stale closure or
+// re-rendered prop, and a keypress should never trigger a re-render of
+// the whole canvas by itself.
+let isAltPressed = false;
 
 
 
@@ -99,16 +107,18 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
           }
         }}
         onDragMove={(e) => {
-          // Snap during drag for visual feedback (doesn't mutate store yet)
-          e.target.x(Math.round(e.target.x() / gridSize) * gridSize);
-          e.target.y(Math.round(e.target.y() / gridSize) * gridSize);
+          // Snap during drag for visual feedback (doesn't mutate store yet).
+          // Held Alt bypasses this exactly as it bypasses the final snap
+          // on release, so the preview matches where the object will land.
+          e.target.x(snapValue(e.target.x(), gridSize, isAltPressed));
+          e.target.y(snapValue(e.target.y(), gridSize, isAltPressed));
         }}
         onDragEnd={(e) => {
           // Push final position, then commit exactly one history entry for
           // the whole drag (updateObject itself no longer touches history).
           onChange({
-            x: Math.round(e.target.x() / gridSize) * gridSize,
-            y: Math.round(e.target.y() / gridSize) * gridSize,
+            x: snapValue(e.target.x(), gridSize, isAltPressed),
+            y: snapValue(e.target.y(), gridSize, isAltPressed),
           });
           useStore.getState().saveHistory();
         }}
@@ -126,8 +136,8 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
             // connections are reattached/reported exactly as a
             // Properties-field width edit would.
             onChange({
-              x: Math.round(node.x() / gridSize) * gridSize,
-              y: Math.round(node.y() / gridSize) * gridSize,
+              x: snapValue(node.x(), gridSize, isAltPressed),
+              y: snapValue(node.y(), gridSize, isAltPressed),
               scaleX: 1,
               scaleY: 1,
             });
@@ -138,8 +148,8 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
           }
 
           onChange({
-            x: Math.round(node.x() / gridSize) * gridSize,
-            y: Math.round(node.y() / gridSize) * gridSize,
+            x: snapValue(node.x(), gridSize, isAltPressed),
+            y: snapValue(node.y(), gridSize, isAltPressed),
             rotation: node.rotation(),
             scaleX: Math.max(0.1, scaleX),
             scaleY: Math.max(0.1, scaleY),
@@ -253,6 +263,25 @@ export const Canvas: React.FC = () => {
   const [drawStartPort, setDrawStartPort] = useState<{objId: string, portId: string} | null>(null);
   const [wireDragStart, setWireDragStart] = useState<{objId: string, portId: string} | null>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  // Grid-snap Alt bypass: tracked once, globally, for the whole canvas -
+  // not local React state, since a keypress must never re-render every
+  // object on the canvas just to update a modifier flag.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Alt') isAltPressed = true; };
+    const handleKeyUp = (e: KeyboardEvent) => { if (e.key === 'Alt') isAltPressed = false; };
+    // Also cleared on window blur - Alt released outside the window (e.g.
+    // while alt-tabbing) would otherwise never fire its own keyup here.
+    const handleBlur = () => { isAltPressed = false; };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, []);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -430,9 +459,13 @@ export const Canvas: React.FC = () => {
     let x = (pos.x - stageX) / scale;
     let y = (pos.y - stageY) / scale;
 
-    // Snap to grid
-    x = Math.round(x / gridSize) * gridSize;
-    y = Math.round(y / gridSize) * gridSize;
+    // Snap to grid unless the persistent toggle is off or Alt is held.
+    // e.altKey (the native DragEvent's own modifier state) is combined
+    // with the tracked flag - a drag-and-drop gesture can be less
+    // reliable about delivering keydown/keyup than a plain mouse drag on
+    // some platforms.
+    x = snapValue(x, gridSize, isAltPressed || e.altKey);
+    y = snapValue(y, gridSize, isAltPressed || e.altKey);
 
     const def = getSymbolDefinition(data.type);
     const width = def?.defaultWidth || 80;
