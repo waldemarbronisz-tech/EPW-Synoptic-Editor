@@ -1,0 +1,160 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { useStore } from '../store';
+import type { SynopticObject, SynopticConnection } from '../store';
+import { getBusbarEdgePorts } from '../symbols/scada/BusbarSymbol';
+import { resolveConnectionPoint } from '../utils/GeometryUtils';
+import { GRID_SIZE, BUSBAR_HEIGHT } from '../theme/ScadaTheme';
+
+function makeBusbar(overrides: Partial<SynopticObject> = {}): SynopticObject {
+  return {
+    id: 'BUS1',
+    type: 'scada.busbar',
+    category: 'SCADA',
+    x: 0, y: 0,
+    rotation: 0, scaleX: 1, scaleY: 1,
+    visible: true, locked: false, layer: 1,
+    tag: 'BUS1', description: '', color: '#000', fill: '#000', border: '#000',
+    text: '', font: 'Arial', fontSize: 12, tooltip: '',
+    width: 320, height: BUSBAR_HEIGHT,
+    customProperties: {},
+    ...overrides
+  };
+}
+
+describe('SCADA busbar edge ports (getBusbarEdgePorts)', () => {
+  it('top ports sit at y = 0', () => {
+    const ports = getBusbarEdgePorts(320, 'top');
+    expect(ports.every(p => p.y === 0)).toBe(true);
+  });
+
+  it('bottom ports sit at y = BUSBAR_HEIGHT', () => {
+    const ports = getBusbarEdgePorts(320, 'bottom');
+    expect(ports.every(p => p.y === BUSBAR_HEIGHT)).toBe(true);
+  });
+
+  it('generates one port per GRID_SIZE step, same count as the single-row model', () => {
+    expect(getBusbarEdgePorts(320, 'top').length).toBe(Math.floor(320 / GRID_SIZE));
+  });
+
+  it('a zero-width bar produces no ports on either edge, without throwing', () => {
+    expect(() => getBusbarEdgePorts(0, 'top')).not.toThrow();
+    expect(getBusbarEdgePorts(0, 'top')).toEqual([]);
+    expect(getBusbarEdgePorts(0, 'bottom')).toEqual([]);
+  });
+});
+
+describe('Dynamic port resolution (GeometryUtils.resolveConnectionPoint)', () => {
+  it('resolves a legacy center-row dyn_NN port unchanged (y = 0.5)', () => {
+    // electrical.busbar (the pre-existing symbol) has no
+    // supportsDynamicPorts flag at all - that omission is the exact bug
+    // this whole task exists to fix for the SCADA busbar, and it is left
+    // untouched deliberately. This checks the legacy unprefixed id FORMAT
+    // still resolves correctly on a symbol that does support dynamic
+    // ports, i.e. that adding the top/bottom format did not regress it.
+    const bar = makeBusbar();
+    const point = resolveConnectionPoint(bar, 'dyn_50');
+    expect(point).not.toBeNull();
+    expect(point?.y).toBe(0.5);
+    expect(point?.x).toBeCloseTo(0.5, 5);
+  });
+
+  it('resolves a new dyn_top_NN port at y = 0', () => {
+    const bar = makeBusbar();
+    const point = resolveConnectionPoint(bar, 'dyn_top_25');
+    expect(point).not.toBeNull();
+    expect(point?.y).toBe(0);
+    expect(point?.x).toBeCloseTo(0.25, 5);
+  });
+
+  it('resolves a new dyn_bot_NN port at y = 1', () => {
+    const bar = makeBusbar();
+    const point = resolveConnectionPoint(bar, 'dyn_bot_75');
+    expect(point).not.toBeNull();
+    expect(point?.y).toBe(1);
+    expect(point?.x).toBeCloseTo(0.75, 5);
+  });
+
+  it('uses the object\'s own current width, not the symbol definition\'s static default', () => {
+    const narrowed = makeBusbar({ width: 32 }); // shrunk well below the registry's default of 200
+    const point = resolveConnectionPoint(narrowed, 'dyn_top_50');
+    expect(point?.x).toBeCloseTo(0.5, 5);
+  });
+});
+
+describe('Busbar resize reattachment (store.resizeBusbar)', () => {
+  beforeEach(() => {
+    useStore.setState({
+      objects: [],
+      connections: [],
+      messages: [],
+      history: [{ objects: [], connections: [] } as any],
+      historyIndex: 0
+    });
+  });
+
+  function makeConn(overrides: Partial<SynopticConnection> = {}): SynopticConnection {
+    return {
+      id: 'C1', fromId: 'DEV1', fromPort: 'OUT', toId: 'BUS1', toPort: 'dyn_top_90', type: 'electrical_ac',
+      ...overrides
+    };
+  }
+
+  it('growing the busbar leaves an attached connection untouched and posts no message', () => {
+    useStore.setState({
+      objects: [makeBusbar({ width: 320 })],
+      connections: [makeConn({ toPort: 'dyn_top_50' })] // index 10 of 20 at width 320
+    });
+
+    useStore.getState().resizeBusbar('BUS1', 640);
+
+    const conn = useStore.getState().connections[0];
+    expect(conn.toPort).toBe('dyn_top_50');
+    expect(useStore.getState().messages.length).toBe(0);
+  });
+
+  it('shrinking the busbar past an attached port reattaches it to the nearest surviving port and posts a message', () => {
+    // width 320, GRID_SIZE 16 -> 20 ports (indices 0..19). A port at 90%
+    // resolves to index round(0.9 * 320 / 16) = 18 - well within range.
+    useStore.setState({
+      objects: [makeBusbar({ width: 320 })],
+      connections: [makeConn({ toPort: 'dyn_top_90' })]
+    });
+
+    // Shrink to width 64 -> only 4 ports survive (indices 0..3). The old
+    // port (index 18) no longer exists and must reattach to index 3.
+    useStore.getState().resizeBusbar('BUS1', 64);
+
+    const conn = useStore.getState().connections[0];
+    expect(conn.toPort).not.toBe('dyn_top_90');
+    expect(conn.toPort).toMatch(/^dyn_top_\d+$/);
+    expect(useStore.getState().objects[0].width).toBe(64);
+
+    const messages = useStore.getState().messages;
+    expect(messages.length).toBe(1);
+    expect(messages[0].text).toContain('reattached');
+  });
+
+  it('resize commits exactly one history entry', () => {
+    useStore.setState({
+      objects: [makeBusbar({ width: 320 })],
+      connections: [makeConn({ toPort: 'dyn_top_90' })],
+      history: [{ objects: [makeBusbar({ width: 320 })], connections: [makeConn({ toPort: 'dyn_top_90' })] } as any],
+      historyIndex: 0
+    });
+
+    const lenBefore = useStore.getState().history.length;
+    useStore.getState().resizeBusbar('BUS1', 64);
+    expect(useStore.getState().history.length).toBe(lenBefore + 1);
+  });
+
+  it('a connection unrelated to the resized busbar is left alone', () => {
+    useStore.setState({
+      objects: [makeBusbar({ width: 320 }), makeBusbar({ id: 'BUS2', width: 320 })],
+      connections: [makeConn({ id: 'C2', toId: 'BUS2', toPort: 'dyn_top_90' })]
+    });
+
+    useStore.getState().resizeBusbar('BUS1', 32);
+
+    expect(useStore.getState().connections[0].toPort).toBe('dyn_top_90');
+  });
+});

@@ -7,8 +7,9 @@ import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 import { ConnectionService } from '../project/ConnectionService';
 import { ConnectionLine } from './ConnectionLine';
 import { ObjectLabelRenderer } from './ObjectLabelRenderer';
-import { COLOR_OUTLINE } from '../theme/ScadaTheme';
+import { COLOR_OUTLINE, COLOR_WHITE } from '../theme/ScadaTheme';
 import { WireNodeSymbol } from '../symbols/scada/WireNodeSymbol';
+import { getBusbarEdgePorts } from '../symbols/scada/BusbarSymbol';
 
 
 
@@ -53,7 +54,7 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onMouseUp={(e) => {
-          if (def?.type === 'electrical.busbar') {
+          if (def?.supportsDynamicPorts) {
             const stage = e.target.getStage();
             const pos = stage?.getPointerPosition();
             if (pos) {
@@ -68,11 +69,14 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
               const localX = globalX - obj.x;
               const localY = globalY - obj.y;
 
+              // Use the object's own current width/height, not the symbol
+              // definition's static default - a resizable busbar's actual
+              // size can differ from it.
+              const w = obj.width * (obj.scaleX || 1);
+              const h = obj.height * (obj.scaleY || 1);
+
               // In Canvas, object origin is top-left in our bounding box.
               // So if w >= h (horizontal), percentage is localX / w.
-              const w = (def?.defaultWidth || 80) * (obj.scaleX || 1);
-              const h = (def?.defaultHeight || 80) * (obj.scaleY || 1);
-
               let busPos = 0.5;
               if (w >= h) {
                 busPos = localX / w;
@@ -80,8 +84,16 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
                 busPos = localY / h;
               }
               busPos = Math.max(0, Math.min(1, busPos));
+              const posPercent = Math.round(busPos * 100);
 
-              const dynamicPortId = `dyn_${Math.round(busPos * 100)}`;
+              // The SCADA busbar has ports along BOTH its top and bottom
+              // edges, not just a single center row - pick the edge closer
+              // to where the user clicked. Every other dynamic-port symbol
+              // (just the legacy electrical.busbar today) keeps the
+              // original unprefixed, center-row port id untouched.
+              const dynamicPortId = obj.type === 'scada.busbar'
+                ? `dyn_${localY < h / 2 ? 'top' : 'bot'}_${posPercent}`
+                : `dyn_${posPercent}`;
               onPortMouseUp(obj.id, dynamicPortId, e);
             }
           }
@@ -104,6 +116,26 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
           const node = shapeRef.current;
           const scaleX = node.scaleX();
           const scaleY = node.scaleY();
+
+          if (obj.type === 'scada.busbar') {
+            // The busbar's width field is the single source of truth for
+            // its size (the dynamic-port math keys on it directly) - fold
+            // the drag-resize scale into width instead of leaving it as a
+            // separate multiplier, and reset scale to 1 so it stays that
+            // way. Goes through resizeBusbar so already-attached
+            // connections are reattached/reported exactly as a
+            // Properties-field width edit would.
+            onChange({
+              x: Math.round(node.x() / gridSize) * gridSize,
+              y: Math.round(node.y() / gridSize) * gridSize,
+              scaleX: 1,
+              scaleY: 1,
+            });
+            useStore.getState().resizeBusbar(obj.id, obj.width * scaleX);
+            node.scaleX(1);
+            node.scaleY(1);
+            return;
+          }
 
           onChange({
             x: Math.round(node.x() / gridSize) * gridSize,
@@ -161,6 +193,29 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
                  onPortMouseUp(obj.id, cp.id, e);
                }}
            />
+        ))}
+
+        {/* SCADA busbar: ports along both edges, shown only on hover (or
+            while a wire is being dragged) - visible at all times, it would
+            read as a comb rather than a busbar. */}
+        {obj.type === 'scada.busbar' && (isHovered || wireDragStart) && [
+          ...getBusbarEdgePorts(obj.width, 'top').map((p, idx) => ({ ...p, key: `bus-top-${idx}`, portId: `dyn_top_${Math.round((p.x / Math.max(obj.width, 1)) * 100)}` })),
+          ...getBusbarEdgePorts(obj.width, 'bottom').map((p, idx) => ({ ...p, key: `bus-bot-${idx}`, portId: `dyn_bot_${Math.round((p.x / Math.max(obj.width, 1)) * 100)}` }))
+        ].map(p => (
+          <Circle
+            key={p.key}
+            x={p.x}
+            y={p.y}
+            radius={4}
+            fill={COLOR_WHITE}
+            stroke={COLOR_OUTLINE}
+            strokeWidth={1.5}
+            hitStrokeWidth={12}
+            onMouseDown={(e) => { e.cancelBubble = true; onPortMouseDown(obj.id, p.portId, e); }}
+            onMouseUp={(e) => { e.cancelBubble = true; onPortMouseUp(obj.id, p.portId, e); }}
+            onClick={(e) => { e.cancelBubble = true; onPortClick(obj.id, p.portId); }}
+            onTap={(e) => { e.cancelBubble = true; onPortClick(obj.id, p.portId); }}
+          />
         ))}
       </Group>
       {isSelected && !obj.locked && (

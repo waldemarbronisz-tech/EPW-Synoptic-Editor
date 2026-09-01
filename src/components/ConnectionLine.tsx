@@ -13,6 +13,42 @@ export interface ConnectionProps {
   onSelect: () => void;
 }
 
+/**
+ * Resolves a dynamic busbar port id to a local {x, y} fraction. Mirrors
+ * GeometryUtils.resolveConnectionPoint's own dyn_ handling (kept as a
+ * separate, render-local copy rather than importing that function, to
+ * avoid touching this component's existing port-lookup shape) - supports
+ * both the legacy center-row 'dyn_NN' format and the edge-row
+ * 'dyn_top_NN' / 'dyn_bot_NN' format the SCADA busbar produces.
+ */
+const resolveDynamicPort = (obj: SynopticObject, def: ReturnType<typeof getSymbolDefinition>, portId: string): { id: string; x: number; y: number } | null => {
+  if (!def?.supportsDynamicPorts) return null;
+
+  const edgeMatch = portId.match(/^dyn_(top|bot)_(\d+)$/);
+  const centerMatch = portId.match(/^dyn_(\d+)$/);
+
+  let posPercent: number;
+  let yFraction: number | null = null;
+
+  if (edgeMatch) {
+    posPercent = parseInt(edgeMatch[2], 10);
+    yFraction = edgeMatch[1] === 'top' ? 0 : 1;
+  } else if (centerMatch) {
+    posPercent = parseInt(centerMatch[1], 10);
+  } else {
+    return null;
+  }
+
+  if (isNaN(posPercent) || posPercent < 0 || posPercent > 100) return null;
+  const pos = posPercent / 100;
+
+  const w = obj.width || def.defaultWidth || 80;
+  const h = obj.height || def.defaultHeight || 80;
+
+  if (yFraction !== null) return { id: portId, x: pos, y: yFraction };
+  return w >= h ? { id: portId, x: pos, y: 0.5 } : { id: portId, x: 0.5, y: pos };
+};
+
 const getAbsolutePortCoords = (obj: SynopticObject, portX: number, portY: number) => {
   const rot = obj.rotation || 0;
   const w = obj.width * (obj.scaleX || 1);
@@ -81,22 +117,18 @@ export const ConnectionLine: React.FC<ConnectionProps> = ({ conn, fromObj, toObj
 
   let fromPort = fromDef?.connectionPoints?.find(p => p.id === conn.fromPort);
   if (!fromPort && conn.fromPort.startsWith('dyn_')) {
-     const pos = parseInt(conn.fromPort.replace('dyn_', ''), 10) / 100;
-     const w = fromObj.width || fromDef?.defaultWidth || 80;
-     const h = fromObj.height || fromDef?.defaultHeight || 80;
-     if (w >= h) {
-        fromPort = { id: conn.fromPort, x: pos, y: 0.5 };
-     } else {
-        fromPort = { id: conn.fromPort, x: 0.5, y: pos };
-     }
+    fromPort = resolveDynamicPort(fromObj, fromDef, conn.fromPort) || undefined;
   }
-  const toPort = toDef?.connectionPoints?.find(p => p.id === conn.toPort);
+  let toPort = toDef?.connectionPoints?.find(p => p.id === conn.toPort);
+  if (!toPort && conn.toPort !== 'cursor' && conn.toPort.startsWith('dyn_')) {
+    toPort = resolveDynamicPort(toObj, toDef, conn.toPort) || undefined;
+  }
 
-  if (!fromPort || !toPort) return null;
+  if (!fromPort || (!toPort && conn.toPort !== 'cursor')) return null;
 
   const { x: x1, y: y1 } = getAbsolutePortCoords(fromObj, fromPort.x, fromPort.y);
   let x2, y2;
-  if (conn.toPort === 'cursor') {
+  if (conn.toPort === 'cursor' || !toPort) {
     x2 = toObj.x;
     y2 = toObj.y;
   } else {
@@ -115,7 +147,10 @@ export const ConnectionLine: React.FC<ConnectionProps> = ({ conn, fromObj, toObj
      });
      path += ` L ${x2} ${y2}`;
   } else {
-     path = calculateOrthogonalPath(x1, y1, x2, y2, fromPort, toPort, 16);
+     // toPort is unresolved for the in-progress cursor preview (there is
+     // no real port at the mouse yet) - fromPort's own facing direction
+     // stands in so the router never receives undefined.
+     path = calculateOrthogonalPath(x1, y1, x2, y2, fromPort, toPort || fromPort, 16);
   }
 
   // Color carries the connection's state and nothing else: energized or

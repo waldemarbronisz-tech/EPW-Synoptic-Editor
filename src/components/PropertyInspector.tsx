@@ -3,7 +3,7 @@ import { useStore } from '../store';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 
 export const PropertyInspector: React.FC = () => {
-  const { objects, connections, selectedIds, selectedConnectionIds, updateObject, updateConnection } = useStore();
+  const { objects, connections, selectedIds, selectedConnectionIds, updateObject, updateConnection, resizeBusbar } = useStore();
 
   if (selectedIds.length === 0 && selectedConnectionIds.length === 0) {
     return (
@@ -185,6 +185,35 @@ export const PropertyInspector: React.FC = () => {
 
         <div className="property-group">
           <div className="property-group-title">Layout</div>
+          <div className="property-row">
+            <label>Width</label>
+            <input
+              type="number"
+              value={Math.round(selectedObj.width)}
+              onChange={(e) => {
+                const newWidth = parseFloat(e.target.value);
+                if (isNaN(newWidth)) return;
+                if (selectedObj.type === 'scada.busbar') {
+                  resizeBusbar(selectedObj.id, newWidth);
+                } else {
+                  updateObject(selectedObj.id, { width: newWidth });
+                }
+              }}
+              onBlur={() => useStore.getState().saveHistory()}
+            />
+          </div>
+          <div className="property-row">
+            <label>Height</label>
+            <input
+              type="number"
+              value={Math.round(selectedObj.height)}
+              onChange={(e) => {
+                const newHeight = parseFloat(e.target.value);
+                if (!isNaN(newHeight)) updateObject(selectedObj.id, { height: newHeight });
+              }}
+              onBlur={() => useStore.getState().saveHistory()}
+            />
+          </div>
           <div className="property-row">
             <label>X</label>
             <input type="number" name="x" value={Math.round(selectedObj.x)} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
