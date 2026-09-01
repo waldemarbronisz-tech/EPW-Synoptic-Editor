@@ -131,16 +131,3 @@ export function validateProjectSchema(data: any): ValidationResult {
   const hasErrors = issues.some(i => i.severity === 'ERROR');
   return { valid: !hasErrors, issues };
 }
-
-export function migrateProject(data: any): EPWProjectSchema {
-  // Migration pipeline concept
-  // v1 -> v2 -> v3
-  let current = { ...data };
-
-  // if (current.schema_version === 1) {
-  //   // migrate to 2
-  //   current.schema_version = 2;
-  // }
-
-  return current as EPWProjectSchema;
-}

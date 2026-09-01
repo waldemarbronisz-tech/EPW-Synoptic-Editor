@@ -12,7 +12,7 @@ export const Toolbar: React.FC = () => {
     undo, redo, copySelected, paste, deleteObjects, selectedIds, selectedConnectionIds,
     bringToFront, sendToBack, alignSelected, distributeSelected,
     lockSelected, unlockSelected, rotateSelected,
-    isDrawingConnection, drawingConnectionType, setDrawingMode
+    isDrawingConnection, setDrawingMode
   } = useStore();
 
   return (
@@ -41,25 +41,11 @@ export const Toolbar: React.FC = () => {
 
       <div className="toolbar-group">
         <button
-          title="Draw Electrical Connection"
-          onClick={() => setDrawingMode(isDrawingConnection && drawingConnectionType === 'electrical_ac' ? false : true, 'electrical_ac')}
-          style={{ backgroundColor: isDrawingConnection && drawingConnectionType === 'electrical_ac' ? '#3498db' : 'transparent' }}
+          title="Rysuj połączenie"
+          onClick={() => setDrawingMode(!isDrawingConnection)}
+          style={{ backgroundColor: isDrawingConnection ? '#3498db' : 'transparent' }}
         >
-          <PenLine size={16} color={isDrawingConnection && drawingConnectionType === 'electrical_ac' ? '#e74c3c' : 'inherit'} />
-        </button>
-        <button
-          title="Draw Water Connection"
-          onClick={() => setDrawingMode(isDrawingConnection && drawingConnectionType === 'water' ? false : true, 'water')}
-          style={{ backgroundColor: isDrawingConnection && drawingConnectionType === 'water' ? '#3498db' : 'transparent' }}
-        >
-          <PenLine size={16} color={isDrawingConnection && drawingConnectionType === 'water' ? '#3498db' : 'inherit'} />
-        </button>
-        <button
-          title="Draw HVAC Connection"
-          onClick={() => setDrawingMode(isDrawingConnection && drawingConnectionType === 'hvac_air' ? false : true, 'hvac_air')}
-          style={{ backgroundColor: isDrawingConnection && drawingConnectionType === 'hvac_air' ? '#3498db' : 'transparent' }}
-        >
-          <PenLine size={16} color={isDrawingConnection && drawingConnectionType === 'hvac_air' ? '#95a5a6' : 'inherit'} />
+          <PenLine size={16} />
         </button>
       </div>
 

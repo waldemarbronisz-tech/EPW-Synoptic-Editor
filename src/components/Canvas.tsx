@@ -90,11 +90,13 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
           e.target.y(Math.round(e.target.y() / gridSize) * gridSize);
         }}
         onDragEnd={(e) => {
-          // Push final position to store history once
+          // Push final position, then commit exactly one history entry for
+          // the whole drag (updateObject itself no longer touches history).
           onChange({
             x: Math.round(e.target.x() / gridSize) * gridSize,
             y: Math.round(e.target.y() / gridSize) * gridSize,
           });
+          useStore.getState().saveHistory();
         }}
         onTransformEnd={() => {
           const node = shapeRef.current;
@@ -108,6 +110,7 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
             scaleX: Math.max(0.1, scaleX),
             scaleY: Math.max(0.1, scaleY),
           });
+          useStore.getState().saveHistory();
         }}
       >
         <SymbolRenderer obj={obj} />
@@ -445,7 +448,6 @@ export const Canvas: React.FC = () => {
     selectedConnectionIds,
     selectConnections,
     isDrawingConnection,
-    drawingConnectionType,
     setDrawingMode,
   } = useStore();
 
@@ -461,7 +463,7 @@ export const Canvas: React.FC = () => {
         portId
       );
       if (success) {
-        setDrawingMode(false, 'electrical_ac');
+        setDrawingMode(false);
       }
     }
     setWireDragStart(null);
@@ -538,7 +540,7 @@ export const Canvas: React.FC = () => {
                   fromPort: wireDragStart.portId,
                   toId: 'cursor',
                   toPort: 'cursor',
-                  type: drawingConnectionType || 'electrical_ac'
+                  type: 'preview'
                 }}
                 fromObj={fromObj}
                 toObj={{...fromObj, width: 0, height: 0, x: mousePos.x, y: mousePos.y, rotation: 0} as any}

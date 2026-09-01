@@ -1,6 +1,5 @@
 import type { EPWProjectSchema } from './ProjectSchema';
-
-export const CURRENT_SCHEMA_VERSION = 1;
+export { CURRENT_SCHEMA_VERSION } from './ProjectSchema';
 
 export const runMigrations = (data: any): EPWProjectSchema => {
   let migrated = { ...data };

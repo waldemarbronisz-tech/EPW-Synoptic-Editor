@@ -120,6 +120,12 @@ export const ConnectionLine: React.FC<ConnectionProps> = ({ conn, fromObj, toObj
   let strokeWidth = media?.visualStyle.strokeWidth || 2;
   let dash = media?.visualStyle.dash;
 
+  // Connection being dragged: real type is not yet known (resolved only on
+  // drop), so it must not be drawn in any medium's color.
+  if (conn.type === 'preview') {
+    strokeColor = '#95a5a6';
+  }
+
 
   if (conn.editor?.preview_state === 'ENERGIZED' || conn.editor?.preview_state === 'FLOW') {
     strokeWidth = 4;

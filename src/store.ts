@@ -1,6 +1,10 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 
+// Cap on how many undo/redo snapshots are kept; each entry is a full deep
+// copy of objects+connections, so this bounds both memory and undo depth.
+const MAX_HISTORY = 100;
+
 
 export interface HistorySnapshot {
   objects: SynopticObject[];
@@ -76,7 +80,6 @@ export interface SynopticConnection {
   toPort: string;
   type: string; // e.g. electrical_ac, water, hvac_air
   waypoints?: { x: number; y: number }[]; // Foundation for manual routing and net branch definitions
-  netId?: string; // Foundation for resolving electrical nets, branches, and junction dots
   editor?: {
     preview_state?: string;
   };
@@ -119,8 +122,7 @@ interface AppState {
 
   // Connection Drawing Mode
   isDrawingConnection: boolean;
-  drawingConnectionType: string;
-  setDrawingMode: (active: boolean, type?: string) => void;
+  setDrawingMode: (active: boolean) => void;
 
   // Actions
   setProjectName: (name: string) => void;
@@ -192,12 +194,10 @@ export const useStore = create<AppState>((set, get) => ({
   isDirty: false,
   messages: [],
   isDrawingConnection: false,
-  drawingConnectionType: 'electrical_ac',
 
-  setDrawingMode: (active, type) => set((state) => ({
-    isDrawingConnection: active,
-    drawingConnectionType: type || state.drawingConnectionType
-  })),
+  setDrawingMode: (active) => set({
+    isDrawingConnection: active
+  }),
 
   setProjectName: (name) => set({ projectName: name, isDirty: true }),
   setFileName: (name) => set({ fileName: name }),
@@ -223,11 +223,34 @@ export const useStore = create<AppState>((set, get) => ({
 
   saveHistory: () => {
     const { objects, connections, history, historyIndex } = get();
-    const newHistory = history.slice(0, historyIndex + 1);
+    const objectsJson = JSON.stringify(objects);
+    const connectionsJson = JSON.stringify(connections);
+
+    // Skip if nothing actually changed since the last entry (e.g. a field
+    // was clicked into and blurred without editing) - don't clutter undo
+    // with no-op entries.
+    const lastEntry = history[historyIndex];
+    if (
+      lastEntry &&
+      JSON.stringify(lastEntry.objects) === objectsJson &&
+      JSON.stringify(lastEntry.connections) === connectionsJson
+    ) {
+      return;
+    }
+
+    let newHistory = history.slice(0, historyIndex + 1);
     newHistory.push({
-      objects: JSON.parse(JSON.stringify(objects)),
-      connections: JSON.parse(JSON.stringify(connections))
+      objects: JSON.parse(objectsJson),
+      connections: JSON.parse(connectionsJson)
     });
+
+    // Cap history length; drop oldest entries once the cap is exceeded.
+    // The freshly pushed entry is always last, so its index after
+    // truncation is simply the new array length minus one.
+    if (newHistory.length > MAX_HISTORY) {
+      newHistory = newHistory.slice(newHistory.length - MAX_HISTORY);
+    }
+
     set({ history: newHistory, historyIndex: newHistory.length - 1, isDirty: true });
   },
 
@@ -242,9 +265,9 @@ export const useStore = create<AppState>((set, get) => ({
     set((state) => ({
       objects: state.objects.map(obj =>
         obj.id === id ? { ...obj, ...updates } : obj
-      )
+      ),
+      isDirty: true
     }));
-    get().saveHistory();
   },
 
   updateObjects: (updates) => {
@@ -253,9 +276,8 @@ export const useStore = create<AppState>((set, get) => ({
       updates.forEach(u => {
         newObjects = newObjects.map(obj => obj.id === u.id ? { ...obj, ...u.updates } : obj);
       });
-      return { objects: newObjects };
+      return { objects: newObjects, isDirty: true };
     });
-    get().saveHistory();
   },
 
   addConnection: (conn) => {
@@ -271,7 +293,6 @@ export const useStore = create<AppState>((set, get) => ({
       connections: state.connections.map(c => c.id === id ? { ...c, ...updates } : c),
       isDirty: true
     }));
-    get().saveHistory();
   },
 
   deleteObjects: (ids, connIds = []) => {
