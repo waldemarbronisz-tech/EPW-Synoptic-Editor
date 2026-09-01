@@ -298,6 +298,7 @@ export const PropertyInspector: React.FC = () => {
                 type="text"
                 value={value as string}
                 onChange={(e) => handleCustomPropertyChange(key, e.target.value)}
+                onBlur={() => useStore.getState().saveHistory()}
               />
             </div>
           ))}
