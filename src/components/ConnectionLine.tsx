@@ -1,9 +1,9 @@
 import React from 'react';
-import { getMediaDefinition } from '../symbols/registry/MediaRegistry';
 
 import { Group, Path, Circle } from 'react-konva';
 import type { SynopticConnection, SynopticObject } from '../store';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
+import { COLOR_DE_ENERGIZED, COLOR_ENERGIZED, CONDUCTOR_OUTLINE, CONDUCTOR_WIDTH, COLOR_OUTLINE, COLOR_WHITE } from '../theme/ScadaTheme';
 
 export interface ConnectionProps {
   conn: SynopticConnection;
@@ -12,6 +12,42 @@ export interface ConnectionProps {
   isSelected: boolean;
   onSelect: () => void;
 }
+
+/**
+ * Resolves a dynamic busbar port id to a local {x, y} fraction. Mirrors
+ * GeometryUtils.resolveConnectionPoint's own dyn_ handling (kept as a
+ * separate, render-local copy rather than importing that function, to
+ * avoid touching this component's existing port-lookup shape) - supports
+ * both the legacy center-row 'dyn_NN' format and the edge-row
+ * 'dyn_top_NN' / 'dyn_bot_NN' format the SCADA busbar produces.
+ */
+const resolveDynamicPort = (obj: SynopticObject, def: ReturnType<typeof getSymbolDefinition>, portId: string): { id: string; x: number; y: number } | null => {
+  if (!def?.supportsDynamicPorts) return null;
+
+  const edgeMatch = portId.match(/^dyn_(top|bot)_(\d+)$/);
+  const centerMatch = portId.match(/^dyn_(\d+)$/);
+
+  let posPercent: number;
+  let yFraction: number | null = null;
+
+  if (edgeMatch) {
+    posPercent = parseInt(edgeMatch[2], 10);
+    yFraction = edgeMatch[1] === 'top' ? 0 : 1;
+  } else if (centerMatch) {
+    posPercent = parseInt(centerMatch[1], 10);
+  } else {
+    return null;
+  }
+
+  if (isNaN(posPercent) || posPercent < 0 || posPercent > 100) return null;
+  const pos = posPercent / 100;
+
+  const w = obj.width || def.defaultWidth || 80;
+  const h = obj.height || def.defaultHeight || 80;
+
+  if (yFraction !== null) return { id: portId, x: pos, y: yFraction };
+  return w >= h ? { id: portId, x: pos, y: 0.5 } : { id: portId, x: 0.5, y: pos };
+};
 
 const getAbsolutePortCoords = (obj: SynopticObject, portX: number, portY: number) => {
   const rot = obj.rotation || 0;
@@ -31,42 +67,44 @@ const getAbsolutePortCoords = (obj: SynopticObject, portX: number, portY: number
   };
 };
 
-// Simple orthogonal router
-const calculateOrthogonalPath = (x1: number, y1: number, x2: number, y2: number, fromPort: any, toPort: any) => {
+/**
+ * Orthogonal-only router (a wire only ever bends at a right angle): the
+ * elbow itself is snapped to the nearest grid node so bends land cleanly
+ * even when a port's own pixel position falls off-grid (e.g. a 150x150
+ * symbol's center port against GRID_SIZE 16, which does not divide it -
+ * a pre-existing tension between the symbol canvas size fixed by the
+ * prior task and this one's grid; snapping the bend is what stays
+ * achievable without redrawing the symbols).
+ */
+const calculateOrthogonalPath = (x1: number, y1: number, x2: number, y2: number, fromPort: any, toPort: any, gridSize: number) => {
   const dx = Math.abs(x2 - x1);
   const dy = Math.abs(y2 - y1);
+  const snap = (v: number) => Math.round(v / gridSize) * gridSize;
 
   // Straight line
   if (dx < 5) return `M ${x1} ${y1} L ${x1} ${y2}`;
   if (dy < 5) return `M ${x1} ${y1} L ${x2} ${y1}`;
 
-  // Calculate normal vector based on port local percentage coordinates
-  // Assuming a standard unrotated port at top (x=0.5, y=0) has normal (0, -1)
-  // We approximate the normal vector by how close it is to the edges.
-  // But wait, it's easier to just use the port's x/y ratio directly if it's strictly on an edge.
   const fromDirY = fromPort.y === 0 ? -1 : (fromPort.y === 1 ? 1 : 0);
   const fromDirX = fromPort.x === 0 ? -1 : (fromPort.x === 1 ? 1 : 0);
   const toDirY = toPort.y === 0 ? -1 : (toPort.y === 1 ? 1 : 0);
   const toDirX = toPort.x === 0 ? -1 : (toPort.x === 1 ? 1 : 0);
 
-  // If both ports are vertically oriented (top/bottom)
   if (fromDirY !== 0 || toDirY !== 0) {
-     const midY = y1 + (y2 - y1) / 2;
+     const midY = snap(y1 + (y2 - y1) / 2);
      return `M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`;
   }
 
-  // If both ports are horizontally oriented (left/right)
   if (fromDirX !== 0 || toDirX !== 0) {
-     const midX = x1 + (x2 - x1) / 2;
+     const midX = snap(x1 + (x2 - x1) / 2);
      return `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}`;
   }
 
-  // Fallback to aspect ratio
   if (dy > dx) {
-    const midY = y1 + (y2 - y1) / 2;
+    const midY = snap(y1 + (y2 - y1) / 2);
     return `M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`;
   } else {
-    const midX = x1 + (x2 - x1) / 2;
+    const midX = snap(x1 + (x2 - x1) / 2);
     return `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}`;
   }
 };
@@ -79,22 +117,18 @@ export const ConnectionLine: React.FC<ConnectionProps> = ({ conn, fromObj, toObj
 
   let fromPort = fromDef?.connectionPoints?.find(p => p.id === conn.fromPort);
   if (!fromPort && conn.fromPort.startsWith('dyn_')) {
-     const pos = parseInt(conn.fromPort.replace('dyn_', ''), 10) / 100;
-     const w = fromDef?.defaultWidth || 80;
-     const h = fromDef?.defaultHeight || 80;
-     if (w >= h) {
-        fromPort = { id: conn.fromPort, x: pos, y: 0.5 };
-     } else {
-        fromPort = { id: conn.fromPort, x: 0.5, y: pos };
-     }
+    fromPort = resolveDynamicPort(fromObj, fromDef, conn.fromPort) || undefined;
   }
-  const toPort = toDef?.connectionPoints?.find(p => p.id === conn.toPort);
+  let toPort = toDef?.connectionPoints?.find(p => p.id === conn.toPort);
+  if (!toPort && conn.toPort !== 'cursor' && conn.toPort.startsWith('dyn_')) {
+    toPort = resolveDynamicPort(toObj, toDef, conn.toPort) || undefined;
+  }
 
-  if (!fromPort || !toPort) return null;
+  if (!fromPort || (!toPort && conn.toPort !== 'cursor')) return null;
 
   const { x: x1, y: y1 } = getAbsolutePortCoords(fromObj, fromPort.x, fromPort.y);
   let x2, y2;
-  if (conn.toPort === 'cursor') {
+  if (conn.toPort === 'cursor' || !toPort) {
     x2 = toObj.x;
     y2 = toObj.y;
   } else {
@@ -102,6 +136,8 @@ export const ConnectionLine: React.FC<ConnectionProps> = ({ conn, fromObj, toObj
     x2 = coords.x;
     y2 = coords.y;
   }
+
+  const isPreview = conn.type === 'preview';
 
   let path = '';
   if (conn.waypoints && conn.waypoints.length > 0) {
@@ -111,46 +147,46 @@ export const ConnectionLine: React.FC<ConnectionProps> = ({ conn, fromObj, toObj
      });
      path += ` L ${x2} ${y2}`;
   } else {
-     path = calculateOrthogonalPath(x1, y1, x2, y2, fromPort, toPort);
+     // toPort is unresolved for the in-progress cursor preview (there is
+     // no real port at the mouse yet) - fromPort's own facing direction
+     // stands in so the router never receives undefined.
+     path = calculateOrthogonalPath(x1, y1, x2, y2, fromPort, toPort || fromPort, 16);
   }
 
-  // Styling based on type and state
-  const media = getMediaDefinition(conn.type);
-  let strokeColor = media?.visualStyle.strokeColor || '#2c3e50';
-  let strokeWidth = media?.visualStyle.strokeWidth || 2;
-  let dash = media?.visualStyle.dash;
+  // Color carries the connection's state and nothing else: energized or
+  // de-energized, set in the connection's own Properties (defaulting to
+  // energized when unset - "DEENERGIZED" is the only state that reads as
+  // de-energized; any other value, including the legacy FLOW/FAULT
+  // options still offered in Properties, reads as energized).
+  const isDeEnergized = conn.editor?.preview_state === 'DEENERGIZED';
+  const coreColor = isDeEnergized ? COLOR_DE_ENERGIZED : COLOR_ENERGIZED;
+  const outlineWidth = CONDUCTOR_WIDTH + CONDUCTOR_OUTLINE;
 
-  // Connection being dragged: real type is not yet known (resolved only on
-  // drop), so it must not be drawn in any medium's color.
-  if (conn.type === 'preview') {
-    strokeColor = '#95a5a6';
-  }
-
-
-  if (conn.editor?.preview_state === 'ENERGIZED' || conn.editor?.preview_state === 'FLOW') {
-    strokeWidth = 4;
-  }
-
-  if (conn.editor?.preview_state === 'FAULT') {
-    strokeColor = '#f1c40f';
-    dash = [5, 5];
+  if (isPreview) {
+    // In-progress wire: its real state is not yet known (resolved only on
+    // drop), so it is drawn thinner, in a neutral gray, single-pass - not
+    // in either state's color.
+    return (
+      <Group onClick={onSelect} onTap={onSelect}>
+        <Path data={path} stroke={COLOR_DE_ENERGIZED} strokeWidth={CONDUCTOR_WIDTH / 2} lineCap="butt" lineJoin="miter" />
+      </Group>
+    );
   }
 
   return (
     <Group onClick={onSelect} onTap={onSelect}>
       {/* Invisible hit area for easier selection */}
-      <Path data={path} stroke="transparent" strokeWidth={15} />
+      <Path data={path} stroke="transparent" strokeWidth={outlineWidth + 10} />
 
-      <Path
-        data={path}
-        stroke={isSelected ? '#3498db' : strokeColor}
-        strokeWidth={isSelected ? strokeWidth + 2 : strokeWidth}
-        dash={dash}
-      />
+      {/* Two-pass conductor: outline pass, then the state color on top.
+          Selection reads as a white outline (a halo) instead of the usual
+          black one - a geometric/palette-only cue, not an invented color. */}
+      <Path data={path} stroke={isSelected ? COLOR_WHITE : COLOR_OUTLINE} strokeWidth={outlineWidth} lineCap="butt" lineJoin="miter" />
+      <Path data={path} stroke={coreColor} strokeWidth={CONDUCTOR_WIDTH} lineCap="butt" lineJoin="miter" />
 
       {/* Port dots */}
-      <Circle x={x1} y={y1} radius={3} fill={strokeColor} />
-      <Circle x={x2} y={y2} radius={3} fill={strokeColor} />
+      <Circle x={x1} y={y1} radius={CONDUCTOR_WIDTH / 2} fill={COLOR_OUTLINE} />
+      <Circle x={x2} y={y2} radius={CONDUCTOR_WIDTH / 2} fill={COLOR_OUTLINE} />
     </Group>
   );
 };

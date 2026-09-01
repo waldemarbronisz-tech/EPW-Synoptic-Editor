@@ -8,7 +8,7 @@ export interface MenuBarProps {
 }
 
 export const MenuBar: React.FC<MenuBarProps> = ({ onOpenScadaPreview }) => {
-  const { undo, redo, copySelected, paste, deleteObjects, selectedIds, isDirty } = useStore();
+  const { undo, redo, copySelected, paste, deleteObjects, selectedIds, isDirty, snapToGridEnabled, toggleSnapToGrid } = useStore();
 
   const handleMenuClick = (action: () => void) => {
     action();
@@ -77,6 +77,9 @@ export const MenuBar: React.FC<MenuBarProps> = ({ onOpenScadaPreview }) => {
       <div className="menu-item">
         <span>View</span>
         <div className="dropdown">
+          <div className="dropdown-item" onClick={toggleSnapToGrid}>
+            {snapToGridEnabled ? '✓ ' : '   '}Snap to Grid
+          </div>
           <div className="dropdown-item" onClick={() => onOpenScadaPreview?.()}>SCADA Style Preview...</div>
         </div>
       </div>

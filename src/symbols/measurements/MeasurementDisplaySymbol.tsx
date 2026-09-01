@@ -1,6 +1,16 @@
 import React from 'react';
 import { Group, Rect, Text } from 'react-konva';
 import type { SymbolProps } from '../SymbolRenderer';
+import { COLOR_PANEL, COLOR_OUTLINE, COLOR_VALUE_FIELD, COLOR_TEXT, COLOR_ALARM } from '../../theme/ScadaTheme';
+
+// Bug fix: this legacy symbol still painted its own pre-SCADA colors
+// (dark bezel, black LED background, green phosphor text) instead of the
+// retro-industrial palette every other symbol now uses. Colors only -
+// same rects, same value/format logic, same fault indicator, unchanged.
+const PANEL_OUTLINE_WIDTH = 4;       // per this symbol's own spec, matches MeterSymbol's convention
+const LABEL_OUTLINE_WIDTH = 1;
+const VALUE_FIELD_OUTLINE_WIDTH = 2; // per this symbol's own spec
+const FAULT_OUTLINE_WIDTH = 3;
 
 export const MeasurementDisplaySymbol: React.FC<SymbolProps> = ({ obj, state }) => {
   const w = obj.width;
@@ -29,37 +39,36 @@ export const MeasurementDisplaySymbol: React.FC<SymbolProps> = ({ obj, state }) 
 
   return (
     <Group>
-      {/* 3D bezel for retro instrument feel */}
-      <Rect width={w} height={h} fill="#7f8c8d" />
-      <Rect x={2} y={2} width={w-4} height={h-4} fill="#2c3e50" />
+      {/* Flat panel background with a black outline - retro SCADA palette, no bezel/gradient. */}
+      <Rect width={w} height={h} fill={COLOR_PANEL} stroke={COLOR_OUTLINE} strokeWidth={PANEL_OUTLINE_WIDTH} />
 
       {/* Label area (top) */}
-      <Rect x={4} y={4} width={w-8} height={14} fill="#bdc3c7" />
+      <Rect x={4} y={4} width={w-8} height={14} fill={COLOR_PANEL} stroke={COLOR_OUTLINE} strokeWidth={LABEL_OUTLINE_WIDTH} />
       <Text
         x={6} y={6}
         width={w-12} height={10}
         text={obj.tag || obj.text || "SENSOR"}
         fontSize={10}
         fontFamily="monospace"
-        fill="#2c3e50"
+        fill={COLOR_TEXT}
         align="center"
       />
 
-      {/* LED Display area */}
-      <Rect x={4} y={20} width={w-8} height={h-24} fill="#000000" />
+      {/* Value field area - fixed-width font, per the SCADA value-field convention. */}
+      <Rect x={4} y={20} width={w-8} height={h-24} fill={COLOR_VALUE_FIELD} stroke={COLOR_OUTLINE} strokeWidth={VALUE_FIELD_OUTLINE_WIDTH} />
       <Text
         x={8} y={24}
         width={w-16} height={h-32}
         text={displayString}
         fontSize={14}
         fontFamily="Courier New, monospace"
-        fill="#2ecc71" // Retro green phosphor look
+        fill={COLOR_TEXT}
         align="right"
         verticalAlign="middle"
       />
 
       {isFault && (
-        <Rect width={w} height={h} fill="transparent" stroke="#e74c3c" strokeWidth={3} />
+        <Rect width={w} height={h} fill="transparent" stroke={COLOR_ALARM} strokeWidth={FAULT_OUTLINE_WIDTH} />
       )}
     </Group>
   );

@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
+import { COLOR_CANVAS_BACKGROUND, GRID_SIZE } from './theme/ScadaTheme';
+import type { MeterRow } from './symbols/scada/MeterSymbol';
 
 // Cap on how many undo/redo snapshots are kept; each entry is a full deep
 // copy of objects+connections, so this bounds both memory and undo depth.
@@ -64,6 +66,11 @@ export interface SynopticObject {
   labelPosition?: 'TOP' | 'BOTTOM' | 'LEFT' | 'RIGHT';
   labelOffsetX?: number;
   labelOffsetY?: number;
+
+  // SCADA meter (scada.meter): rows are edited by hand for now - wiring
+  // this to the device registry is a separate, later task. Optional: only
+  // meter objects use it, every other object leaves it undefined.
+  meterRows?: MeterRow[];
 }
 
 export interface CanvasState {
@@ -124,6 +131,12 @@ interface AppState {
   isDrawingConnection: boolean;
   setDrawingMode: (active: boolean) => void;
 
+  // Grid snapping: a persistent toggle (View menu, default on) separate
+  // from the momentary Alt-key bypass, which lives outside the store
+  // entirely (Canvas.tsx tracks the live key state directly).
+  snapToGridEnabled: boolean;
+  toggleSnapToGrid: () => void;
+
   // Actions
   setProjectName: (name: string) => void;
   setFileName: (name: string | null) => void;
@@ -137,6 +150,7 @@ interface AppState {
   updateObjects: (updates: {id: string, updates: Partial<SynopticObject>}[]) => void;
   addConnection: (conn: Omit<SynopticConnection, 'id'>) => void;
   updateConnection: (id: string, updates: Partial<SynopticConnection>) => void;
+  resizeBusbar: (id: string, newWidth: number) => void;
   deleteObjects: (ids: string[], connIds?: string[]) => void;
   selectObjects: (ids: string[], multi?: boolean) => void;
   selectConnections: (ids: string[], multi?: boolean) => void;
@@ -176,8 +190,8 @@ export const useStore = create<AppState>((set, get) => ({
   canvasConfig: {
     width: 1920,
     height: 1080,
-    background: "#ffffff",
-    gridSize: 20
+    background: COLOR_CANVAS_BACKGROUND,
+    gridSize: GRID_SIZE
   },
   objects: [],
   connections: [],
@@ -194,10 +208,13 @@ export const useStore = create<AppState>((set, get) => ({
   isDirty: false,
   messages: [],
   isDrawingConnection: false,
+  snapToGridEnabled: true,
 
   setDrawingMode: (active) => set({
     isDrawingConnection: active
   }),
+
+  toggleSnapToGrid: () => set((state) => ({ snapToGridEnabled: !state.snapToGridEnabled })),
 
   setProjectName: (name) => set({ projectName: name, isDirty: true }),
   setFileName: (name) => set({ fileName: name }),
@@ -293,6 +310,66 @@ export const useStore = create<AppState>((set, get) => ({
       connections: state.connections.map(c => c.id === id ? { ...c, ...updates } : c),
       isDirty: true
     }));
+  },
+
+  // Busbar-specific resize: connections already attached to a dynamic
+  // ('dyn_top_NN' / 'dyn_bot_NN') port stay attached across a width
+  // change. If a port's grid position no longer exists at the new width,
+  // the connection is reattached to the nearest surviving port and a
+  // message is posted so the change is visible, not silent. One history
+  // entry for the whole resize+reattach.
+  resizeBusbar: (id, newWidth) => {
+    const { objects, connections } = get();
+    const obj = objects.find(o => o.id === id);
+    if (!obj) return;
+
+    const oldWidth = obj.width;
+    const safeNewWidth = Math.max(0, newWidth);
+    const newPortCount = Math.floor(safeNewWidth / GRID_SIZE);
+
+    const reattachments = new Map<string, string>(); // connectionId+field -> new port id
+    const notices: string[] = [];
+
+    connections.forEach(conn => {
+      (['fromId', 'toId'] as const).forEach((idField) => {
+        if (conn[idField] !== id) return;
+        const portField = idField === 'fromId' ? 'fromPort' : 'toPort';
+        const portId = conn[portField];
+        const match = portId.match(/^dyn_(top|bot)_(\d+)$/);
+        if (!match || newPortCount <= 0) return;
+
+        const edge = match[1];
+        const percent = parseInt(match[2], 10);
+        const oldIndex = Math.round(((percent / 100) * oldWidth) / GRID_SIZE);
+
+        if (oldIndex < newPortCount) return; // still a valid port, nothing to do
+
+        const newIndex = newPortCount - 1;
+        const newPercent = Math.round(((newIndex * GRID_SIZE) / safeNewWidth) * 100);
+        const newPortId = `dyn_${edge}_${newPercent}`;
+
+        reattachments.set(`${conn.id}:${portField}`, newPortId);
+        notices.push(`[WARN] Connection ${conn.id} reattached to the nearest busbar port (${portId} -> ${newPortId}) after resize`);
+      });
+    });
+
+    set((state) => ({
+      objects: state.objects.map(o => o.id === id ? { ...o, width: safeNewWidth } : o),
+      connections: state.connections.map(c => {
+        const fromKey = `${c.id}:fromPort`;
+        const toKey = `${c.id}:toPort`;
+        if (!reattachments.has(fromKey) && !reattachments.has(toKey)) return c;
+        return {
+          ...c,
+          fromPort: reattachments.get(fromKey) || c.fromPort,
+          toPort: reattachments.get(toKey) || c.toPort
+        };
+      }),
+      isDirty: true
+    }));
+
+    notices.forEach(n => get().addMessage(n));
+    get().saveHistory();
   },
 
   deleteObjects: (ids, connIds = []) => {

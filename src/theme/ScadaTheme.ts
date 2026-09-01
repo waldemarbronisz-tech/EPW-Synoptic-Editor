@@ -38,3 +38,28 @@ export const OUTLINE_WIDTH = 5;      // kontur ksztaltow wypelnionych (default; 
                                       // that symbol gives one explicitly)
 export const BUSBAR_HEIGHT = 22;     // wysokosc szyny zbiorczej
 export const GRID_SIZE = 16;
+
+// ---- Bridge into CSS -----------------------------------------------------
+// CSS cannot import a TypeScript module, so the interface chrome (panels,
+// toolbar, property fields) reads these values through CSS custom
+// properties instead of a second, hand-copied set of hex literals. This
+// function is the ONLY place that writes them, and it must be called
+// exactly once, synchronously, before the app's first paint (see
+// src/main.tsx) - never at this module's top level, so importing
+// ScadaTheme.ts (e.g. from a Vitest test running under Node, with no
+// `document`) stays side-effect-free.
+export function applyScadaCssVariables(target: HTMLElement = document.documentElement): void {
+  target.style.setProperty('--scada-canvas-bg', COLOR_CANVAS_BACKGROUND);
+  target.style.setProperty('--scada-outline', COLOR_OUTLINE);
+  target.style.setProperty('--scada-panel', COLOR_PANEL);
+  target.style.setProperty('--scada-bevel-light', COLOR_BEVEL_LIGHT);
+  target.style.setProperty('--scada-bevel-dark', COLOR_BEVEL_DARK);
+  target.style.setProperty('--scada-value-field', COLOR_VALUE_FIELD);
+  target.style.setProperty('--scada-white', COLOR_WHITE);
+  target.style.setProperty('--scada-energized', COLOR_ENERGIZED);
+  target.style.setProperty('--scada-de-energized', COLOR_DE_ENERGIZED);
+  target.style.setProperty('--scada-run', COLOR_RUN);
+  target.style.setProperty('--scada-alarm', COLOR_ALARM);
+  target.style.setProperty('--scada-lamp-lit', COLOR_LAMP_LIT);
+  target.style.setProperty('--scada-water', COLOR_WATER);
+}

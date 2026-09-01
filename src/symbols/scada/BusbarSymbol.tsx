@@ -33,6 +33,27 @@ export function getBusbarPorts(width: number): { x: number; y: number }[] {
   return ports;
 }
 
+/**
+ * Ports along one edge (top or bottom) of the bar, spaced every GRID_SIZE -
+ * the two-row model the live editor actually uses (a connection may land
+ * on either side, not just through the center). Added alongside
+ * getBusbarPorts rather than changing it, so its existing single-row
+ * behavior and the test asserting an exact port count for it stay
+ * intact.
+ */
+// oxlint-disable-next-line react/only-export-components -- one file per symbol is required; this helper belongs beside its component.
+export function getBusbarEdgePorts(width: number, edge: 'top' | 'bottom'): { x: number; y: number }[] {
+  if (!(width > 0)) return [];
+
+  const count = Math.floor(width / GRID_SIZE);
+  const y = edge === 'top' ? 0 : BUSBAR_HEIGHT;
+  const ports: { x: number; y: number }[] = [];
+  for (let i = 0; i < count; i++) {
+    ports.push({ x: i * GRID_SIZE, y });
+  }
+  return ports;
+}
+
 export interface BusbarSymbolProps {
   width: number;
   state: BusbarState;

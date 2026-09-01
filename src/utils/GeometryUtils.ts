@@ -9,17 +9,44 @@ export const resolveConnectionPoint = (obj: SynopticObject, portId: string): Con
   // Normal port
   let port = def.connectionPoints?.find(p => p.id === portId);
 
-  // Dynamic port (busbars, etc)
+  // Dynamic port (busbars, etc). Two id formats:
+  //  - 'dyn_NN' (legacy): a single row through the vertical/horizontal
+  //    center, inferred from aspect ratio - unchanged since this was
+  //    introduced, still what the original electrical.busbar produces.
+  //  - 'dyn_top_NN' / 'dyn_bot_NN': a row along the top or bottom edge -
+  //    added for the SCADA busbar, which accepts connections on either
+  //    side of its length, not just through the middle.
   if (!port && portId.startsWith('dyn_')) {
     if (!def.supportsDynamicPorts) return null;
-    const match = portId.match(/^dyn_(\d+)$/);
-    if (!match) return null;
-    let pos = parseInt(match[1], 10);
-    if (isNaN(pos) || pos < 0 || pos > 100) return null;
-    pos = pos / 100;
-    const w = def.defaultWidth || 80;
-    const h = def.defaultHeight || 80;
-    if (w >= h) {
+
+    const edgeMatch = portId.match(/^dyn_(top|bot)_(\d+)$/);
+    const centerMatch = portId.match(/^dyn_(\d+)$/);
+
+    let posPercent: number;
+    let yFraction: number | null = null; // null = infer from aspect ratio, like the legacy format always has
+
+    if (edgeMatch) {
+      posPercent = parseInt(edgeMatch[2], 10);
+      yFraction = edgeMatch[1] === 'top' ? 0 : 1;
+    } else if (centerMatch) {
+      posPercent = parseInt(centerMatch[1], 10);
+    } else {
+      return null;
+    }
+
+    if (isNaN(posPercent) || posPercent < 0 || posPercent > 100) return null;
+    const pos = posPercent / 100;
+
+    // Prefer the object's own current width/height over the symbol
+    // definition's static default - a resizable busbar's actual width
+    // can differ from it, and using the default here would place ports
+    // as if the bar were still its original size.
+    const w = obj.width || def.defaultWidth || 80;
+    const h = obj.height || def.defaultHeight || 80;
+
+    if (yFraction !== null) {
+      port = { id: portId, x: pos, y: yFraction, domain: 'electrical', medium: 'electrical_ac', direction: 'passive', multiplicity: 'multiple' };
+    } else if (w >= h) {
       port = { id: portId, x: pos, y: 0.5, domain: 'electrical', medium: 'electrical_ac', direction: 'passive', multiplicity: 'multiple' };
     } else {
       port = { id: portId, x: 0.5, y: pos, domain: 'electrical', medium: 'electrical_ac', direction: 'passive', multiplicity: 'multiple' };

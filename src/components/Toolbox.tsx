@@ -6,7 +6,8 @@ export const Toolbox: React.FC = () => {
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     Electrical: true,
-    Water: true
+    Water: true,
+    SCADA: true
   });
 
   const toggleFolder = (folder: string) => {

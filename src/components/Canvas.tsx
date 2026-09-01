@@ -7,6 +7,17 @@ import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 import { ConnectionService } from '../project/ConnectionService';
 import { ConnectionLine } from './ConnectionLine';
 import { ObjectLabelRenderer } from './ObjectLabelRenderer';
+import { COLOR_ALARM, COLOR_CANVAS_BACKGROUND, COLOR_OUTLINE, COLOR_WATER, COLOR_WHITE } from '../theme/ScadaTheme';
+import { WireNodeSymbol } from '../symbols/scada/WireNodeSymbol';
+import { getBusbarEdgePorts } from '../symbols/scada/BusbarSymbol';
+import { snapValue } from '../utils/GridSnap';
+
+// Momentary Alt-key bypass for grid snapping. Deliberately outside React
+// state: every ObjectNode's drag handlers need the CURRENT key state at
+// the instant a drag ends, not a value captured in a stale closure or
+// re-rendered prop, and a keypress should never trigger a re-render of
+// the whole canvas by itself.
+let isAltPressed = false;
 
 
 
@@ -51,7 +62,7 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onMouseUp={(e) => {
-          if (def?.type === 'electrical.busbar') {
+          if (def?.supportsDynamicPorts) {
             const stage = e.target.getStage();
             const pos = stage?.getPointerPosition();
             if (pos) {
@@ -66,11 +77,14 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
               const localX = globalX - obj.x;
               const localY = globalY - obj.y;
 
+              // Use the object's own current width/height, not the symbol
+              // definition's static default - a resizable busbar's actual
+              // size can differ from it.
+              const w = obj.width * (obj.scaleX || 1);
+              const h = obj.height * (obj.scaleY || 1);
+
               // In Canvas, object origin is top-left in our bounding box.
               // So if w >= h (horizontal), percentage is localX / w.
-              const w = (def?.defaultWidth || 80) * (obj.scaleX || 1);
-              const h = (def?.defaultHeight || 80) * (obj.scaleY || 1);
-
               let busPos = 0.5;
               if (w >= h) {
                 busPos = localX / w;
@@ -78,23 +92,33 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
                 busPos = localY / h;
               }
               busPos = Math.max(0, Math.min(1, busPos));
+              const posPercent = Math.round(busPos * 100);
 
-              const dynamicPortId = `dyn_${Math.round(busPos * 100)}`;
+              // The SCADA busbar has ports along BOTH its top and bottom
+              // edges, not just a single center row - pick the edge closer
+              // to where the user clicked. Every other dynamic-port symbol
+              // (just the legacy electrical.busbar today) keeps the
+              // original unprefixed, center-row port id untouched.
+              const dynamicPortId = obj.type === 'scada.busbar'
+                ? `dyn_${localY < h / 2 ? 'top' : 'bot'}_${posPercent}`
+                : `dyn_${posPercent}`;
               onPortMouseUp(obj.id, dynamicPortId, e);
             }
           }
         }}
         onDragMove={(e) => {
-          // Snap during drag for visual feedback (doesn't mutate store yet)
-          e.target.x(Math.round(e.target.x() / gridSize) * gridSize);
-          e.target.y(Math.round(e.target.y() / gridSize) * gridSize);
+          // Snap during drag for visual feedback (doesn't mutate store yet).
+          // Held Alt bypasses this exactly as it bypasses the final snap
+          // on release, so the preview matches where the object will land.
+          e.target.x(snapValue(e.target.x(), gridSize, isAltPressed));
+          e.target.y(snapValue(e.target.y(), gridSize, isAltPressed));
         }}
         onDragEnd={(e) => {
           // Push final position, then commit exactly one history entry for
           // the whole drag (updateObject itself no longer touches history).
           onChange({
-            x: Math.round(e.target.x() / gridSize) * gridSize,
-            y: Math.round(e.target.y() / gridSize) * gridSize,
+            x: snapValue(e.target.x(), gridSize, isAltPressed),
+            y: snapValue(e.target.y(), gridSize, isAltPressed),
           });
           useStore.getState().saveHistory();
         }}
@@ -103,9 +127,29 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
           const scaleX = node.scaleX();
           const scaleY = node.scaleY();
 
+          if (obj.type === 'scada.busbar') {
+            // The busbar's width field is the single source of truth for
+            // its size (the dynamic-port math keys on it directly) - fold
+            // the drag-resize scale into width instead of leaving it as a
+            // separate multiplier, and reset scale to 1 so it stays that
+            // way. Goes through resizeBusbar so already-attached
+            // connections are reattached/reported exactly as a
+            // Properties-field width edit would.
+            onChange({
+              x: snapValue(node.x(), gridSize, isAltPressed),
+              y: snapValue(node.y(), gridSize, isAltPressed),
+              scaleX: 1,
+              scaleY: 1,
+            });
+            useStore.getState().resizeBusbar(obj.id, obj.width * scaleX);
+            node.scaleX(1);
+            node.scaleY(1);
+            return;
+          }
+
           onChange({
-            x: Math.round(node.x() / gridSize) * gridSize,
-            y: Math.round(node.y() / gridSize) * gridSize,
+            x: snapValue(node.x(), gridSize, isAltPressed),
+            y: snapValue(node.y(), gridSize, isAltPressed),
             rotation: node.rotation(),
             scaleX: Math.max(0.1, scaleX),
             scaleY: Math.max(0.1, scaleY),
@@ -124,11 +168,9 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
              x={cp.x * obj.width}
              y={cp.y * obj.height}
              radius={wireDragStart ? 6 : 4}
-             fill={wireDragStart ? "#e74c3c" : "#3498db"}
-             stroke="#2980b9"
+             fill={wireDragStart ? COLOR_ALARM : COLOR_WATER}
+             stroke={COLOR_OUTLINE}
              strokeWidth={1}
-             shadowColor="rgba(0,0,0,0.5)"
-             shadowBlur={2}
              hitStrokeWidth={15}
              onMouseEnter={(e: any) => {
                 const container = e.target.getStage()?.container();
@@ -159,6 +201,29 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
                  onPortMouseUp(obj.id, cp.id, e);
                }}
            />
+        ))}
+
+        {/* SCADA busbar: ports along both edges, shown only on hover (or
+            while a wire is being dragged) - visible at all times, it would
+            read as a comb rather than a busbar. */}
+        {obj.type === 'scada.busbar' && (isHovered || wireDragStart) && [
+          ...getBusbarEdgePorts(obj.width, 'top').map((p, idx) => ({ ...p, key: `bus-top-${idx}`, portId: `dyn_top_${Math.round((p.x / Math.max(obj.width, 1)) * 100)}` })),
+          ...getBusbarEdgePorts(obj.width, 'bottom').map((p, idx) => ({ ...p, key: `bus-bot-${idx}`, portId: `dyn_bot_${Math.round((p.x / Math.max(obj.width, 1)) * 100)}` }))
+        ].map(p => (
+          <Circle
+            key={p.key}
+            x={p.x}
+            y={p.y}
+            radius={4}
+            fill={COLOR_WHITE}
+            stroke={COLOR_OUTLINE}
+            strokeWidth={1.5}
+            hitStrokeWidth={12}
+            onMouseDown={(e) => { e.cancelBubble = true; onPortMouseDown(obj.id, p.portId, e); }}
+            onMouseUp={(e) => { e.cancelBubble = true; onPortMouseUp(obj.id, p.portId, e); }}
+            onClick={(e) => { e.cancelBubble = true; onPortClick(obj.id, p.portId); }}
+            onTap={(e) => { e.cancelBubble = true; onPortClick(obj.id, p.portId); }}
+          />
         ))}
       </Group>
       {isSelected && !obj.locked && (
@@ -196,6 +261,25 @@ export const Canvas: React.FC = () => {
   const [drawStartPort, setDrawStartPort] = useState<{objId: string, portId: string} | null>(null);
   const [wireDragStart, setWireDragStart] = useState<{objId: string, portId: string} | null>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  // Grid-snap Alt bypass: tracked once, globally, for the whole canvas -
+  // not local React state, since a keypress must never re-render every
+  // object on the canvas just to update a modifier flag.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Alt') isAltPressed = true; };
+    const handleKeyUp = (e: KeyboardEvent) => { if (e.key === 'Alt') isAltPressed = false; };
+    // Also cleared on window blur - Alt released outside the window (e.g.
+    // while alt-tabbing) would otherwise never fire its own keyup here.
+    const handleBlur = () => { isAltPressed = false; };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, []);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -373,9 +457,13 @@ export const Canvas: React.FC = () => {
     let x = (pos.x - stageX) / scale;
     let y = (pos.y - stageY) / scale;
 
-    // Snap to grid
-    x = Math.round(x / gridSize) * gridSize;
-    y = Math.round(y / gridSize) * gridSize;
+    // Snap to grid unless the persistent toggle is off or Alt is held.
+    // e.altKey (the native DragEvent's own modifier state) is combined
+    // with the tracked flag - a drag-and-drop gesture can be less
+    // reliable about delivering keydown/keyup than a plain mouse drag on
+    // some platforms.
+    x = snapValue(x, gridSize, isAltPressed || e.altKey);
+    y = snapValue(y, gridSize, isAltPressed || e.altKey);
 
     const def = getSymbolDefinition(data.type);
     const width = def?.defaultWidth || 80;
@@ -408,34 +496,43 @@ export const Canvas: React.FC = () => {
     });
   };
 
-  // Draw Grid
+  // Draw Grid: discreet minor lines every gridSize, a more pronounced
+  // major line every 4th one - both darker than the canvas background,
+  // both plain COLOR_OUTLINE at different opacities (no separate "grid
+  // color" invented outside ScadaTheme).
   const drawGrid = () => {
     const lines = [];
     const width = useStore.getState().canvasConfig.width;
     const height = useStore.getState().canvasConfig.height;
+    const minorOpacity = 0.12;
+    const majorOpacity = 0.32;
 
-    for (let i = 0; i < width / gridSize; i++) {
+    for (let i = 0; i * gridSize <= width; i++) {
+      const isMajor = i % 4 === 0;
       lines.push(
         <Rect
           key={`v${i}`}
           x={i * gridSize}
           y={0}
-          width={1}
+          width={isMajor ? 1.5 : 1}
           height={height}
-          fill="rgba(0, 0, 0, 0.1)" /* subtle retro engineering grid */
+          fill={COLOR_OUTLINE}
+          opacity={isMajor ? majorOpacity : minorOpacity}
           name="grid"
         />
       );
     }
-    for (let j = 0; j < height / gridSize; j++) {
+    for (let j = 0; j * gridSize <= height; j++) {
+      const isMajor = j % 4 === 0;
       lines.push(
         <Rect
           key={`h${j}`}
           x={0}
           y={j * gridSize}
           width={width}
-          height={1}
-          fill="rgba(0, 0, 0, 0.1)"
+          height={isMajor ? 1.5 : 1}
+          fill={COLOR_OUTLINE}
+          opacity={isMajor ? majorOpacity : minorOpacity}
           name="grid"
         />
       );
@@ -514,7 +611,7 @@ export const Canvas: React.FC = () => {
       >
         <Layer>
           <Rect x={0} y={0} width={useStore.getState().canvasConfig.width} height={useStore.getState().canvasConfig.height} fill={useStore.getState().canvasConfig.background} />
-          <Rect x={0} y={0} width={canvasConfig.width || 1920} height={canvasConfig.height || 1080} fill={canvasConfig.background || "#ffffff"} />
+          <Rect x={0} y={0} width={canvasConfig.width || 1920} height={canvasConfig.height || 1080} fill={canvasConfig.background || COLOR_CANVAS_BACKGROUND} />
           {drawGrid()}
         </Layer>
         <Layer>
@@ -549,7 +646,11 @@ export const Canvas: React.FC = () => {
               />
             );
           })()}
-                    {/* Topology Junctions */}
+                    {/* Topology Junctions: a wire node (from the SCADA library)
+                        wherever three or more conductors meet at the same port.
+                        (This used to be two near-identical copies of the same
+                        block, one of them missing dyn_ port support - collapsed
+                        into one, keeping the more complete version.) */}
           {(() => {
              const junctions: {x: number, y: number}[] = [];
              const pointMap = new Map<string, number>();
@@ -567,47 +668,11 @@ export const Canvas: React.FC = () => {
                      const obj = objects.find(o => o.id === objId);
                      if (obj) {
                          const def = getSymbolDefinition(obj.type);
-                         const port = def?.connectionPoints?.find(p => p.id === portId);
-                         if (port) {
-                             const w = obj.width * (obj.scaleX || 1);
-                             const h = obj.height * (obj.scaleY || 1);
-                             const cx = port.x * w - w / 2;
-                             const cy = port.y * h - h / 2;
-                             const rot = obj.rotation || 0;
-                             const radians = rot * (Math.PI / 180);
-                             const rx = cx * Math.cos(radians) - cy * Math.sin(radians);
-                             const ry = cx * Math.sin(radians) + cy * Math.cos(radians);
-                             junctions.push({ x: obj.x + w / 2 + rx, y: obj.y + h / 2 + ry });
-                         }
-                     }
-                 }
-             });
-             return junctions.map((j, idx) => <Circle key={`junc-${idx}`} x={j.x} y={j.y} radius={3} fill="#000" />);
-          })()}
-                    {/* Topology Junctions */}
-          {(() => {
-             const junctions: {x: number, y: number}[] = [];
-             const pointMap = new Map<string, number>();
-
-             connections.forEach(c => {
-                 const key1 = `${c.fromId}:${c.fromPort}`;
-                 const key2 = `${c.toId}:${c.toPort}`;
-                 pointMap.set(key1, (pointMap.get(key1) || 0) + 1);
-                 pointMap.set(key2, (pointMap.get(key2) || 0) + 1);
-             });
-
-             pointMap.forEach((count, key) => {
-                 if (count > 2) {
-                     const [objId, portId] = key.split(':');
-                     const obj = objects.find(o => o.id === objId);
-                     if (obj) {
-                         const def = getSymbolDefinition(obj.type);
                          const port = def?.connectionPoints?.find(p => p.id === portId) ||
                                       (portId.startsWith('dyn_') ? { x: parseInt(portId.replace('dyn_',''))/100, y: 0.5 } : null); // Simple dyn fallback
                          if (port) {
                              const w = obj.width * (obj.scaleX || 1);
                              const h = obj.height * (obj.scaleY || 1);
-                             // To keep it simple, just use center bounds approximation for dyn_ busbars if it's horizontal
                              const cx = (port.x || 0.5) * w - w / 2;
                              const cy = (port.y || 0.5) * h - h / 2;
                              const rot = obj.rotation || 0;
@@ -619,7 +684,13 @@ export const Canvas: React.FC = () => {
                      }
                  }
              });
-             return junctions.map((j, idx) => <Circle key={`junc-${idx}`} x={j.x} y={j.y} radius={4} fill="#000" />);
+             // WireNodeSymbol draws itself centered on its own local (75,75) -
+             // offset the wrapping Group so that point lands on the junction.
+             return junctions.map((j, idx) => (
+               <Group key={`junc-${idx}`} x={j.x - 75} y={j.y - 75} listening={false}>
+                 <WireNodeSymbol />
+               </Group>
+             ));
           })()}
           {[...objects].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)).map((obj) => (
             <ObjectNode
@@ -641,8 +712,9 @@ export const Canvas: React.FC = () => {
               y={selectionBox.y}
               width={selectionBox.width}
               height={selectionBox.height}
-              fill="rgba(0, 161, 255, 0.3)"
-              stroke="#00a1ff"
+              fill={COLOR_WATER}
+              fillOpacity={0.25}
+              stroke={COLOR_WATER}
               strokeWidth={1}
             />
           )}
