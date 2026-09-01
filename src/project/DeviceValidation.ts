@@ -166,6 +166,18 @@ export function validateDeviceFields(device: Device): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const id = device.id;
 
+  // Common to every behavior: designation is what appears on the diagram,
+  // and a device must always have a name and a kind (kind drives the icon).
+  if (device.designation.trim().length === 0) {
+    issues.push({ severity: 'ERROR', code: 'DEVICE_EMPTY_DESIGNATION', message: `Device '${id}': designation must not be empty`, deviceId: id });
+  }
+  if (device.name.trim().length === 0) {
+    issues.push({ severity: 'ERROR', code: 'DEVICE_EMPTY_NAME', message: `Device '${id}': name must not be empty`, deviceId: id });
+  }
+  if (device.kind.trim().length === 0) {
+    issues.push({ severity: 'ERROR', code: 'DEVICE_EMPTY_KIND', message: `Device '${id}': kind must not be empty`, deviceId: id });
+  }
+
   switch (device.behavior) {
     case 'SWITCHED': {
       const { feedback, command } = device;
@@ -204,11 +216,21 @@ export function validateDeviceFields(device: Device): ValidationIssue[] {
       checkChannelKind(issues, id, 'feedback.diClosed', feedback.diClosed, 'DI');
       checkChannelKind(issues, id, 'feedback.diOpen', feedback.diOpen, 'DI');
       checkChannelKind(issues, id, 'extraInputs.diFault', device.extraInputs?.diFault, 'DI');
+
+      // Below 100ms, supervision cannot mean anything against a real
+      // device's actual actuation time - that's misconfiguration, not a
+      // fast timeout. No upper bound: a slow device can need a long one.
+      if (!(device.supervision.confirmTimeoutMs >= 100)) {
+        issues.push({ severity: 'ERROR', code: 'SWITCHED_INVALID_CONFIRM_TIMEOUT', message: `Device '${id}': supervision.confirmTimeoutMs must be >= 100`, deviceId: id });
+      }
       break;
     }
 
     case 'SIGNAL': {
       checkChannelKind(issues, id, 'feedback.di', device.feedback.di, 'DI');
+      if (!(device.debounceMs >= 0)) {
+        issues.push({ severity: 'ERROR', code: 'SIGNAL_INVALID_DEBOUNCE', message: `Device '${id}': debounceMs must be >= 0`, deviceId: id });
+      }
       break;
     }
 
@@ -219,6 +241,9 @@ export function validateDeviceFields(device: Device): ValidationIssue[] {
       }
       if (!(device.deadband >= 0)) {
         issues.push({ severity: 'ERROR', code: 'MEASURED_INVALID_DEADBAND', message: `Device '${id}': deadband must be >= 0`, deviceId: id });
+      }
+      if (device.unit.trim().length === 0) {
+        issues.push({ severity: 'ERROR', code: 'MEASURED_EMPTY_UNIT', message: `Device '${id}': unit must not be empty`, deviceId: id });
       }
       break;
     }
@@ -236,6 +261,9 @@ export function validateDeviceFields(device: Device): ValidationIssue[] {
       }
       if (!(device.safeValue >= device.rangeMin && device.safeValue <= device.rangeMax)) {
         issues.push({ severity: 'ERROR', code: 'MODULATED_SAFE_OUT_OF_RANGE', message: `Device '${id}': safeValue must be within rangeMin..rangeMax`, deviceId: id });
+      }
+      if (device.unit.trim().length === 0) {
+        issues.push({ severity: 'ERROR', code: 'MODULATED_EMPTY_UNIT', message: `Device '${id}': unit must not be empty`, deviceId: id });
       }
       break;
     }
@@ -468,6 +496,9 @@ export function validateDeviceRegistry(registry: unknown): ValidationResult {
       issues.push({ severity: 'ERROR', code: 'LOCATION_DUPLICATE_CODE', message: `Duplicate location code '${loc.code}'` });
     }
     seenLocationCodes.add(loc.code);
+    if (loc.description.trim().length === 0) {
+      issues.push({ severity: 'ERROR', code: 'LOCATION_EMPTY_DESCRIPTION', message: `Location '${loc.code}': description must not be empty` });
+    }
   }
 
   const seenCardIds = new Set<string>();
@@ -482,11 +513,14 @@ export function validateDeviceRegistry(registry: unknown): ValidationResult {
     if (!(card.channelCount > 0)) {
       issues.push({ severity: 'ERROR', code: 'CARD_INVALID_CHANNEL_COUNT', message: `Card '${card.id}' channelCount must be greater than zero` });
     }
+    if (card.model.trim().length === 0) {
+      issues.push({ severity: 'ERROR', code: 'CARD_EMPTY_MODEL', message: `Card '${card.id}': model must not be empty` });
+    }
   }
 
   const seenDeviceIds = new Set<string>();
   const designationsByLocation = new Map<string, Map<string, string>>();
-  const channelUsage = new Map<string, { deviceId: string; field: string }>();
+  const channelUsage = new Map<string, { deviceId: string; field: string; addr: string }>();
 
   for (const device of devices) {
     issues.push(...validateDeviceId(device.id, locations));
@@ -517,16 +551,25 @@ export function validateDeviceRegistry(registry: unknown): ValidationResult {
     for (const { field, addr } of getDeviceChannelAddresses(device)) {
       issues.push(...validateChannelAddress(addr, cards));
 
-      const existing = channelUsage.get(addr);
+      // Collision detection must key on the RESOLVED channel, not the raw
+      // address text: 'ELA1.DI.12' and 'ELA1.DI.012' are the same physical
+      // terminal. An address that fails to parse already produced a format
+      // error above and cannot be meaningfully compared to anything else,
+      // so it is left out of the collision map entirely.
+      const parsed = parseChannelAddress(addr);
+      if (!parsed) continue;
+
+      const normalizedKey = `${parsed.card}.${parsed.kind}.${parsed.channel}`;
+      const existing = channelUsage.get(normalizedKey);
       if (existing) {
         issues.push({
           severity: 'ERROR',
           code: 'CHANNEL_ADDRESS_COLLISION',
-          message: `Channel address '${addr}' is used by both '${existing.deviceId}' (${existing.field}) and '${device.id}' (${field})`,
+          message: `Channel address '${addr}' (device '${device.id}', ${field}) collides with '${existing.addr}' (device '${existing.deviceId}', ${existing.field}) - both resolve to channel ${normalizedKey}`,
           deviceId: device.id
         });
       } else {
-        channelUsage.set(addr, { deviceId: device.id, field });
+        channelUsage.set(normalizedKey, { deviceId: device.id, field, addr });
       }
     }
   }
