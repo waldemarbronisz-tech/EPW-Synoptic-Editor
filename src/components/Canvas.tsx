@@ -7,6 +7,7 @@ import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 import { ConnectionService } from '../project/ConnectionService';
 import { ConnectionLine } from './ConnectionLine';
 import { ObjectLabelRenderer } from './ObjectLabelRenderer';
+import { COLOR_OUTLINE } from '../theme/ScadaTheme';
 
 
 
@@ -408,34 +409,43 @@ export const Canvas: React.FC = () => {
     });
   };
 
-  // Draw Grid
+  // Draw Grid: discreet minor lines every gridSize, a more pronounced
+  // major line every 4th one - both darker than the canvas background,
+  // both plain COLOR_OUTLINE at different opacities (no separate "grid
+  // color" invented outside ScadaTheme).
   const drawGrid = () => {
     const lines = [];
     const width = useStore.getState().canvasConfig.width;
     const height = useStore.getState().canvasConfig.height;
+    const minorOpacity = 0.12;
+    const majorOpacity = 0.32;
 
-    for (let i = 0; i < width / gridSize; i++) {
+    for (let i = 0; i * gridSize <= width; i++) {
+      const isMajor = i % 4 === 0;
       lines.push(
         <Rect
           key={`v${i}`}
           x={i * gridSize}
           y={0}
-          width={1}
+          width={isMajor ? 1.5 : 1}
           height={height}
-          fill="rgba(0, 0, 0, 0.1)" /* subtle retro engineering grid */
+          fill={COLOR_OUTLINE}
+          opacity={isMajor ? majorOpacity : minorOpacity}
           name="grid"
         />
       );
     }
-    for (let j = 0; j < height / gridSize; j++) {
+    for (let j = 0; j * gridSize <= height; j++) {
+      const isMajor = j % 4 === 0;
       lines.push(
         <Rect
           key={`h${j}`}
           x={0}
           y={j * gridSize}
           width={width}
-          height={1}
-          fill="rgba(0, 0, 0, 0.1)"
+          height={isMajor ? 1.5 : 1}
+          fill={COLOR_OUTLINE}
+          opacity={isMajor ? majorOpacity : minorOpacity}
           name="grid"
         />
       );

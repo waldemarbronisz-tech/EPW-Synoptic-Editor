@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
+import { COLOR_CANVAS_BACKGROUND, GRID_SIZE } from './theme/ScadaTheme';
 
 // Cap on how many undo/redo snapshots are kept; each entry is a full deep
 // copy of objects+connections, so this bounds both memory and undo depth.
@@ -176,8 +177,8 @@ export const useStore = create<AppState>((set, get) => ({
   canvasConfig: {
     width: 1920,
     height: 1080,
-    background: "#ffffff",
-    gridSize: 20
+    background: COLOR_CANVAS_BACKGROUND,
+    gridSize: GRID_SIZE
   },
   objects: [],
   connections: [],

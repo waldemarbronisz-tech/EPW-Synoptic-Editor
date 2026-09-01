@@ -1,5 +1,6 @@
 import type { SynopticObject, SynopticConnection } from '../store';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
+import { COLOR_CANVAS_BACKGROUND, GRID_SIZE } from '../theme/ScadaTheme';
 
 export interface EPWProjectInfo {
   name: string;
@@ -40,8 +41,8 @@ export function createEmptyProject(name: string = "New Project"): EPWProjectSche
     canvas: {
       width: 1920,
       height: 1080,
-      background: "#ffffff",
-      gridSize: 20
+      background: COLOR_CANVAS_BACKGROUND,
+      gridSize: GRID_SIZE
     },
     objects: [],
     connections: []
