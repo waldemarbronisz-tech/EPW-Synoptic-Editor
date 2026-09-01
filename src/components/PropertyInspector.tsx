@@ -95,6 +95,31 @@ export const PropertyInspector: React.FC = () => {
     }
   };
 
+  // scada.meter row editing: label/value/unit per row, entered by hand
+  // for now - wiring this to the device registry is a separate, later
+  // task (per the task that added this element).
+  const addMeterRow = () => {
+    if (!selectedObj) return;
+    updateObject(selectedObj.id, {
+      meterRows: [...(selectedObj.meterRows || []), { label: '', value: '', unit: '' }]
+    });
+    useStore.getState().saveHistory();
+  };
+
+  const removeMeterRow = (index: number) => {
+    if (!selectedObj) return;
+    const rows = [...(selectedObj.meterRows || [])];
+    rows.splice(index, 1);
+    updateObject(selectedObj.id, { meterRows: rows });
+    useStore.getState().saveHistory();
+  };
+
+  const updateMeterRow = (index: number, field: 'label' | 'value' | 'unit', value: string) => {
+    if (!selectedObj) return;
+    const rows = (selectedObj.meterRows || []).map((row, i) => i === index ? { ...row, [field]: value } : row);
+    updateObject(selectedObj.id, { meterRows: rows });
+  };
+
   if (selectedConn) {
     return (
       <div className="property-inspector">
@@ -312,6 +337,47 @@ export const PropertyInspector: React.FC = () => {
             <input type="text" name="bindings.command.tag" value={selectedObj.bindings?.command?.tag || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
         </div>
+
+        {selectedObj.type === 'scada.meter' && (
+          <div className="property-group">
+            <div className="property-group-title">
+              Meter Rows
+              <button onClick={addMeterRow} style={{marginLeft: 'auto', fontSize: '10px'}}>+ Row</button>
+            </div>
+            {(selectedObj.meterRows || []).map((row, index) => (
+              <div className="property-row" key={index} style={{ gap: '2px' }}>
+                <input
+                  type="text"
+                  placeholder="Label"
+                  value={row.label}
+                  onChange={(e) => updateMeterRow(index, 'label', e.target.value)}
+                  onBlur={() => useStore.getState().saveHistory()}
+                  style={{ flex: 2 }}
+                />
+                <input
+                  type="text"
+                  placeholder="Value"
+                  value={row.value}
+                  onChange={(e) => updateMeterRow(index, 'value', e.target.value)}
+                  onBlur={() => useStore.getState().saveHistory()}
+                  style={{ flex: 1 }}
+                />
+                <input
+                  type="text"
+                  placeholder="Unit"
+                  value={row.unit}
+                  onChange={(e) => updateMeterRow(index, 'unit', e.target.value)}
+                  onBlur={() => useStore.getState().saveHistory()}
+                  style={{ flex: 1 }}
+                />
+                <button onClick={() => removeMeterRow(index)} style={{ fontSize: '10px' }}>x</button>
+              </div>
+            ))}
+            {(selectedObj.meterRows || []).length === 0 && (
+              <div className="property-row"><em>No rows yet - use + Row to add one.</em></div>
+            )}
+          </div>
+        )}
 
         <div className="property-group">
           <div className="property-group-title">

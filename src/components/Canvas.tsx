@@ -7,7 +7,7 @@ import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 import { ConnectionService } from '../project/ConnectionService';
 import { ConnectionLine } from './ConnectionLine';
 import { ObjectLabelRenderer } from './ObjectLabelRenderer';
-import { COLOR_OUTLINE, COLOR_WHITE } from '../theme/ScadaTheme';
+import { COLOR_ALARM, COLOR_CANVAS_BACKGROUND, COLOR_OUTLINE, COLOR_WATER, COLOR_WHITE } from '../theme/ScadaTheme';
 import { WireNodeSymbol } from '../symbols/scada/WireNodeSymbol';
 import { getBusbarEdgePorts } from '../symbols/scada/BusbarSymbol';
 import { snapValue } from '../utils/GridSnap';
@@ -168,11 +168,9 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
              x={cp.x * obj.width}
              y={cp.y * obj.height}
              radius={wireDragStart ? 6 : 4}
-             fill={wireDragStart ? "#e74c3c" : "#3498db"}
-             stroke="#2980b9"
+             fill={wireDragStart ? COLOR_ALARM : COLOR_WATER}
+             stroke={COLOR_OUTLINE}
              strokeWidth={1}
-             shadowColor="rgba(0,0,0,0.5)"
-             shadowBlur={2}
              hitStrokeWidth={15}
              onMouseEnter={(e: any) => {
                 const container = e.target.getStage()?.container();
@@ -613,7 +611,7 @@ export const Canvas: React.FC = () => {
       >
         <Layer>
           <Rect x={0} y={0} width={useStore.getState().canvasConfig.width} height={useStore.getState().canvasConfig.height} fill={useStore.getState().canvasConfig.background} />
-          <Rect x={0} y={0} width={canvasConfig.width || 1920} height={canvasConfig.height || 1080} fill={canvasConfig.background || "#ffffff"} />
+          <Rect x={0} y={0} width={canvasConfig.width || 1920} height={canvasConfig.height || 1080} fill={canvasConfig.background || COLOR_CANVAS_BACKGROUND} />
           {drawGrid()}
         </Layer>
         <Layer>
@@ -714,8 +712,9 @@ export const Canvas: React.FC = () => {
               y={selectionBox.y}
               width={selectionBox.width}
               height={selectionBox.height}
-              fill="rgba(0, 161, 255, 0.3)"
-              stroke="#00a1ff"
+              fill={COLOR_WATER}
+              fillOpacity={0.25}
+              stroke={COLOR_WATER}
               strokeWidth={1}
             />
           )}
