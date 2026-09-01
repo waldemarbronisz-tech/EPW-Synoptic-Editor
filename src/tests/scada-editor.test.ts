@@ -11,6 +11,7 @@ import { ProjectManager } from '../project/ProjectManager';
 import { FORMAT_NAME } from '../project/ProjectSchema';
 import { getBoundaryPointWidth, getBoundaryPortFraction } from '../symbols/scada/BoundaryPointSymbol';
 import { ConnectionService } from '../project/ConnectionService';
+import { describeObject } from '../utils/ObjectDisplay';
 
 function makeBusbar(overrides: Partial<SynopticObject> = {}): SynopticObject {
   return {
@@ -543,5 +544,65 @@ describe('A port accepts more than one connection (ConnectionService, usterka fi
     const outA = makeBoundaryPoint({ id: 'OA', boundaryDirection: 'SOURCE' });
     const outB = makeBoundaryPoint({ id: 'OB', boundaryDirection: 'SOURCE' });
     expect(ConnectionService.validateConnection(outA, 'PORT', outB, 'PORT', []).code).toBe('DIRECTION_MISMATCH');
+  });
+});
+
+// Usterka D1: Messages showed the raw object id (a UUID) - never
+// readable, never allowed there per the task's boundary.
+const UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+describe('Readable object identification for Messages (describeObject)', () => {
+  it('uses the designation when set', () => {
+    const obj = makeDevice({ id: 'obj-uuid-123', designation: '-Q1' });
+    expect(describeObject(obj)).toBe('-Q1');
+  });
+
+  it('falls back to the symbol\'s own library label when designation is empty - never the type string, never the id', () => {
+    const obj = makeDevice({ id: 'obj-uuid-123', designation: '' });
+    const text = describeObject(obj);
+    expect(text).toBe('Circuit Breaker'); // electrical.circuit_breaker's registry label
+    expect(text).not.toBe(obj.id);
+    expect(text).not.toContain('electrical.circuit_breaker');
+    expect(UUID_PATTERN.test(text)).toBe(false);
+  });
+
+  it('never throws and reads as "unknown object" for a missing object', () => {
+    expect(describeObject(undefined)).toBe('unknown object');
+    expect(describeObject(null)).toBe('unknown object');
+  });
+});
+
+describe('Connection-created Messages contain no UUID (usterka D1 fix)', () => {
+  beforeEach(() => {
+    useStore.setState({ objects: [], connections: [], messages: [], history: [{ objects: [], connections: [] } as any], historyIndex: 0 });
+  });
+
+  it('posts a readable Polaczono message using designations, with no UUID anywhere in it', () => {
+    const q1 = makeDevice({ id: 'uuid-aaaa', type: 'electrical.circuit_breaker', designation: '-Q1', width: 40, height: 40 });
+    const k1 = makeDevice({ id: 'uuid-bbbb', type: 'electrical.contactor', designation: '-K1', width: 40, height: 40 });
+    useStore.setState({ objects: [q1, k1] });
+
+    const ok = ConnectionService.tryCreateConnection(q1.id, 'OUT', k1.id, 'IN');
+    expect(ok).toBe(true);
+
+    const messages = useStore.getState().messages;
+    const last = messages[messages.length - 1].text;
+    expect(last).toContain('-Q1');
+    expect(last).toContain('-K1');
+    expect(UUID_PATTERN.test(last)).toBe(false);
+  });
+
+  it('falls back to the symbol label (not the id) when designation is unset', () => {
+    const q1 = makeDevice({ id: 'uuid-cccc', type: 'electrical.circuit_breaker', designation: '', width: 40, height: 40 });
+    const k1 = makeDevice({ id: 'uuid-dddd', type: 'electrical.contactor', designation: '', width: 40, height: 40 });
+    useStore.setState({ objects: [q1, k1] });
+
+    ConnectionService.tryCreateConnection(q1.id, 'OUT', k1.id, 'IN');
+
+    const messages = useStore.getState().messages;
+    const last = messages[messages.length - 1].text;
+    expect(UUID_PATTERN.test(last)).toBe(false);
+    expect(last).not.toContain(q1.id);
+    expect(last).not.toContain(k1.id);
   });
 });

@@ -3,6 +3,7 @@ import { resolveConnectionPoint } from '../utils/GeometryUtils';
 import type { SynopticObject } from '../store';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 import { getMediaDefinition } from '../symbols/registry/MediaRegistry';
+import { describeObject } from '../utils/ObjectDisplay';
 
 export interface ValidationResult {
   valid: boolean;
@@ -119,7 +120,12 @@ export class ConnectionService {
       type: validation.inferredType || 'electrical_ac'
     });
 
-    store.addMessage(`[INFO] Connected ${fromId}:${fromPortId} to ${toId}:${toPortId}`);
+    // Bug fix: this used to print the raw object ids (UUIDs) - never
+    // readable, never allowed in Messages. describeObject falls back
+    // designation -> the symbol's own library label, matching the
+    // task's target example text exactly ("Polaczono -Q1 z -K1" /
+    // "Polaczono Lacznik z Silnik").
+    store.addMessage(`[INFO] Polaczono ${describeObject(fromObj)} z ${describeObject(toObj)}`);
     return true;
   }
 }

@@ -14,6 +14,7 @@ import { getBoundaryPointWidth, getBoundaryPortFraction } from '../symbols/scada
 import { getLabelFrameSize } from '../symbols/scada/LabelFrameSymbol';
 import { snapValue } from '../utils/GridSnap';
 import { resolveConnectionPoint, getAbsolutePortPosition } from '../utils/GeometryUtils';
+import { describeObject } from '../utils/ObjectDisplay';
 
 // Momentary Alt-key bypass for grid snapping. Deliberately outside React
 // state: every ObjectNode's drag handlers need the CURRENT key state at
@@ -165,13 +166,17 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
         {/* Render Designation/Name Label */}
         <ObjectLabelRenderer obj={obj} onChange={onChange} />
 
-        {/* Render Connection Points if Selected */}
-        {(isSelected || isHovered || wireDragStart) && def?.connectionPoints?.map((cp, idx) => (
+        {/* Ports highlight on hover (or while a wire is being dragged)
+            only, per usterka D3 - not on selection, not permanently: a
+            schematic with every port on every object always visible
+            reads as unreadable clutter. Radius 6, contrasting fill,
+            black outline, exactly the task's spec. */}
+        {(isHovered || wireDragStart) && def?.connectionPoints?.map((cp, idx) => (
            <Circle
              key={`cp-${idx}`}
              x={cp.x * obj.width}
              y={cp.y * obj.height}
-             radius={wireDragStart ? 6 : 4}
+             radius={6}
              fill={wireDragStart ? COLOR_ALARM : COLOR_WATER}
              stroke={COLOR_OUTLINE}
              strokeWidth={1}
@@ -222,7 +227,7 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
             key={p.key}
             x={p.x}
             y={p.y}
-            radius={4}
+            radius={6}
             fill={COLOR_WHITE}
             stroke={COLOR_OUTLINE}
             strokeWidth={1.5}
@@ -250,7 +255,7 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
             <Circle
               x={fx * bpWidth}
               y={fy * bpHeight}
-              radius={wireDragStart ? 6 : 4}
+              radius={6}
               fill={wireDragStart ? COLOR_ALARM : COLOR_WATER}
               stroke={COLOR_OUTLINE}
               strokeWidth={1}
@@ -272,6 +277,14 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
             }
             return newBox;
           }}
+          // Usterka D2: a selected object wasn't clearly visible - a
+          // dashed, contrasting outline around it, separate from the
+          // resize-scale handle squares (anchorStroke/anchorFill,
+          // untouched below). Same white-reads-as-selected convention
+          // ConnectionLine.tsx already uses for a selected wire.
+          borderStroke={COLOR_WHITE}
+          borderStrokeWidth={2}
+          borderDash={[6, 4]}
         />
       )}
     </React.Fragment>
@@ -607,7 +620,9 @@ export const Canvas: React.FC = () => {
 
     if (!drawStartPort) {
       setDrawStartPort({ objId, portId });
-      useStore.getState().addMessage(`[INFO] Connection started from ${objId}:${portId}`);
+      // Bug fix: objId is a UUID, never shown to the user - describeObject
+      // reads back designation, falling back to the symbol's own label.
+      useStore.getState().addMessage(`[INFO] Connection started from ${describeObject(objects.find(o => o.id === objId))}:${portId}`);
     } else {
       if (drawStartPort.objId !== objId) {
         const success = ConnectionService.tryCreateConnection(

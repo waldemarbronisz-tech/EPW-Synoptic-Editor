@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { COLOR_CANVAS_BACKGROUND, GRID_SIZE } from './theme/ScadaTheme';
 import type { MeterRow } from './symbols/scada/MeterSymbol';
+import { describeObject } from './utils/ObjectDisplay';
 
 // Cap on how many undo/redo snapshots are kept; each entry is a full deep
 // copy of objects+connections, so this bounds both memory and undo depth.
@@ -359,7 +360,12 @@ export const useStore = create<AppState>((set, get) => ({
         const newPortId = `dyn_${edge}_${newPercent}`;
 
         reattachments.set(`${conn.id}:${portField}`, newPortId);
-        notices.push(`[WARN] Connection ${conn.id} reattached to the nearest busbar port (${portId} -> ${newPortId}) after resize`);
+        // Bug fix: conn.id is a UUID, never shown to the user - describe
+        // the OTHER end of this connection (the device actually plugged
+        // into the busbar) instead.
+        const otherId = idField === 'fromId' ? conn.toId : conn.fromId;
+        const otherObj = objects.find(o => o.id === otherId);
+        notices.push(`[WARN] Connection from ${describeObject(otherObj)} reattached to the nearest busbar port (${portId} -> ${newPortId}) after resize`);
       });
     });
 
