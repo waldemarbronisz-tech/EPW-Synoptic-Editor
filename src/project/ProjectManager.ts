@@ -2,6 +2,7 @@ import { validateProjectSchema, createEmptyProject, CURRENT_SCHEMA_VERSION, FORM
 import { runMigrations } from './Migrations';
 import type { EPWProjectSchema } from './ProjectSchema';
 import { useStore } from '../store';
+import { GRID_SIZE } from '../theme/ScadaTheme';
 
 export class ProjectManager {
   static newProject(name: string = "New Project") {
@@ -76,7 +77,13 @@ export class ProjectManager {
         width: project.canvas.width || 1920,
         height: project.canvas.height || 1080,
         background: project.canvas.background || "#ffffff",
-        gridSize: project.canvas.gridSize || 20
+        // Bug fix (usterka 3): this hardcoded 20 was a leftover from
+        // before GRID_SIZE existed - any loaded project file missing (or
+        // explicitly saved with a falsy) canvas.gridSize silently
+        // installed a grid pitch that disagreed with GRID_SIZE
+        // everywhere else in the app, instead of GRID_SIZE actually
+        // being that single source of truth.
+        gridSize: project.canvas.gridSize || GRID_SIZE
       },
       isDirty: isDirty,
       selectedIds: [],

@@ -6,6 +6,8 @@ import { resolveConnectionPoint } from '../utils/GeometryUtils';
 import { resolveObjectLabelText, measureLabelLine, LABEL_MAX_WIDTH } from '../components/ObjectLabelRenderer';
 import { snapValue } from '../utils/GridSnap';
 import { GRID_SIZE, BUSBAR_HEIGHT } from '../theme/ScadaTheme';
+import { ProjectManager } from '../project/ProjectManager';
+import { FORMAT_NAME } from '../project/ProjectSchema';
 
 function makeBusbar(overrides: Partial<SynopticObject> = {}): SynopticObject {
   return {
@@ -277,5 +279,45 @@ describe('Grid snapping (GridSnap.snapValue / shouldSnapToGrid)', () => {
     const before = useStore.getState().snapToGridEnabled;
     useStore.getState().toggleSnapToGrid();
     expect(useStore.getState().snapToGridEnabled).toBe(!before);
+  });
+});
+
+describe('Grid size on project load (ProjectManager.loadProject, usterka 3 fix)', () => {
+  // Root cause of usterka 3, found by empirical inspection (see raport.md):
+  // handleDrop/onDragEnd/onTransformEnd all snap correctly against
+  // canvasConfig.gridSize on a fresh session - but ProjectManager used to
+  // fall back to a hardcoded 20 (a pre-GRID_SIZE leftover) whenever a
+  // loaded project's canvas.gridSize was missing or falsy, silently
+  // diverging canvasConfig.gridSize from GRID_SIZE for any such file.
+  it('falls back to GRID_SIZE, not a hardcoded 20, when a loaded project omits canvas.gridSize', () => {
+    const minimalProject = {
+      format: FORMAT_NAME,
+      schema_version: 1,
+      project: { name: 'Legacy project', description: '', created_at: '', modified_at: '' },
+      canvas: { width: 1920, height: 1080, background: '#ffffff' }, // no gridSize field
+      objects: [],
+      connections: []
+    };
+
+    const ok = ProjectManager.loadProject(JSON.stringify(minimalProject), 'legacy.epwsyn');
+
+    expect(ok).toBe(true);
+    expect(useStore.getState().canvasConfig.gridSize).toBe(GRID_SIZE);
+    expect(useStore.getState().canvasConfig.gridSize).not.toBe(20);
+  });
+
+  it('still honors an explicit, valid gridSize from the file', () => {
+    const project = {
+      format: FORMAT_NAME,
+      schema_version: 1,
+      project: { name: 'Custom grid', description: '', created_at: '', modified_at: '' },
+      canvas: { width: 1920, height: 1080, background: '#ffffff', gridSize: 32 },
+      objects: [],
+      connections: []
+    };
+
+    ProjectManager.loadProject(JSON.stringify(project), 'custom.epwsyn');
+
+    expect(useStore.getState().canvasConfig.gridSize).toBe(32);
   });
 });
