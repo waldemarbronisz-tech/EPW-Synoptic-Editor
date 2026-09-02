@@ -28,13 +28,28 @@ describe('Project Schema Validation', () => {
     expect(result.issues[0].message).toContain('Duplicate object ID');
   });
 
-  it('rejects dangling connections', () => {
+  it('rejects a connection with fewer than 2 points (node-based wiring model)', () => {
     const proj = createEmptyProject("Test");
-    proj.objects = [{ id: 'obj1', type: 'electrical.busbar', x: 0, y: 0 } as any];
-    proj.connections = [{ id: 'conn1', fromId: 'obj1', fromPort: 'P1', toId: 'obj2', toPort: 'IN', type: 'electrical_ac' }];
+    proj.connections = [{ id: 'conn1', points: [{ x: 0, y: 0 }], medium: 'ELECTRICAL', style: 'NORMAL', state: 'LIVE' }];
     const result = validateProjectSchema(proj);
     expect(result.valid).toBe(false);
-    expect(result.issues[0].message).toContain('Dangling connection');
+    expect(result.issues.some(i => i.message.toLowerCase().includes('point'))).toBe(true);
+  });
+
+  it('rejects a connection point that is not on a grid node', () => {
+    const proj = createEmptyProject("Test");
+    proj.connections = [{ id: 'conn1', points: [{ x: 0, y: 0 }, { x: 17, y: 0 }], medium: 'ELECTRICAL', style: 'NORMAL', state: 'LIVE' }];
+    const result = validateProjectSchema(proj);
+    expect(result.valid).toBe(false);
+    expect(result.issues.some(i => i.code === 'OFF_GRID_POINT')).toBe(true);
+  });
+
+  it('rejects a diagonal segment', () => {
+    const proj = createEmptyProject("Test");
+    proj.connections = [{ id: 'conn1', points: [{ x: 0, y: 0 }, { x: 16, y: 16 }], medium: 'ELECTRICAL', style: 'NORMAL', state: 'LIVE' }];
+    const result = validateProjectSchema(proj);
+    expect(result.valid).toBe(false);
+    expect(result.issues.some(i => i.code === 'DIAGONAL_SEGMENT')).toBe(true);
   });
 
   it('migrates schema non-destructively', () => {

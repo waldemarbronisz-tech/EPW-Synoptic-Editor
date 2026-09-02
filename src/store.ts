@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { COLOR_CANVAS_BACKGROUND, GRID_SIZE } from './theme/ScadaTheme';
 import type { MeterRow } from './symbols/scada/MeterSymbol';
-import { describeObject } from './utils/ObjectDisplay';
 
 // Cap on how many undo/redo snapshots are kept; each entry is a full deep
 // copy of objects+connections, so this bounds both memory and undo depth.
@@ -90,17 +89,23 @@ export interface CanvasState {
   panY: number;
 }
 
+export interface WirePoint {
+  x: number;
+  y: number;
+}
+
+// Node-based connection model (schema v2): a connection is a freehand
+// orthogonal polyline, not a pair of ports. Two wires - or a wire and a
+// symbol terminal - are joined simply by sharing a grid node; nothing
+// else references anything by id. fromId/fromPort/toId/toPort are gone
+// entirely - see NetResolver.ts for how wires and terminals are grouped
+// into nets from geometry alone.
 export interface SynopticConnection {
   id: string;
-  fromId: string;
-  fromPort: string;
-  toId: string;
-  toPort: string;
-  type: string; // e.g. electrical_ac, water, hvac_air
-  waypoints?: { x: number; y: number }[]; // Foundation for manual routing and net branch definitions
-  editor?: {
-    preview_state?: string;
-  };
+  points: WirePoint[]; // minimum 2, every point on a GRID_SIZE node, every segment horizontal or vertical
+  medium: 'ELECTRICAL' | 'WATER';
+  style: 'NORMAL' | 'BUS'; // BUS is a busbar/manifold: thicker, touchable anywhere along its length
+  state: 'LIVE' | 'DEAD';
 }
 
 export interface Message {
@@ -161,7 +166,6 @@ interface AppState {
   updateObjects: (updates: {id: string, updates: Partial<SynopticObject>}[]) => void;
   addConnection: (conn: Omit<SynopticConnection, 'id'>) => void;
   updateConnection: (id: string, updates: Partial<SynopticConnection>) => void;
-  resizeBusbar: (id: string, newWidth: number) => void;
   deleteObjects: (ids: string[], connIds?: string[]) => void;
   selectObjects: (ids: string[], multi?: boolean) => void;
   selectConnections: (ids: string[], multi?: boolean) => void;
@@ -323,85 +327,21 @@ export const useStore = create<AppState>((set, get) => ({
     }));
   },
 
-  // Busbar-specific resize: connections already attached to a dynamic
-  // ('dyn_top_NN' / 'dyn_bot_NN') port stay attached across a width
-  // change. If a port's grid position no longer exists at the new width,
-  // the connection is reattached to the nearest surviving port and a
-  // message is posted so the change is visible, not silent. One history
-  // entry for the whole resize+reattach.
-  resizeBusbar: (id, newWidth) => {
-    const { objects, connections } = get();
-    const obj = objects.find(o => o.id === id);
-    if (!obj) return;
-
-    const oldWidth = obj.width;
-    const safeNewWidth = Math.max(0, newWidth);
-    const newPortCount = Math.floor(safeNewWidth / GRID_SIZE);
-
-    const reattachments = new Map<string, string>(); // connectionId+field -> new port id
-    const notices: string[] = [];
-
-    connections.forEach(conn => {
-      (['fromId', 'toId'] as const).forEach((idField) => {
-        if (conn[idField] !== id) return;
-        const portField = idField === 'fromId' ? 'fromPort' : 'toPort';
-        const portId = conn[portField];
-        const match = portId.match(/^dyn_(top|bot)_(\d+)$/);
-        if (!match || newPortCount <= 0) return;
-
-        const edge = match[1];
-        const percent = parseInt(match[2], 10);
-        const oldIndex = Math.round(((percent / 100) * oldWidth) / GRID_SIZE);
-
-        if (oldIndex < newPortCount) return; // still a valid port, nothing to do
-
-        const newIndex = newPortCount - 1;
-        const newPercent = Math.round(((newIndex * GRID_SIZE) / safeNewWidth) * 100);
-        const newPortId = `dyn_${edge}_${newPercent}`;
-
-        reattachments.set(`${conn.id}:${portField}`, newPortId);
-        // Bug fix: conn.id is a UUID, never shown to the user - describe
-        // the OTHER end of this connection (the device actually plugged
-        // into the busbar) instead.
-        const otherId = idField === 'fromId' ? conn.toId : conn.fromId;
-        const otherObj = objects.find(o => o.id === otherId);
-        notices.push(`[WARN] Connection from ${describeObject(otherObj)} reattached to the nearest busbar port (${portId} -> ${newPortId}) after resize`);
-      });
-    });
-
-    set((state) => ({
-      objects: state.objects.map(o => o.id === id ? { ...o, width: safeNewWidth } : o),
-      connections: state.connections.map(c => {
-        const fromKey = `${c.id}:fromPort`;
-        const toKey = `${c.id}:toPort`;
-        if (!reattachments.has(fromKey) && !reattachments.has(toKey)) return c;
-        return {
-          ...c,
-          fromPort: reattachments.get(fromKey) || c.fromPort,
-          toPort: reattachments.get(toKey) || c.toPort
-        };
-      }),
-      isDirty: true
-    }));
-
-    notices.forEach(n => get().addMessage(n));
-    get().saveHistory();
-  },
-
+  // Bug fix (node-based wiring rewrite): deleting an object used to
+  // cascade-delete every connection whose fromId/toId pointed at it. A
+  // connection no longer references any object id at all - it is a free
+  // polyline that happens to touch a terminal geometrically - so nothing
+  // needs to cascade any more. A wire left dangling by a deleted object
+  // simply stops being part of any net; it stays on the canvas exactly
+  // like drawing a wire into empty space always could.
   deleteObjects: (ids, connIds = []) => {
     if (ids.length === 0 && connIds.length === 0) return;
-    set((state) => {
-      // Find connections attached to deleted objects
-      const connectedConns = state.connections.filter(c => ids.includes(c.fromId) || ids.includes(c.toId));
-      const allConnsToDelete = [...connIds, ...connectedConns.map(c => c.id)];
-
-      return {
-        objects: state.objects.filter(obj => !ids.includes(obj.id)),
-        selectedIds: state.selectedIds.filter(id => !ids.includes(id)),
-        connections: state.connections.filter(c => !allConnsToDelete.includes(c.id)),
-        selectedConnectionIds: state.selectedConnectionIds.filter(id => !allConnsToDelete.includes(id))
-      };
-    });
+    set((state) => ({
+      objects: state.objects.filter(obj => !ids.includes(obj.id)),
+      selectedIds: state.selectedIds.filter(id => !ids.includes(id)),
+      connections: state.connections.filter(c => !connIds.includes(c.id)),
+      selectedConnectionIds: state.selectedConnectionIds.filter(id => !connIds.includes(id))
+    }));
     get().saveHistory();
   },
 

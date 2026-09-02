@@ -25,7 +25,10 @@ export interface EPWProjectSchema {
   connections?: SynopticConnection[];
 }
 
-export const CURRENT_SCHEMA_VERSION = 1;
+// v2: node-based wiring. A connection is a freehand orthogonal polyline
+// (SynopticConnection.points), not a pair of ports - fromId/fromPort/
+// toId/toPort are gone. See Migrations.ts for the v1 -> v2 conversion.
+export const CURRENT_SCHEMA_VERSION = 2;
 export const FORMAT_NAME = "EPW_SYNOPTIC";
 
 export function createEmptyProject(name: string = "New Project"): EPWProjectSchema {
@@ -108,6 +111,12 @@ export function validateProjectSchema(data: any): ValidationResult {
     }
   }
 
+  // Node-based wiring model (v2): a connection is a freehand polyline,
+  // not a pair of ports - there is no fromId/toId left to dangle. What
+  // replaces "does this connection reference a real object" is net-level
+  // validation instead (NetResolver.validateNets, run separately - it
+  // needs the full symbol registry's terminal geometry, which does not
+  // belong in a plain schema-shape validator like this one).
   const connIds = new Set<string>();
   if (data.connections) {
     for (const conn of data.connections) {
@@ -120,11 +129,33 @@ export function validateProjectSchema(data: any): ValidationResult {
       }
       connIds.add(conn.id);
 
-      if (!objectIds.has(conn.fromId)) {
-         issues.push({ severity: 'ERROR', code: 'DANGLING_CONNECTION', message: `Dangling connection fromId: ${conn.fromId}` });
+      if (!Array.isArray(conn.points) || conn.points.length < 2) {
+         issues.push({ severity: 'ERROR', code: 'TOO_FEW_POINTS', message: `Connection ${conn.id} needs at least 2 points, got ${Array.isArray(conn.points) ? conn.points.length : 0}` });
+         continue;
       }
-      if (!objectIds.has(conn.toId)) {
-         issues.push({ severity: 'ERROR', code: 'DANGLING_CONNECTION', message: `Dangling connection toId: ${conn.toId}` });
+
+      for (const p of conn.points) {
+        if (typeof p.x !== 'number' || typeof p.y !== 'number' || p.x % GRID_SIZE !== 0 || p.y % GRID_SIZE !== 0) {
+           issues.push({ severity: 'ERROR', code: 'OFF_GRID_POINT', message: `Connection ${conn.id} has a point off the ${GRID_SIZE}px grid: (${p.x}, ${p.y})` });
+        }
+      }
+
+      for (let i = 0; i < conn.points.length - 1; i++) {
+        const a = conn.points[i];
+        const b = conn.points[i + 1];
+        if (a.x !== b.x && a.y !== b.y) {
+           issues.push({ severity: 'ERROR', code: 'DIAGONAL_SEGMENT', message: `Connection ${conn.id} has a diagonal segment between points ${i} and ${i + 1} - only horizontal or vertical segments are allowed` });
+        }
+      }
+
+      if (conn.medium !== 'ELECTRICAL' && conn.medium !== 'WATER') {
+         issues.push({ severity: 'ERROR', code: 'INVALID_MEDIUM', message: `Connection ${conn.id} has an invalid medium: ${conn.medium}` });
+      }
+      if (conn.style !== 'NORMAL' && conn.style !== 'BUS') {
+         issues.push({ severity: 'ERROR', code: 'INVALID_STYLE', message: `Connection ${conn.id} has an invalid style: ${conn.style}` });
+      }
+      if (conn.state !== 'LIVE' && conn.state !== 'DEAD') {
+         issues.push({ severity: 'ERROR', code: 'INVALID_STATE', message: `Connection ${conn.id} has an invalid state: ${conn.state}` });
       }
     }
   }

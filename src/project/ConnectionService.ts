@@ -1,9 +1,7 @@
-import { useStore } from '../store';
 import { resolveConnectionPoint } from '../utils/GeometryUtils';
 import type { SynopticObject } from '../store';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 import { getMediaDefinition } from '../symbols/registry/MediaRegistry';
-import { describeObject } from '../utils/ObjectDisplay';
 
 export interface ValidationResult {
   valid: boolean;
@@ -93,39 +91,13 @@ export class ConnectionService {
     return { valid: true, inferredType };
   }
 
-  static tryCreateConnection(
-    fromId: string,
-    fromPortId: string,
-    toId: string,
-    toPortId: string
-  ): boolean {
-    const store = useStore.getState();
-    const fromObj = store.objects.find(o => o.id === fromId);
-    const toObj = store.objects.find(o => o.id === toId);
-
-    if (!fromObj || !toObj) return false;
-
-    const validation = this.validateConnection(fromObj, fromPortId, toObj, toPortId, store.connections);
-
-    if (!validation.valid) {
-      store.addMessage(`[ERROR] ${validation.message}`);
-      return false;
-    }
-
-    store.addConnection({
-      fromId,
-      fromPort: fromPortId,
-      toId,
-      toPort: toPortId,
-      type: validation.inferredType || 'electrical_ac'
-    });
-
-    // Bug fix: this used to print the raw object ids (UUIDs) - never
-    // readable, never allowed in Messages. describeObject falls back
-    // designation -> the symbol's own library label, matching the
-    // task's target example text exactly ("Polaczono -Q1 z -K1" /
-    // "Polaczono Lacznik z Silnik").
-    store.addMessage(`[INFO] Polaczono ${describeObject(fromObj)} z ${describeObject(toObj)}`);
-    return true;
-  }
+  // tryCreateConnection (used to build a port-pair SynopticConnection
+  // and addConnection() it) is gone - the node-based wiring model has no
+  // ports to pair up, so there is nothing left for it to do. Wire
+  // creation now happens directly in Canvas.tsx's freehand drawing tool,
+  // which posts its own readable, UUID-free Messages entry when a wire
+  // is finished (see describeObject usage there). validateConnection
+  // above is kept: it is still a useful, independently-testable port-
+  // compatibility check (domain/medium/direction/self-connection), even
+  // though nothing in the live app feeds it real connections any more.
 }

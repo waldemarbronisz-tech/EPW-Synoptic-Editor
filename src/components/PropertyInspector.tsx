@@ -3,7 +3,7 @@ import { useStore } from '../store';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 
 export const PropertyInspector: React.FC = () => {
-  const { objects, connections, selectedIds, selectedConnectionIds, updateObject, updateConnection, resizeBusbar } = useStore();
+  const { objects, connections, selectedIds, selectedConnectionIds, updateObject } = useStore();
 
   if (selectedIds.length === 0 && selectedConnectionIds.length === 0) {
     return (
@@ -62,22 +62,6 @@ export const PropertyInspector: React.FC = () => {
     }
   };
 
-  const handleConnChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    if (!selectedConn) return;
-    const { name, value } = e.target;
-    if (name.startsWith('editor.')) {
-      const key = name.split('.')[1];
-      updateConnection(selectedConn.id, {
-        editor: {
-          ...selectedConn.editor,
-          [key]: value
-        }
-      });
-    } else {
-      updateConnection(selectedConn.id, { [name]: value });
-    }
-  };
-
   const handleCustomPropertyChange = (key: string, value: string) => {
     if (!selectedObj) return;
     updateObject(selectedObj.id, {
@@ -121,46 +105,31 @@ export const PropertyInspector: React.FC = () => {
   };
 
   if (selectedConn) {
+    // Node-based wiring model: a connection is a freehand polyline now,
+    // not a from/to port pair - there is no source/target object or
+    // port to show any more. Read-only for this commit; the editable
+    // medium/style/state UI is its own follow-up commit.
     return (
       <div className="property-inspector">
         <div className="inspector-header">Connection Properties</div>
         <div className="inspector-content">
           <div className="property-group">
-            <div className="property-group-title">General</div>
+            <div className="property-group-title">Wire</div>
             <div className="property-row">
-              <label>Type</label>
-              <select name="type" value={selectedConn.type} onChange={handleConnChange} onBlur={() => useStore.getState().saveHistory()}>
-                <option value="electrical_ac">Electrical AC</option>
-                <option value="electrical_dc">Electrical DC</option>
-                <option value="water">Water</option>
-                <option value="hvac_air">HVAC Air</option>
-              </select>
+              <label>Medium</label>
+              <input type="text" value={selectedConn.medium} disabled />
             </div>
             <div className="property-row">
-              <label>Source Obj</label>
-              <input type="text" value={objects.find(o=>o.id === selectedConn.fromId)?.designation || selectedConn.fromId} disabled />
+              <label>Style</label>
+              <input type="text" value={selectedConn.style} disabled />
             </div>
-            <div className="property-row">
-              <label>Source Port</label>
-              <input type="text" value={selectedConn.fromPort} disabled />
-            </div>
-            <div className="property-row">
-              <label>Target Obj</label>
-              <input type="text" value={objects.find(o=>o.id === selectedConn.toId)?.designation || selectedConn.toId} disabled />
-            </div>
-            <div className="property-row">
-              <label>Target Port</label>
-              <input type="text" value={selectedConn.toPort} disabled />
-            </div>
-          </div>
-          <div className="property-group">
-            <div className="property-group-title">Preview</div>
             <div className="property-row">
               <label>State</label>
-              <select name="editor.preview_state" value={selectedConn.editor?.preview_state || 'ENERGIZED'} onChange={handleConnChange} onBlur={() => useStore.getState().saveHistory()}>
-                <option value="ENERGIZED">Energized</option>
-                <option value="DEENERGIZED">De-energized</option>
-              </select>
+              <input type="text" value={selectedConn.state} disabled />
+            </div>
+            <div className="property-row">
+              <label>Points</label>
+              <input type="text" value={selectedConn.points.length} disabled />
             </div>
           </div>
         </div>
@@ -218,11 +187,11 @@ export const PropertyInspector: React.FC = () => {
               onChange={(e) => {
                 const newWidth = parseFloat(e.target.value);
                 if (isNaN(newWidth)) return;
-                if (getSymbolDefinition(selectedObj.type)?.supportsDynamicPorts) {
-                  resizeBusbar(selectedObj.id, newWidth);
-                } else {
-                  updateObject(selectedObj.id, { width: newWidth });
-                }
+                // The old busbar-resize special case (resizeBusbar,
+                // dyn_top_NN port reattachment) is gone under the node-
+                // based wiring model - a busbar is a BUS-style wire now,
+                // resized by dragging its own endpoint.
+                updateObject(selectedObj.id, { width: newWidth });
               }}
               onBlur={() => useStore.getState().saveHistory()}
             />
