@@ -1,12 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useStore } from '../store';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 import { clampMeterWidth, METER_MIN_WIDTH, METER_MAX_WIDTH, METER_DEFAULT_FONT_SIZE } from '../meter/MeterElement';
 import type { MeterElementRow } from '../meter/MeterElement';
+import { MeterWizardDialog } from './MeterWizardDialog';
 
 export const PropertyInspector: React.FC = () => {
   const { objects, connections, selectedIds, selectedConnectionIds, updateObject, updateConnection } = useStore();
-  const { meters, selectedMeterIds, updateMeter } = useStore();
+  const { meters, selectedMeterIds, updateMeter, devices } = useStore();
+  // Hooks must run unconditionally on every render (this component is
+  // otherwise a chain of early returns depending on what is selected),
+  // so this lives up here rather than inside the selectedMeter branch
+  // below, even though only that branch ever reads it.
+  const [showMeterWizard, setShowMeterWizard] = useState(false);
 
   if (selectedIds.length === 0 && selectedConnectionIds.length === 0 && selectedMeterIds.length === 0) {
     return (
@@ -185,6 +191,7 @@ export const PropertyInspector: React.FC = () => {
     };
 
     return (
+      <>
       <div className="property-inspector">
         <div className="inspector-header">Meter Properties</div>
         <div className="inspector-content">
@@ -230,7 +237,8 @@ export const PropertyInspector: React.FC = () => {
           <div className="property-group">
             <div className="property-group-title">
               Rows
-              <button onClick={addManualRow} style={{ marginLeft: 'auto', fontSize: '10px' }}>+ Manual row</button>
+              <button onClick={() => setShowMeterWizard(true)} style={{ marginLeft: 'auto', fontSize: '10px' }}>Kreator...</button>
+              <button onClick={addManualRow} style={{ fontSize: '10px' }}>+ Manual row</button>
             </div>
             {selectedMeter.rows.map((row, idx) => (
               <div className="property-row" key={idx} style={{ gap: '2px', alignItems: 'center' }}>
@@ -274,6 +282,18 @@ export const PropertyInspector: React.FC = () => {
           </div>
         </div>
       </div>
+      {showMeterWizard && (
+        <MeterWizardDialog
+          devices={devices}
+          onCancel={() => setShowMeterWizard(false)}
+          onAddManualRow={addManualRow}
+          onConfirm={(newRows) => {
+            setRows([...selectedMeter.rows, ...newRows]);
+            setShowMeterWizard(false);
+          }}
+        />
+      )}
+      </>
     );
   }
 
