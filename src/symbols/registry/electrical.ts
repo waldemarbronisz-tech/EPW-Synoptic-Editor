@@ -12,34 +12,42 @@ import type { SymbolDefinition } from '../SymbolRegistry';
 // 5 kept symbols above are now GRID_SIZE (16) multiples (they were not
 // before - e.g. 40, 30, 60). Each symbol's own artwork draws itself
 // from obj.width/obj.height using fixed fractions (w/2, h*0.3, ...), so
-// resizing the default changes the rendered proportions too; each kept
-// symbol's terminals were recomputed at the SAME fraction against the
-// NEW dimension and re-snapped to the grid (round-to-nearest, ties
-// round up) - some landed on the same coordinate as before, some moved.
+// resizing the default changes the rendered proportions too.
 // Hidden symbols below (contactor, transformer, ...) are untouched:
 // they are not part of the 22 this task's A2 applies to.
+//
+// feat/editing-and-signal-panel commit 1: terminals no longer carry a
+// raw x/y at all - just a side (TOP/BOTTOM/LEFT/RIGHT), resolved
+// against the object's own current width/height by
+// utils/Terminals.ts's getTerminalOffsetForSide, always landing dead
+// center on that edge. This also tightened defaultWidth/defaultHeight
+// further, from any GRID_SIZE multiple to an EVEN one (32/64/96/...,
+// not 16 or 48) - w/2 and h/2 must themselves be grid-aligned for the
+// terminal (always at exactly w/2 or h/2 now) to land on a grid node.
+// circuit_breaker/disconnect_switch/earth move from 48 to 64; motor
+// and indicator_lamp were already even multiples and are untouched.
 export const electricalSymbols: Record<string, SymbolDefinition> = {
   'electrical.circuit_breaker': {
     type: 'electrical.circuit_breaker',
     label: 'Circuit Breaker',
     category: 'Electrical',
-    defaultWidth: 48,
-    defaultHeight: 48,
+    defaultWidth: 64,
+    defaultHeight: 64,
     allowedStates: ['OPEN', 'CLOSED', 'TRIPPED', 'FAULT'],
     defaultState: 'OPEN',
     connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}],
-    terminals: [{ id: 'IN', x: 32, y: 0, medium: 'ELECTRICAL' }, { id: 'OUT', x: 32, y: 48, medium: 'ELECTRICAL' }]
+    terminals: [{ id: 'IN', side: 'TOP', medium: 'ELECTRICAL' }, { id: 'OUT', side: 'BOTTOM', medium: 'ELECTRICAL' }]
   },
   'electrical.disconnect_switch': {
     type: 'electrical.disconnect_switch',
     label: 'Disconnect Switch',
     category: 'Electrical',
-    defaultWidth: 48,
-    defaultHeight: 48,
+    defaultWidth: 64,
+    defaultHeight: 64,
     allowedStates: ['OPEN', 'CLOSED', 'FAULT'],
     defaultState: 'OPEN',
     connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}],
-    terminals: [{ id: 'IN', x: 32, y: 0, medium: 'ELECTRICAL' }, { id: 'OUT', x: 32, y: 48, medium: 'ELECTRICAL' }]
+    terminals: [{ id: 'IN', side: 'TOP', medium: 'ELECTRICAL' }, { id: 'OUT', side: 'BOTTOM', medium: 'ELECTRICAL' }]
   },
   'electrical.contactor': {
     type: 'electrical.contactor',
@@ -109,7 +117,7 @@ export const electricalSymbols: Record<string, SymbolDefinition> = {
     allowedStates: ['OFF', 'ON', 'BLINK', 'FAULT'],
     defaultState: 'OFF',
     connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}],
-    terminals: [{ id: 'IN', x: 16, y: 0, medium: 'ELECTRICAL' }]
+    terminals: [{ id: 'IN', side: 'TOP', medium: 'ELECTRICAL' }]
   },
   'electrical.generator': {
     type: 'electrical.generator',
@@ -142,7 +150,7 @@ export const electricalSymbols: Record<string, SymbolDefinition> = {
     allowedStates: ['OFF', 'RUNNING', 'FAULT'],
     defaultState: 'OFF',
     connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}],
-    terminals: [{ id: 'IN', x: 32, y: 0, medium: 'ELECTRICAL' }]
+    terminals: [{ id: 'IN', side: 'TOP', medium: 'ELECTRICAL' }]
   },
   'electrical.generic_load': {
     type: 'electrical.generic_load',
@@ -202,12 +210,12 @@ export const electricalSymbols: Record<string, SymbolDefinition> = {
     type: 'electrical.earth',
     label: 'Earth',
     category: 'Electrical',
-    defaultWidth: 48,
-    defaultHeight: 48,
+    defaultWidth: 64,
+    defaultHeight: 64,
     allowedStates: ['NORMAL', 'FAULT'],
     defaultState: 'NORMAL',
     connectionPoints: [{id: 'GND', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}],
-    terminals: [{ id: 'GND', x: 32, y: 0, medium: 'ELECTRICAL' }]
+    terminals: [{ id: 'GND', side: 'TOP', medium: 'ELECTRICAL' }]
   },
 
   // Water

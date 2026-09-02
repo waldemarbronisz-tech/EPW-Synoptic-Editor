@@ -12,21 +12,21 @@ export const hvacSymbols: Record<string, SymbolDefinition> = {
     type: 'hvac.fan',
     label: 'Fan',
     category: 'HVAC',
-    defaultWidth: 48,
-    defaultHeight: 48,
+    defaultWidth: 64,
+    defaultHeight: 64,
     allowedStates: ['OFF', 'RUNNING', 'FAULT'],
     defaultState: 'OFF',
-    terminals: [{ id: 'IN', x: 32, y: 0, medium: 'VENTILATION' }]
+    terminals: [{ id: 'IN', side: 'TOP', medium: 'VENTILATION' }]
   },
   'hvac.heater': {
     type: 'hvac.heater',
     label: 'Heater',
     category: 'HVAC',
-    defaultWidth: 80,
-    defaultHeight: 48,
+    defaultWidth: 96,
+    defaultHeight: 64,
     allowedStates: ['OFF', 'HEATING', 'FAULT'],
     defaultState: 'OFF',
-    terminals: [{ id: 'IN', x: 48, y: 0, medium: 'VENTILATION' }]
+    terminals: [{ id: 'IN', side: 'TOP', medium: 'VENTILATION' }]
   },
 
   // Instrumentation (Sensors & Displays)

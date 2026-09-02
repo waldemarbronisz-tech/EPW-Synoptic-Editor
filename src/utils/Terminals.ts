@@ -4,7 +4,7 @@
 // logic shared between the canvas and tests.
 
 import type { SynopticObject } from '../store';
-import type { Terminal } from '../symbols/SymbolRegistry';
+import type { Terminal, TerminalSide } from '../symbols/SymbolRegistry';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 import { GRID_SIZE } from '../theme/ScadaTheme';
 import { getBoundaryPointWidth, getBoundaryPortFraction } from '../symbols/scada/BoundaryPointSymbol';
@@ -15,18 +15,47 @@ export function snapToGridNode(v: number): number {
 }
 
 /**
+ * feat/editing-and-signal-panel commit 1: a terminal lies ALWAYS on the
+ * middle of a symbol's edge - exactly one of these four positions for a
+ * symbol of width w and height h. No symbol declares a raw x/y for its
+ * own terminal any more (see SymbolRegistry.ts's TerminalSpec) - only
+ * which side, and this is the one place that turns a side into a
+ * position, from whatever the object's CURRENT width/height actually
+ * are (not a registry default - a resized symbol's terminal follows the
+ * resize, it does not stay pinned to where the default size once put
+ * it).
+ */
+export function getTerminalOffsetForSide(side: TerminalSide, width: number, height: number): { x: number; y: number } {
+  switch (side) {
+    case 'TOP': return { x: width / 2, y: 0 };
+    case 'BOTTOM': return { x: width / 2, y: height };
+    case 'LEFT': return { x: 0, y: height / 2 };
+    case 'RIGHT': return { x: width, y: height / 2 };
+  }
+}
+
+/**
  * A symbol's terminals, in LOCAL coordinates (from its own top-left).
- * Most symbols just return their registry's static terminals list. The
- * boundary point is the one exception: its single terminal's side is a
- * per-instance property (boundaryPortSide), and its frame's width/height
- * hug the label/sublabel text - so its terminal is computed here instead
- * of being listed in the registry, the same way the old port model
- * special-cased it in GeometryUtils.resolveConnectionPoint. Its raw
- * fraction position is snapped to the grid: the frame's text-driven size
- * is not itself a multiple of GRID_SIZE, so the terminal must be nudged
- * onto the nearest node explicitly, the same tension every other
- * terminal below resolves by picking a grid-aligned position near
- * (not necessarily exactly at) each visual lead.
+ * Most symbols resolve their registry's side-only terminal specs
+ * (TerminalSpec) against the object's own current width/height via
+ * getTerminalOffsetForSide above. The boundary point is the one
+ * exception: its single terminal's side is a per-instance property
+ * (boundaryPortSide), and its frame's width/height hug the label/
+ * sublabel text - so its terminal is computed here instead of being
+ * listed in the registry, the same way the old port model special-
+ * cased it in GeometryUtils.resolveConnectionPoint. Deliberately left
+ * on its own pre-existing fraction-based mechanism (getBoundaryPortFraction,
+ * TOP/BOTTOM/LEFT/RIGHT -> 0/0.5/1 fractions) rather than switched onto
+ * getTerminalOffsetForSide above: the two are mathematically the same
+ * center-of-edge rule expressed two different ways, and this one is
+ * still relied on directly by GeometryUtils.ts (legacy v1 migration
+ * support) and its own dedicated tests - not worth the risk of
+ * disturbing either for a purely cosmetic de-duplication. Its raw
+ * fraction position is snapped to the grid: the frame's text-driven
+ * size is not itself a multiple of GRID_SIZE, so the terminal must be
+ * nudged onto the nearest node explicitly, the same tension every
+ * other terminal below resolves by picking a grid-aligned position at
+ * (now always exactly at, per this commit) each visual lead.
  */
 export function getObjectTerminals(obj: SynopticObject): Terminal[] {
   if (obj.type === 'scada.boundary_point') {
@@ -44,7 +73,11 @@ export function getObjectTerminals(obj: SynopticObject): Terminal[] {
     return [{ id: 'T1', x: snapToGridNode(fx * width), y: snapToGridNode(fy * height), medium }];
   }
 
-  return getSymbolDefinition(obj.type)?.terminals || [];
+  const specs = getSymbolDefinition(obj.type)?.terminals || [];
+  return specs.map(spec => {
+    const offset = getTerminalOffsetForSide(spec.side, obj.width, obj.height);
+    return { id: spec.id, x: offset.x, y: offset.y, medium: spec.medium };
+  });
 }
 
 /**
