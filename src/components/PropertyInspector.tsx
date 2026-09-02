@@ -218,7 +218,7 @@ export const PropertyInspector: React.FC = () => {
               onChange={(e) => {
                 const newWidth = parseFloat(e.target.value);
                 if (isNaN(newWidth)) return;
-                if (selectedObj.type === 'scada.busbar') {
+                if (getSymbolDefinition(selectedObj.type)?.supportsDynamicPorts) {
                   resizeBusbar(selectedObj.id, newWidth);
                 } else {
                   updateObject(selectedObj.id, { width: newWidth });
@@ -376,6 +376,36 @@ export const PropertyInspector: React.FC = () => {
             {(selectedObj.meterRows || []).length === 0 && (
               <div className="property-row"><em>No rows yet - use + Row to add one.</em></div>
             )}
+          </div>
+        )}
+
+        {selectedObj.type === 'scada.boundary_point' && (
+          <div className="property-group">
+            <div className="property-group-title">Boundary Point</div>
+            <div className="property-row">
+              <label>Direction</label>
+              <select name="boundaryDirection" value={selectedObj.boundaryDirection || 'SOURCE'} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()}>
+                <option value="SOURCE">Source</option>
+                <option value="SINK">Sink</option>
+              </select>
+            </div>
+            <div className="property-row">
+              <label>Medium</label>
+              <select name="boundaryMedium" value={selectedObj.boundaryMedium || 'ELECTRICAL'} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()}>
+                <option value="ELECTRICAL">Electrical</option>
+                <option value="WATER">Water</option>
+              </select>
+            </div>
+            <div className="property-row">
+              <label>Port Side</label>
+              <select name="boundaryPortSide" value={selectedObj.boundaryPortSide || 'TOP'} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()}>
+                <option value="TOP">Top</option>
+                <option value="BOTTOM">Bottom</option>
+                <option value="LEFT">Left</option>
+                <option value="RIGHT">Right</option>
+              </select>
+            </div>
+            <div className="property-row"><em>Label/sublabel use Designation/Description above.</em></div>
           </div>
         )}
 

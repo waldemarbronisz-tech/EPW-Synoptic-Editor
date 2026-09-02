@@ -69,7 +69,16 @@ export const electricalSymbols: Record<string, SymbolDefinition> = {
     defaultHeight: 10,
     allowedStates: ['DEENERGIZED', 'ENERGIZED', 'FAULT'],
     defaultState: 'DEENERGIZED',
-    isLine: true
+    isLine: true,
+    // Bug fix: this symbol had no connectionPoints and no dynamic-port
+    // support at all - zero ports reported, so no wire could ever attach
+    // to it. It shares the same name-ish "Busbar" a user reaches for
+    // first (listed here in Electrical, ahead of the SCADA folder), so
+    // this is very likely the busbar a "can't attach anything" report is
+    // actually about. Now uses the same edge-port mechanism as
+    // scada.busbar (see Canvas.tsx/PropertyInspector.tsx checks on this
+    // flag) - own width/height flow through unchanged.
+    supportsDynamicPorts: true
   },
   'electrical.indicator_lamp': {
     type: 'electrical.indicator_lamp',

@@ -40,13 +40,19 @@ export function getBusbarPorts(width: number): { x: number; y: number }[] {
  * getBusbarPorts rather than changing it, so its existing single-row
  * behavior and the test asserting an exact port count for it stay
  * intact.
+ *
+ * height defaults to BUSBAR_HEIGHT (the SCADA busbar's own height) but
+ * takes the caller's own object height explicitly - electrical.busbar,
+ * the other symbol that now shares this port mechanism, is a different
+ * height, and its bottom-row ports need to sit on ITS edge, not one
+ * borrowed from an unrelated symbol's constant.
  */
 // oxlint-disable-next-line react/only-export-components -- one file per symbol is required; this helper belongs beside its component.
-export function getBusbarEdgePorts(width: number, edge: 'top' | 'bottom'): { x: number; y: number }[] {
+export function getBusbarEdgePorts(width: number, edge: 'top' | 'bottom', height: number = BUSBAR_HEIGHT): { x: number; y: number }[] {
   if (!(width > 0)) return [];
 
   const count = Math.floor(width / GRID_SIZE);
-  const y = edge === 'top' ? 0 : BUSBAR_HEIGHT;
+  const y = edge === 'top' ? 0 : height;
   const ports: { x: number; y: number }[] = [];
   for (let i = 0; i < count; i++) {
     ports.push({ x: i * GRID_SIZE, y });

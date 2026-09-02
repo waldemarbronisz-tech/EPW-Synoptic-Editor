@@ -1,6 +1,8 @@
 import type { SynopticObject } from '../store';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 import type { ConnectionPoint } from '../symbols/SymbolRegistry';
+import { getBoundaryPortFraction } from '../symbols/scada/BoundaryPointSymbol';
+import type { BoundaryPortSide } from '../symbols/scada/BoundaryPointSymbol';
 
 export const resolveConnectionPoint = (obj: SynopticObject, portId: string): ConnectionPoint | null => {
   const def = getSymbolDefinition(obj.type);
@@ -51,6 +53,30 @@ export const resolveConnectionPoint = (obj: SynopticObject, portId: string): Con
     } else {
       port = { id: portId, x: 0.5, y: pos, domain: 'electrical', medium: 'electrical_ac', direction: 'passive', multiplicity: 'multiple' };
     }
+  }
+
+  // Boundary point (scada.boundary_point): exactly one port, whose side
+  // is a per-instance property (boundaryPortSide) rather than something
+  // fixed in the registry - so, like the dynamic ports above, it is
+  // resolved here instead of listed in def.connectionPoints. Not part of
+  // the dyn_ family above: it is a single fixed id, not a percentage
+  // along a length.
+  if (!port && portId === 'PORT' && obj.type === 'scada.boundary_point') {
+    const side: BoundaryPortSide =
+      obj.boundaryPortSide === 'BOTTOM' || obj.boundaryPortSide === 'LEFT' || obj.boundaryPortSide === 'RIGHT'
+        ? obj.boundaryPortSide
+        : 'TOP';
+    const { x, y } = getBoundaryPortFraction(side);
+    const isWater = obj.boundaryMedium === 'WATER';
+    port = {
+      id: portId,
+      x,
+      y,
+      domain: isWater ? 'water' : 'electrical',
+      medium: isWater ? 'water' : 'electrical_ac',
+      direction: obj.boundaryDirection === 'SINK' ? 'in' : 'out',
+      multiplicity: 'multiple'
+    };
   }
 
   return port || null;

@@ -98,5 +98,20 @@ export const scadaSymbols: Record<string, SymbolDefinition> = {
     defaultHeight: 100,
     allowedStates: [],
     defaultState: ''
+  },
+  'scada.boundary_point': {
+    type: 'scada.boundary_point',
+    label: 'Boundary Point',
+    category: 'SCADA',
+    // Its real rendered size hugs the label/sublabel text (clamped to
+    // 96-200px wide) - same as the label frame it is built on, these are
+    // just the initial values a freshly dropped instance starts with.
+    // No connectionPoints here: its single port's position depends on
+    // the per-instance boundaryPortSide, so it is resolved dynamically
+    // (GeometryUtils.resolveConnectionPoint) rather than listed statically.
+    defaultWidth: 150,
+    defaultHeight: 60,
+    allowedStates: [],
+    defaultState: ''
   }
 };

@@ -3,11 +3,15 @@ import { useStore } from '../store';
 import type { SynopticObject, SynopticConnection } from '../store';
 import { getBusbarEdgePorts } from '../symbols/scada/BusbarSymbol';
 import { resolveConnectionPoint } from '../utils/GeometryUtils';
+import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 import { resolveObjectLabelText, measureLabelLine, LABEL_MAX_WIDTH } from '../components/ObjectLabelRenderer';
 import { snapValue } from '../utils/GridSnap';
 import { GRID_SIZE, BUSBAR_HEIGHT } from '../theme/ScadaTheme';
 import { ProjectManager } from '../project/ProjectManager';
 import { FORMAT_NAME } from '../project/ProjectSchema';
+import { getBoundaryPointWidth, getBoundaryPortFraction } from '../symbols/scada/BoundaryPointSymbol';
+import { ConnectionService } from '../project/ConnectionService';
+import { describeObject } from '../utils/ObjectDisplay';
 
 function makeBusbar(overrides: Partial<SynopticObject> = {}): SynopticObject {
   return {
@@ -45,16 +49,39 @@ describe('SCADA busbar edge ports (getBusbarEdgePorts)', () => {
     expect(getBusbarEdgePorts(0, 'top')).toEqual([]);
     expect(getBusbarEdgePorts(0, 'bottom')).toEqual([]);
   });
+
+  // Mandatory test from the task spec: a 320-wide busbar at GRID_SIZE 16
+  // must generate 40 ports total (20 top + 20 bottom) - calls the actual
+  // port-generating function itself, not a stand-in constant.
+  it('a 320-wide busbar generates 40 ports total: 20 top and 20 bottom', () => {
+    const width = 320;
+    const top = getBusbarEdgePorts(width, 'top');
+    const bottom = getBusbarEdgePorts(width, 'bottom');
+
+    expect(top.length).toBe(20);
+    expect(bottom.length).toBe(20);
+    expect(top.length + bottom.length).toBe(40);
+    // Ties the count to GRID_SIZE itself, not a hardcoded 20, so this
+    // still catches a regression if GRID_SIZE ever changes.
+    expect(top.length).toBe(Math.floor(width / GRID_SIZE));
+  });
+
+  // Root-cause fix for usterka "szyna zbiorcza nie ma przylaczen": a port
+  // is generated at a custom height too, not hardcoded to BUSBAR_HEIGHT -
+  // electrical.busbar (defaultHeight 10, not 22) now shares this same
+  // mechanism and needs its OWN edge, not scada.busbar's.
+  it('bottom-row ports sit at a caller-supplied height, not always BUSBAR_HEIGHT', () => {
+    const ports = getBusbarEdgePorts(160, 'bottom', 10);
+    expect(ports.every(p => p.y === 10)).toBe(true);
+  });
 });
 
 describe('Dynamic port resolution (GeometryUtils.resolveConnectionPoint)', () => {
   it('resolves a legacy center-row dyn_NN port unchanged (y = 0.5)', () => {
-    // electrical.busbar (the pre-existing symbol) has no
-    // supportsDynamicPorts flag at all - that omission is the exact bug
-    // this whole task exists to fix for the SCADA busbar, and it is left
-    // untouched deliberately. This checks the legacy unprefixed id FORMAT
-    // still resolves correctly on a symbol that does support dynamic
-    // ports, i.e. that adding the top/bottom format did not regress it.
+    // The legacy unprefixed dyn_NN center-row id format must keep
+    // resolving correctly (existing saved projects use it) even though
+    // new connections are generated in the top/bottom edge format now -
+    // this checks adding that format did not regress it.
     const bar = makeBusbar();
     const point = resolveConnectionPoint(bar, 'dyn_50');
     expect(point).not.toBeNull();
@@ -82,6 +109,24 @@ describe('Dynamic port resolution (GeometryUtils.resolveConnectionPoint)', () =>
     const narrowed = makeBusbar({ width: 32 }); // shrunk well below the registry's default of 200
     const point = resolveConnectionPoint(narrowed, 'dyn_top_50');
     expect(point?.x).toBeCloseTo(0.5, 5);
+  });
+
+  // Root-cause fix: electrical.busbar (the plain "Busbar" in the
+  // Electrical category, listed ahead of "Busbar (SCADA)") had no
+  // connectionPoints and no supportsDynamicPorts at all - it reported
+  // zero ports, so no wire could ever attach to it, regardless of what
+  // the newer scada.busbar could do. Now shares the same mechanism.
+  it('electrical.busbar registry entry now supports dynamic ports', () => {
+    const def = getSymbolDefinition('electrical.busbar');
+    expect(def?.supportsDynamicPorts).toBe(true);
+  });
+
+  it('resolves a dyn_top_NN port on an electrical.busbar object too, at its own height', () => {
+    const legacyBar = makeBusbar({ type: 'electrical.busbar', width: 200, height: 10 });
+    const point = resolveConnectionPoint(legacyBar, 'dyn_top_40');
+    expect(point).not.toBeNull();
+    expect(point?.y).toBe(0);
+    expect(point?.x).toBeCloseTo(0.4, 5);
   });
 });
 
@@ -319,5 +364,245 @@ describe('Grid size on project load (ProjectManager.loadProject, usterka 3 fix)'
     ProjectManager.loadProject(JSON.stringify(project), 'custom.epwsyn');
 
     expect(useStore.getState().canvasConfig.gridSize).toBe(32);
+  });
+});
+
+function makeBoundaryPoint(overrides: Partial<SynopticObject> = {}): SynopticObject {
+  return {
+    id: 'BP1',
+    type: 'scada.boundary_point',
+    category: 'SCADA',
+    x: 0, y: 0,
+    rotation: 0, scaleX: 1, scaleY: 1,
+    visible: true, locked: false, layer: 1,
+    tag: 'BP1', description: '', color: '#000', fill: '#000', border: '#000',
+    text: '', font: 'Arial', fontSize: 12, tooltip: '',
+    width: 150, height: 60,
+    customProperties: {},
+    designation: 'ZKP',
+    boundaryDirection: 'SOURCE',
+    boundaryMedium: 'ELECTRICAL',
+    boundaryPortSide: 'TOP',
+    ...overrides
+  };
+}
+
+describe('Boundary point width (getBoundaryPointWidth)', () => {
+  it('clamps a short label/sublabel up to the 96px minimum', () => {
+    expect(getBoundaryPointWidth('X', '')).toBe(96);
+  });
+
+  it('clamps a long label/sublabel down to the 200px maximum', () => {
+    expect(getBoundaryPointWidth('A VERY LONG BOUNDARY LABEL INDEED', 'AN EQUALLY LONG SUBLABEL TEXT')).toBe(200);
+  });
+
+  it('hugs a mid-length label between the two bounds', () => {
+    const width = getBoundaryPointWidth('WORKSHOP', '400V AC');
+    expect(width).toBeGreaterThan(96);
+    expect(width).toBeLessThan(200);
+  });
+});
+
+describe('Boundary point port side (getBoundaryPortFraction)', () => {
+  it('TOP sits at the horizontal center of the top edge', () => {
+    expect(getBoundaryPortFraction('TOP')).toEqual({ x: 0.5, y: 0 });
+  });
+
+  it('BOTTOM sits at the horizontal center of the bottom edge', () => {
+    expect(getBoundaryPortFraction('BOTTOM')).toEqual({ x: 0.5, y: 1 });
+  });
+
+  it('LEFT sits at the vertical center of the left edge', () => {
+    expect(getBoundaryPortFraction('LEFT')).toEqual({ x: 0, y: 0.5 });
+  });
+
+  it('RIGHT sits at the vertical center of the right edge', () => {
+    expect(getBoundaryPortFraction('RIGHT')).toEqual({ x: 1, y: 0.5 });
+  });
+});
+
+describe('Boundary point connection resolution (GeometryUtils.resolveConnectionPoint)', () => {
+  it('resolves its single PORT id at the configured side', () => {
+    const bp = makeBoundaryPoint({ boundaryPortSide: 'RIGHT' });
+    const point = resolveConnectionPoint(bp, 'PORT');
+    expect(point).not.toBeNull();
+    expect(point?.x).toBe(1);
+    expect(point?.y).toBe(0.5);
+  });
+
+  it('SOURCE resolves an out-direction port', () => {
+    const bp = makeBoundaryPoint({ boundaryDirection: 'SOURCE' });
+    expect(resolveConnectionPoint(bp, 'PORT')?.direction).toBe('out');
+  });
+
+  it('SINK resolves an in-direction port', () => {
+    const bp = makeBoundaryPoint({ boundaryDirection: 'SINK' });
+    expect(resolveConnectionPoint(bp, 'PORT')?.direction).toBe('in');
+  });
+
+  it('ELECTRICAL medium resolves the electrical domain and electrical_ac medium', () => {
+    const bp = makeBoundaryPoint({ boundaryMedium: 'ELECTRICAL' });
+    const point = resolveConnectionPoint(bp, 'PORT');
+    expect(point?.domain).toBe('electrical');
+    expect(point?.medium).toBe('electrical_ac');
+  });
+
+  it('WATER medium resolves the water domain and water medium', () => {
+    const bp = makeBoundaryPoint({ boundaryMedium: 'WATER' });
+    const point = resolveConnectionPoint(bp, 'PORT');
+    expect(point?.domain).toBe('water');
+    expect(point?.medium).toBe('water');
+  });
+
+  it('an unknown port id on a boundary point still resolves to null', () => {
+    const bp = makeBoundaryPoint();
+    expect(resolveConnectionPoint(bp, 'NOT_A_REAL_PORT')).toBeNull();
+  });
+});
+
+describe('Boundary point connection validation (ConnectionService)', () => {
+  it('a SOURCE boundary point can connect to a SINK boundary point of the same medium', () => {
+    const source = makeBoundaryPoint({ id: 'SRC', boundaryDirection: 'SOURCE', boundaryMedium: 'ELECTRICAL' });
+    const sink = makeBoundaryPoint({ id: 'SNK', boundaryDirection: 'SINK', boundaryMedium: 'ELECTRICAL' });
+    const result = ConnectionService.validateConnection(source, 'PORT', sink, 'PORT', []);
+    expect(result.valid).toBe(true);
+    expect(result.inferredType).toBe('electrical_ac');
+  });
+
+  it('a WATER SOURCE and an ELECTRICAL SINK are rejected (different domains, checked before medium)', () => {
+    const source = makeBoundaryPoint({ id: 'SRC', boundaryDirection: 'SOURCE', boundaryMedium: 'WATER' });
+    const sink = makeBoundaryPoint({ id: 'SNK', boundaryDirection: 'SINK', boundaryMedium: 'ELECTRICAL' });
+    const result = ConnectionService.validateConnection(source, 'PORT', sink, 'PORT', []);
+    expect(result.valid).toBe(false);
+    expect(result.code).toBe('DOMAIN_MISMATCH');
+  });
+
+  it('two SOURCE boundary points (out-to-out) are rejected on direction mismatch', () => {
+    const a = makeBoundaryPoint({ id: 'A', boundaryDirection: 'SOURCE' });
+    const b = makeBoundaryPoint({ id: 'B', boundaryDirection: 'SOURCE' });
+    const result = ConnectionService.validateConnection(a, 'PORT', b, 'PORT', []);
+    expect(result.valid).toBe(false);
+    expect(result.code).toBe('DIRECTION_MISMATCH');
+  });
+
+  it('a WATER source resolves inferredType water, so the wire renders in the water color', () => {
+    const source = makeBoundaryPoint({ id: 'SRC', boundaryDirection: 'SOURCE', boundaryMedium: 'WATER' });
+    const sink = makeBoundaryPoint({ id: 'SNK', boundaryDirection: 'SINK', boundaryMedium: 'WATER' });
+    const result = ConnectionService.validateConnection(source, 'PORT', sink, 'PORT', []);
+    expect(result.valid).toBe(true);
+    expect(result.inferredType).toBe('water');
+  });
+});
+
+// Usterka: "Source/Target port is already occupied" blocked drawing any
+// real schematic (several circuits off one feed, several wires landing
+// on one node). A port must now accept any number of connections, while
+// every other validation rule keeps working exactly as before.
+describe('A port accepts more than one connection (ConnectionService, usterka fix)', () => {
+  it('a second, third and fourth connection to an already-occupied SOURCE port all still validate', () => {
+    const source = makeBoundaryPoint({ id: 'SRC', boundaryDirection: 'SOURCE', boundaryMedium: 'ELECTRICAL' });
+    const sinkB = makeBoundaryPoint({ id: 'B', boundaryDirection: 'SINK', boundaryMedium: 'ELECTRICAL' });
+    const sinkC = makeBoundaryPoint({ id: 'C', boundaryDirection: 'SINK', boundaryMedium: 'ELECTRICAL' });
+
+    const existing = [
+      { id: 'C1', fromId: 'SRC', fromPort: 'PORT', toId: 'A', toPort: 'PORT', type: 'electrical_ac' } as SynopticConnection
+    ];
+
+    // Source port SRC:PORT is already used by C1 above - a second wire
+    // from it (to a different sink) must still succeed.
+    const second = ConnectionService.validateConnection(source, 'PORT', sinkB, 'PORT', existing);
+    expect(second.valid).toBe(true);
+    expect(second.code).toBeUndefined();
+
+    existing.push({ id: 'C2', fromId: 'SRC', fromPort: 'PORT', toId: 'B', toPort: 'PORT', type: 'electrical_ac' } as SynopticConnection);
+
+    const third = ConnectionService.validateConnection(source, 'PORT', sinkC, 'PORT', existing);
+    expect(third.valid).toBe(true);
+  });
+
+  it('a target port with two wires already landed on it still accepts a third', () => {
+    const sink = makeBoundaryPoint({ id: 'SNK', boundaryDirection: 'SINK', boundaryMedium: 'ELECTRICAL' });
+    const sourceC = makeBoundaryPoint({ id: 'C', boundaryDirection: 'SOURCE', boundaryMedium: 'ELECTRICAL' });
+
+    const existing = [
+      { id: 'C1', fromId: 'A', fromPort: 'PORT', toId: 'SNK', toPort: 'PORT', type: 'electrical_ac' } as SynopticConnection,
+      { id: 'C2', fromId: 'B', fromPort: 'PORT', toId: 'SNK', toPort: 'PORT', type: 'electrical_ac' } as SynopticConnection
+    ];
+
+    const result = ConnectionService.validateConnection(sourceC, 'PORT', sink, 'PORT', existing);
+    expect(result.valid).toBe(true);
+  });
+
+  it('every other validation rule still rejects, unaffected by the multiplicity removal', () => {
+    const elec = makeBoundaryPoint({ id: 'E', boundaryMedium: 'ELECTRICAL' });
+    const water = makeBoundaryPoint({ id: 'W', boundaryMedium: 'WATER' });
+    expect(ConnectionService.validateConnection(elec, 'PORT', water, 'PORT', []).code).toBe('DOMAIN_MISMATCH');
+
+    const self = makeBoundaryPoint({ id: 'S' });
+    expect(ConnectionService.validateConnection(self, 'PORT', self, 'PORT', []).code).toBe('SELF_CONNECTION');
+
+    const outA = makeBoundaryPoint({ id: 'OA', boundaryDirection: 'SOURCE' });
+    const outB = makeBoundaryPoint({ id: 'OB', boundaryDirection: 'SOURCE' });
+    expect(ConnectionService.validateConnection(outA, 'PORT', outB, 'PORT', []).code).toBe('DIRECTION_MISMATCH');
+  });
+});
+
+// Usterka D1: Messages showed the raw object id (a UUID) - never
+// readable, never allowed there per the task's boundary.
+const UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+describe('Readable object identification for Messages (describeObject)', () => {
+  it('uses the designation when set', () => {
+    const obj = makeDevice({ id: 'obj-uuid-123', designation: '-Q1' });
+    expect(describeObject(obj)).toBe('-Q1');
+  });
+
+  it('falls back to the symbol\'s own library label when designation is empty - never the type string, never the id', () => {
+    const obj = makeDevice({ id: 'obj-uuid-123', designation: '' });
+    const text = describeObject(obj);
+    expect(text).toBe('Circuit Breaker'); // electrical.circuit_breaker's registry label
+    expect(text).not.toBe(obj.id);
+    expect(text).not.toContain('electrical.circuit_breaker');
+    expect(UUID_PATTERN.test(text)).toBe(false);
+  });
+
+  it('never throws and reads as "unknown object" for a missing object', () => {
+    expect(describeObject(undefined)).toBe('unknown object');
+    expect(describeObject(null)).toBe('unknown object');
+  });
+});
+
+describe('Connection-created Messages contain no UUID (usterka D1 fix)', () => {
+  beforeEach(() => {
+    useStore.setState({ objects: [], connections: [], messages: [], history: [{ objects: [], connections: [] } as any], historyIndex: 0 });
+  });
+
+  it('posts a readable Polaczono message using designations, with no UUID anywhere in it', () => {
+    const q1 = makeDevice({ id: 'uuid-aaaa', type: 'electrical.circuit_breaker', designation: '-Q1', width: 40, height: 40 });
+    const k1 = makeDevice({ id: 'uuid-bbbb', type: 'electrical.contactor', designation: '-K1', width: 40, height: 40 });
+    useStore.setState({ objects: [q1, k1] });
+
+    const ok = ConnectionService.tryCreateConnection(q1.id, 'OUT', k1.id, 'IN');
+    expect(ok).toBe(true);
+
+    const messages = useStore.getState().messages;
+    const last = messages[messages.length - 1].text;
+    expect(last).toContain('-Q1');
+    expect(last).toContain('-K1');
+    expect(UUID_PATTERN.test(last)).toBe(false);
+  });
+
+  it('falls back to the symbol label (not the id) when designation is unset', () => {
+    const q1 = makeDevice({ id: 'uuid-cccc', type: 'electrical.circuit_breaker', designation: '', width: 40, height: 40 });
+    const k1 = makeDevice({ id: 'uuid-dddd', type: 'electrical.contactor', designation: '', width: 40, height: 40 });
+    useStore.setState({ objects: [q1, k1] });
+
+    ConnectionService.tryCreateConnection(q1.id, 'OUT', k1.id, 'IN');
+
+    const messages = useStore.getState().messages;
+    const last = messages[messages.length - 1].text;
+    expect(UUID_PATTERN.test(last)).toBe(false);
+    expect(last).not.toContain(q1.id);
+    expect(last).not.toContain(k1.id);
   });
 });

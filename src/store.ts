@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { COLOR_CANVAS_BACKGROUND, GRID_SIZE } from './theme/ScadaTheme';
 import type { MeterRow } from './symbols/scada/MeterSymbol';
+import { describeObject } from './utils/ObjectDisplay';
 
 // Cap on how many undo/redo snapshots are kept; each entry is a full deep
 // copy of objects+connections, so this bounds both memory and undo depth.
@@ -71,6 +72,16 @@ export interface SynopticObject {
   // this to the device registry is a separate, later task. Optional: only
   // meter objects use it, every other object leaves it undefined.
   meterRows?: MeterRow[];
+
+  // SCADA boundary point (scada.boundary_point): where a schematic
+  // begins or ends (a utility feed, a well, a branch to a sub
+  // installation). Optional: only boundary point objects use these three
+  // - label/sublabel reuse the existing designation/description fields,
+  // same convention as the label frame this symbol is built on. Every
+  // other object leaves these undefined.
+  boundaryDirection?: 'SOURCE' | 'SINK';
+  boundaryMedium?: 'ELECTRICAL' | 'WATER';
+  boundaryPortSide?: 'TOP' | 'BOTTOM' | 'LEFT' | 'RIGHT';
 }
 
 export interface CanvasState {
@@ -349,7 +360,12 @@ export const useStore = create<AppState>((set, get) => ({
         const newPortId = `dyn_${edge}_${newPercent}`;
 
         reattachments.set(`${conn.id}:${portField}`, newPortId);
-        notices.push(`[WARN] Connection ${conn.id} reattached to the nearest busbar port (${portId} -> ${newPortId}) after resize`);
+        // Bug fix: conn.id is a UUID, never shown to the user - describe
+        // the OTHER end of this connection (the device actually plugged
+        // into the busbar) instead.
+        const otherId = idField === 'fromId' ? conn.toId : conn.fromId;
+        const otherObj = objects.find(o => o.id === otherId);
+        notices.push(`[WARN] Connection from ${describeObject(otherObj)} reattached to the nearest busbar port (${portId} -> ${newPortId}) after resize`);
       });
     });
 

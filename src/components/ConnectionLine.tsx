@@ -2,8 +2,8 @@ import React from 'react';
 
 import { Group, Path, Circle } from 'react-konva';
 import type { SynopticConnection, SynopticObject } from '../store';
-import { getSymbolDefinition } from '../symbols/SymbolRegistry';
-import { COLOR_DE_ENERGIZED, COLOR_ENERGIZED, CONDUCTOR_OUTLINE, CONDUCTOR_WIDTH, COLOR_OUTLINE, COLOR_WHITE } from '../theme/ScadaTheme';
+import { resolveConnectionPoint } from '../utils/GeometryUtils';
+import { COLOR_DE_ENERGIZED, COLOR_ENERGIZED, COLOR_WATER, CONDUCTOR_OUTLINE, CONDUCTOR_WIDTH, COLOR_OUTLINE, COLOR_WHITE } from '../theme/ScadaTheme';
 
 export interface ConnectionProps {
   conn: SynopticConnection;
@@ -12,42 +12,6 @@ export interface ConnectionProps {
   isSelected: boolean;
   onSelect: () => void;
 }
-
-/**
- * Resolves a dynamic busbar port id to a local {x, y} fraction. Mirrors
- * GeometryUtils.resolveConnectionPoint's own dyn_ handling (kept as a
- * separate, render-local copy rather than importing that function, to
- * avoid touching this component's existing port-lookup shape) - supports
- * both the legacy center-row 'dyn_NN' format and the edge-row
- * 'dyn_top_NN' / 'dyn_bot_NN' format the SCADA busbar produces.
- */
-const resolveDynamicPort = (obj: SynopticObject, def: ReturnType<typeof getSymbolDefinition>, portId: string): { id: string; x: number; y: number } | null => {
-  if (!def?.supportsDynamicPorts) return null;
-
-  const edgeMatch = portId.match(/^dyn_(top|bot)_(\d+)$/);
-  const centerMatch = portId.match(/^dyn_(\d+)$/);
-
-  let posPercent: number;
-  let yFraction: number | null = null;
-
-  if (edgeMatch) {
-    posPercent = parseInt(edgeMatch[2], 10);
-    yFraction = edgeMatch[1] === 'top' ? 0 : 1;
-  } else if (centerMatch) {
-    posPercent = parseInt(centerMatch[1], 10);
-  } else {
-    return null;
-  }
-
-  if (isNaN(posPercent) || posPercent < 0 || posPercent > 100) return null;
-  const pos = posPercent / 100;
-
-  const w = obj.width || def.defaultWidth || 80;
-  const h = obj.height || def.defaultHeight || 80;
-
-  if (yFraction !== null) return { id: portId, x: pos, y: yFraction };
-  return w >= h ? { id: portId, x: pos, y: 0.5 } : { id: portId, x: 0.5, y: pos };
-};
 
 const getAbsolutePortCoords = (obj: SynopticObject, portX: number, portY: number) => {
   const rot = obj.rotation || 0;
@@ -112,17 +76,17 @@ const calculateOrthogonalPath = (x1: number, y1: number, x2: number, y2: number,
 export const ConnectionLine: React.FC<ConnectionProps> = ({ conn, fromObj, toObj, isSelected, onSelect }) => {
   if (!fromObj || !toObj) return null;
 
-  const fromDef = getSymbolDefinition(fromObj.type);
-  const toDef = getSymbolDefinition(toObj.type);
-
-  let fromPort = fromDef?.connectionPoints?.find(p => p.id === conn.fromPort);
-  if (!fromPort && conn.fromPort.startsWith('dyn_')) {
-    fromPort = resolveDynamicPort(fromObj, fromDef, conn.fromPort) || undefined;
-  }
-  let toPort = toDef?.connectionPoints?.find(p => p.id === conn.toPort);
-  if (!toPort && conn.toPort !== 'cursor' && conn.toPort.startsWith('dyn_')) {
-    toPort = resolveDynamicPort(toObj, toDef, conn.toPort) || undefined;
-  }
+  // Bug fix: this used to reimplement port resolution by hand (a static
+  // connectionPoints lookup plus a dyn_-only fallback), which never knew
+  // about the boundary point's single PORT id - the connection was
+  // created successfully (ConnectionService already went through the
+  // real resolveConnectionPoint) but silently never drew a wire, because
+  // fromPort/toPort came back undefined here and the early return below
+  // fired. Reused GeometryUtils.resolveConnectionPoint, the one shared,
+  // complete implementation every port position on the canvas already
+  // goes through, instead of a second, incomplete copy.
+  const fromPort = resolveConnectionPoint(fromObj, conn.fromPort) || undefined;
+  const toPort = conn.toPort !== 'cursor' ? (resolveConnectionPoint(toObj, conn.toPort) || undefined) : undefined;
 
   if (!fromPort || (!toPort && conn.toPort !== 'cursor')) return null;
 
@@ -153,13 +117,19 @@ export const ConnectionLine: React.FC<ConnectionProps> = ({ conn, fromObj, toObj
      path = calculateOrthogonalPath(x1, y1, x2, y2, fromPort, toPort || fromPort, 16);
   }
 
-  // Color carries the connection's state and nothing else: energized or
-  // de-energized, set in the connection's own Properties (defaulting to
-  // energized when unset - "DEENERGIZED" is the only state that reads as
-  // de-energized; any other value, including the legacy FLOW/FAULT
-  // options still offered in Properties, reads as energized).
+  // Color carries the connection's medium and state, and nothing else. A
+  // water connection (conn.type set by ConnectionService's medium
+  // inference, e.g. from a boundary point's WATER medium or an existing
+  // water-domain symbol) always reads as water - the energized/
+  // de-energized distinction is an electrical concept that does not
+  // apply to it. Otherwise: energized or de-energized, set in the
+  // connection's own Properties (defaulting to energized when unset -
+  // "DEENERGIZED" is the only state that reads as de-energized; any
+  // other value, including the legacy FLOW/FAULT options still offered
+  // in Properties, reads as energized).
+  const isWater = conn.type === 'water';
   const isDeEnergized = conn.editor?.preview_state === 'DEENERGIZED';
-  const coreColor = isDeEnergized ? COLOR_DE_ENERGIZED : COLOR_ENERGIZED;
+  const coreColor = isWater ? COLOR_WATER : (isDeEnergized ? COLOR_DE_ENERGIZED : COLOR_ENERGIZED);
   const outlineWidth = CONDUCTOR_WIDTH + CONDUCTOR_OUTLINE;
 
   if (isPreview) {

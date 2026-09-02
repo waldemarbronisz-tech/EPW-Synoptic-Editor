@@ -24,6 +24,8 @@ import { IndicatorDiodeSymbol, INDICATOR_DIODE_STATES } from './IndicatorDiodeSy
 import type { IndicatorDiodeSize, IndicatorDiodeState } from './IndicatorDiodeSymbol';
 import { MeterSymbol } from './MeterSymbol';
 import type { MeterRow } from './MeterSymbol';
+import { BoundaryPointSymbol } from './BoundaryPointSymbol';
+import type { BoundaryDirection, BoundaryMedium, BoundaryPortSide } from './BoundaryPointSymbol';
 
 /** Falls back to the definition's own default rather than an arbitrary state when a saved/loaded preview_state is stale or absent. */
 function resolveState<T extends string>(state: string, allowed: readonly T[], fallback: T): T {
@@ -64,4 +66,22 @@ export const ScadaIndicatorDiodeAdapter: React.FC<SymbolProps> = ({ obj, state }
 export const ScadaMeterAdapter: React.FC<SymbolProps> = ({ obj }) => {
   const rows: MeterRow[] = obj.meterRows || [];
   return <MeterSymbol width={obj.width} title={obj.designation || obj.name || undefined} rows={rows} />;
+};
+
+export const ScadaBoundaryPointAdapter: React.FC<SymbolProps> = ({ obj }) => {
+  const direction: BoundaryDirection = obj.boundaryDirection === 'SINK' ? 'SINK' : 'SOURCE';
+  const medium: BoundaryMedium = obj.boundaryMedium === 'WATER' ? 'WATER' : 'ELECTRICAL';
+  const portSide: BoundaryPortSide =
+    obj.boundaryPortSide === 'BOTTOM' || obj.boundaryPortSide === 'LEFT' || obj.boundaryPortSide === 'RIGHT'
+      ? obj.boundaryPortSide
+      : 'TOP';
+  return (
+    <BoundaryPointSymbol
+      label={obj.designation || obj.name || 'LABEL'}
+      sublabel={obj.description || obj.text || ''}
+      direction={direction}
+      medium={medium}
+      portSide={portSide}
+    />
+  );
 };
