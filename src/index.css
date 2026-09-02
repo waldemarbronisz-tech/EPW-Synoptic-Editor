@@ -142,6 +142,18 @@ body, html, #root {
   background-color: var(--sys-dark);
 }
 
+/* Status Bar (feat/editing-and-signal-panel commit 4: canvas zoom) */
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  background-color: var(--sys-bg);
+  color: var(--sys-text);
+  border-top: 1px solid var(--sys-light);
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
 .panel-container {
   background-color: var(--sys-bg);
   display: flex;

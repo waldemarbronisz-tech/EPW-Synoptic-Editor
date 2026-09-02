@@ -19,6 +19,7 @@ import { WireNodeSymbol } from '../symbols/scada/WireNodeSymbol';
 import { MeterElementNode } from './MeterElementNode';
 import { computeMeterHeight } from '../meter/MeterElement';
 import { isObjectFullyInBox, isMeterFullyInBox, isConnectionFullyInBox } from '../utils/SelectionBox';
+import { clampZoom, computeContentBounds, computeFitView, GRID_THIN_BELOW_ZOOM } from '../utils/CanvasView';
 
 // Momentary Alt-key bypass for grid snapping. Deliberately outside React
 // state: every ObjectNode's drag handlers need the CURRENT key state at
@@ -26,6 +27,11 @@ import { isObjectFullyInBox, isMeterFullyInBox, isConnectionFullyInBox } from '.
 // re-rendered prop, and a keypress should never trigger a re-render of
 // the whole canvas by itself.
 let isAltPressed = false;
+
+// Same reasoning as isAltPressed above - held Space (commit 4) turns
+// the cursor into a hand and lets a left-button drag pan the canvas,
+// without waiting for a React re-render to notice the key state.
+let isSpacePressed = false;
 
 const ObjectNode = ({ obj, isSelected, onSelect, onChange, gridSize }: {
   gridSize: number,
@@ -238,6 +244,12 @@ export const Canvas: React.FC = () => {
   const { meters, selectedMeterIds, selectMeters, updateMeter, devices } = useStore();
   const { selectMixed } = useStore();
   const [size, setSize] = useState({ width: 800, height: 600 });
+  // Mirrors `size` for the keydown handler below (registered once,
+  // empty deps) - the same drawingPointsRef pattern already used
+  // elsewhere in this file so that closure always reads the CURRENT
+  // container size, not whatever it was when the effect first ran.
+  const sizeRef = useRef(size);
+  useEffect(() => { sizeRef.current = size; }, [size]);
 
   // Selection Rect
   const [selectionBox, setSelectionBox] = useState<{ x: number, y: number, width: number, height: number } | null>(null);
@@ -374,12 +386,41 @@ export const Canvas: React.FC = () => {
         // paste, without touching the clipboard.
         e.preventDefault();
         useStore.getState().duplicateSelected();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+        // Restores the SCALE only - pan is left exactly where it is.
+        e.preventDefault();
+        useStore.getState().setCanvasState({ zoom: 1 });
+      } else if ((e.ctrlKey || e.metaKey) && e.key === '9') {
+        // Fit the whole project's content into the current viewport.
+        e.preventDefault();
+        const s = useStore.getState();
+        const bounds = computeContentBounds(s.objects, s.meters, s.connections);
+        const view = computeFitView(bounds, sizeRef.current.width, sizeRef.current.height);
+        s.setCanvasState(view);
+      } else if (e.key === ' ') {
+        // Held Space (commit 4): the cursor turns into a hand, and a
+        // left-button drag pans - guarded behind isTypingInField()
+        // (checked above, unlike Alt) since typing a space is common
+        // and must not put the canvas into pan mode.
+        isSpacePressed = true;
+        if (containerRef.current && !isPanningRef.current) containerRef.current.style.cursor = 'grab';
       }
     };
-    const handleKeyUp = (e: KeyboardEvent) => { if (e.key === 'Alt') isAltPressed = false; };
-    // Also cleared on window blur - Alt released outside the window (e.g.
-    // while alt-tabbing) would otherwise never fire its own keyup here.
-    const handleBlur = () => { isAltPressed = false; };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Alt') isAltPressed = false;
+      if (e.key === ' ') {
+        isSpacePressed = false;
+        if (containerRef.current && !isPanningRef.current) containerRef.current.style.cursor = 'default';
+      }
+    };
+    // Also cleared on window blur - Alt/Space released outside the
+    // window (e.g. while alt-tabbing) would otherwise never fire their
+    // own keyup here.
+    const handleBlur = () => {
+      isAltPressed = false;
+      isSpacePressed = false;
+      if (containerRef.current && !isPanningRef.current) containerRef.current.style.cursor = 'default';
+    };
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('blur', handleBlur);
@@ -421,10 +462,11 @@ export const Canvas: React.FC = () => {
       y: stage.getPointerPosition().y / oldScale - stage.y() / oldScale,
     };
 
-    const newScale = e.evt.deltaY < 0 ? oldScale * scaleBy : oldScale / scaleBy;
-
-    // limit zoom
-    if (newScale < 0.1 || newScale > 5) return;
+    // Clamped to [MIN_ZOOM, MAX_ZOOM] (25%-400%) rather than simply
+    // refused past the edge - so scrolling hard against the limit still
+    // lands exactly on 25% or 400%, not on whatever the previous step
+    // happened to stop at.
+    const newScale = clampZoom(e.evt.deltaY < 0 ? oldScale * scaleBy : oldScale / scaleBy);
 
     setCanvasState({
       zoom: newScale,
@@ -434,7 +476,9 @@ export const Canvas: React.FC = () => {
   };
 
   const handleMouseDown = (e: any) => {
-    if (e.evt.button === 1) {
+    // Middle-button pan (unchanged), or a left-button drag while Space
+    // is held (commit 4) - the same panning gesture either way.
+    if (e.evt.button === 1 || (isSpacePressed && e.evt.button === 0)) {
       isPanningRef.current = true;
       lastPanPosRef.current = { x: e.evt.clientX, y: e.evt.clientY };
       if (containerRef.current) containerRef.current.style.cursor = 'grabbing';
@@ -645,9 +689,15 @@ export const Canvas: React.FC = () => {
     const height = useStore.getState().canvasConfig.height;
     const minorOpacity = 0.12;
     const majorOpacity = 0.32;
+    // Below GRID_THIN_BELOW_ZOOM (commit 4), only the major (every 4th)
+    // line draws at all - at that scale every minor line packed this
+    // close together on screen blurs into a solid gray plane instead of
+    // reading as a grid.
+    const onlyMajor = canvasState.zoom < GRID_THIN_BELOW_ZOOM;
 
     for (let i = 0; i * gridSize <= width; i++) {
       const isMajor = i % 4 === 0;
+      if (onlyMajor && !isMajor) continue;
       lines.push(
         <Rect
           key={`v${i}`}
@@ -663,6 +713,7 @@ export const Canvas: React.FC = () => {
     }
     for (let j = 0; j * gridSize <= height; j++) {
       const isMajor = j % 4 === 0;
+      if (onlyMajor && !isMajor) continue;
       lines.push(
         <Rect
           key={`h${j}`}
