@@ -7,6 +7,7 @@ import { MeterWizardDialog } from './MeterWizardDialog';
 import { clampSignalPanelWidth, SIGNAL_PANEL_MIN_WIDTH, SIGNAL_PANEL_MAX_WIDTH, SIGNAL_PANEL_DEFAULT_FONT_SIZE } from '../elements/SignalPanelElement';
 import type { SignalPanelRow } from '../elements/SignalPanelElement';
 import { INDICATOR_DIODE_STATES } from '../symbols/scada/IndicatorDiodeSymbol';
+import { SignalPanelWizardDialog } from './SignalPanelWizardDialog';
 
 export const PropertyInspector: React.FC = () => {
   const { objects, connections, selectedIds, selectedConnectionIds, updateObject, updateConnection } = useStore();
@@ -14,9 +15,11 @@ export const PropertyInspector: React.FC = () => {
   const { signalPanels, selectedSignalPanelIds, updateSignalPanel } = useStore();
   // Hooks must run unconditionally on every render (this component is
   // otherwise a chain of early returns depending on what is selected),
-  // so this lives up here rather than inside the selectedMeter branch
-  // below, even though only that branch ever reads it.
+  // so this lives up here rather than inside the selectedMeter/
+  // selectedSignalPanel branches below, even though each is only ever
+  // read by its own branch.
   const [showMeterWizard, setShowMeterWizard] = useState(false);
+  const [showSignalPanelWizard, setShowSignalPanelWizard] = useState(false);
 
   if (selectedIds.length === 0 && selectedConnectionIds.length === 0 && selectedMeterIds.length === 0 && selectedSignalPanelIds.length === 0) {
     return (
@@ -312,8 +315,10 @@ export const PropertyInspector: React.FC = () => {
     // the meter, one text label plus a three-way state select here -
     // that a fully generic version would need its own render-prop
     // customization, more indirection than these ~40 lines justify).
-    // Picking a device for a row (the wizard, commit 8) and resolving
-    // one from the device list (commit 7) are their own commits.
+    // commit 8: picking a device for a row via the location-grouped
+    // wizard, mirroring the meter's own MeterWizardDialog wiring below.
+    // Resolving a row from the device list is commit 7's own concern
+    // (SignalPanelResolver.ts), already wired into SignalPanelElementNode.
     const setRows = (rows: SignalPanelRow[]) => {
       updateSignalPanel(selectedSignalPanel.id, { rows });
       useStore.getState().saveHistory();
@@ -332,6 +337,7 @@ export const PropertyInspector: React.FC = () => {
     };
 
     return (
+      <>
       <div className="property-inspector">
         <div className="inspector-header">Signal Panel Properties</div>
         <div className="inspector-content">
@@ -377,7 +383,8 @@ export const PropertyInspector: React.FC = () => {
           <div className="property-group">
             <div className="property-group-title">
               Rows
-              <button onClick={addManualRow} style={{ marginLeft: 'auto', fontSize: '10px' }}>+ Manual row</button>
+              <button onClick={() => setShowSignalPanelWizard(true)} style={{ marginLeft: 'auto', fontSize: '10px' }}>Kreator...</button>
+              <button onClick={addManualRow} style={{ fontSize: '10px' }}>+ Manual row</button>
             </div>
             {selectedSignalPanel.rows.map((row, idx) => (
               <div className="property-row" key={idx} style={{ gap: '2px', alignItems: 'center' }}>
@@ -410,6 +417,18 @@ export const PropertyInspector: React.FC = () => {
           </div>
         </div>
       </div>
+      {showSignalPanelWizard && (
+        <SignalPanelWizardDialog
+          devices={devices}
+          onCancel={() => setShowSignalPanelWizard(false)}
+          onAddManualRow={addManualRow}
+          onConfirm={(newRows) => {
+            setRows([...selectedSignalPanel.rows, ...newRows]);
+            setShowSignalPanelWizard(false);
+          }}
+        />
+      )}
+      </>
     );
   }
 
