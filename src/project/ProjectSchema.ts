@@ -148,7 +148,7 @@ export function validateProjectSchema(data: any): ValidationResult {
         }
       }
 
-      if (conn.medium !== 'ELECTRICAL' && conn.medium !== 'WATER') {
+      if (conn.medium !== 'ELECTRICAL' && conn.medium !== 'WATER' && conn.medium !== 'VENTILATION') {
          issues.push({ severity: 'ERROR', code: 'INVALID_MEDIUM', message: `Connection ${conn.id} has an invalid medium: ${conn.medium}` });
       }
       if (conn.style !== 'NORMAL' && conn.style !== 'BUS') {

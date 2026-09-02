@@ -38,7 +38,9 @@ export function getObjectTerminals(obj: SynopticObject): Terminal[] {
       ? obj.boundaryPortSide
       : 'TOP';
     const { x: fx, y: fy } = getBoundaryPortFraction(side);
-    const medium: 'ELECTRICAL' | 'WATER' = obj.boundaryMedium === 'WATER' ? 'WATER' : 'ELECTRICAL';
+    const medium: 'ELECTRICAL' | 'WATER' | 'VENTILATION' =
+      obj.boundaryMedium === 'WATER' ? 'WATER' :
+      obj.boundaryMedium === 'VENTILATION' ? 'VENTILATION' : 'ELECTRICAL';
     return [{ id: 'T1', x: snapToGridNode(fx * width), y: snapToGridNode(fy * height), medium }];
   }
 
@@ -71,7 +73,7 @@ export interface WorldTerminal {
   terminalId: string;
   x: number;
   y: number;
-  medium: 'ELECTRICAL' | 'WATER';
+  medium: 'ELECTRICAL' | 'WATER' | 'VENTILATION';
 }
 
 /** Every terminal of every object, already in world coordinates. */

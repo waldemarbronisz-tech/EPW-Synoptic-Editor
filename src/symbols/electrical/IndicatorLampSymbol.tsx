@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Group, Circle, Rect } from 'react-konva';
 import type { SymbolProps } from '../SymbolRenderer';
+import { SYMBOL_STROKE } from '../../theme/ScadaTheme';
 
 export const IndicatorLampSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
   const w = obj.width;
@@ -32,11 +33,11 @@ export const IndicatorLampSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
         radius={radius}
         fill={fillColor}
         stroke="#000"
-        strokeWidth={1}
+        strokeWidth={SYMBOL_STROKE}
       />
 
       {isFault && (
-        <Rect width={w} height={h} fill="rgba(255, 0, 0, 0.3)" stroke="red" strokeWidth={2} />
+        <Rect width={w} height={h} fill="rgba(255, 0, 0, 0.3)" stroke="red" strokeWidth={SYMBOL_STROKE} />
       )}
     </Group>
   );

@@ -79,7 +79,7 @@ export interface SynopticObject {
   // same convention as the label frame this symbol is built on. Every
   // other object leaves these undefined.
   boundaryDirection?: 'SOURCE' | 'SINK';
-  boundaryMedium?: 'ELECTRICAL' | 'WATER';
+  boundaryMedium?: 'ELECTRICAL' | 'WATER' | 'VENTILATION';
   boundaryPortSide?: 'TOP' | 'BOTTOM' | 'LEFT' | 'RIGHT';
 }
 
@@ -100,10 +100,15 @@ export interface WirePoint {
 // else references anything by id. fromId/fromPort/toId/toPort are gone
 // entirely - see NetResolver.ts for how wires and terminals are grouped
 // into nets from geometry alone.
+//
+// feat/media-and-proportions part B: VENTILATION joins ELECTRICAL/WATER
+// as a third medium value. This is a value added to the existing medium
+// field, not a change to the connection's shape - schema version stays
+// at 2 (see ProjectSchema.ts's CURRENT_SCHEMA_VERSION comment).
 export interface SynopticConnection {
   id: string;
   points: WirePoint[]; // minimum 2, every point on a GRID_SIZE node, every segment horizontal or vertical
-  medium: 'ELECTRICAL' | 'WATER';
+  medium: 'ELECTRICAL' | 'WATER' | 'VENTILATION';
   style: 'NORMAL' | 'BUS'; // BUS is a busbar/manifold: thicker, touchable anywhere along its length
   state: 'LIVE' | 'DEAD';
 }
@@ -146,6 +151,15 @@ interface AppState {
   // Connection Drawing Mode
   isDrawingConnection: boolean;
   setDrawingMode: (active: boolean) => void;
+
+  // feat/media-and-proportions part C: the medium/style a NEW wire is
+  // drawn with, chosen up front in the toolbar rather than after the
+  // fact in Properties - it still applies to every newly drawn wire
+  // until changed again, and can still be edited per-wire afterward.
+  drawingMedium: SynopticConnection['medium'];
+  drawingStyle: SynopticConnection['style'];
+  setDrawingMedium: (medium: SynopticConnection['medium']) => void;
+  setDrawingStyle: (style: SynopticConnection['style']) => void;
 
   // Grid snapping: a persistent toggle (View menu, default on) separate
   // from the momentary Alt-key bypass, which lives outside the store
@@ -224,10 +238,15 @@ export const useStore = create<AppState>((set, get) => ({
   messages: [],
   isDrawingConnection: false,
   snapToGridEnabled: true,
+  drawingMedium: 'ELECTRICAL',
+  drawingStyle: 'NORMAL',
 
   setDrawingMode: (active) => set({
     isDrawingConnection: active
   }),
+
+  setDrawingMedium: (medium) => set({ drawingMedium: medium }),
+  setDrawingStyle: (style) => set({ drawingStyle: style }),
 
   toggleSnapToGrid: () => set((state) => ({ snapToGridEnabled: !state.snapToGridEnabled })),
 

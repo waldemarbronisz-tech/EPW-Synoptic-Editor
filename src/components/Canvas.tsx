@@ -4,9 +4,9 @@ import { useStore } from '../store';
 import type { SynopticObject, SynopticConnection, WirePoint } from '../store';
 import { SymbolRenderer } from '../symbols/SymbolRenderer';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
-import { ConnectionLine, pathFromPoints } from './ConnectionLine';
+import { ConnectionLine, pathFromPoints, getConductorCoreColor } from './ConnectionLine';
 import { ObjectLabelRenderer } from './ObjectLabelRenderer';
-import { COLOR_CANVAS_BACKGROUND, COLOR_OUTLINE, COLOR_WATER, COLOR_WHITE, COLOR_DE_ENERGIZED, CONDUCTOR_WIDTH } from '../theme/ScadaTheme';
+import { COLOR_CANVAS_BACKGROUND, COLOR_OUTLINE, COLOR_WATER, COLOR_WHITE, CONDUCTOR_WIDTH } from '../theme/ScadaTheme';
 import { snapValue } from '../utils/GridSnap';
 import { getObjectTerminals } from '../utils/Terminals';
 import {
@@ -240,8 +240,10 @@ export const Canvas: React.FC = () => {
   // isDrawingConnection/setDrawingMode is the same store pair the old
   // click-two-ports tool used, repurposed (not renamed) for the freehand
   // wire tool - Toolbar.tsx's existing "Rysuj polaczenie" button already
-  // toggles it; Canvas.tsx only needs to read it here.
-  const { connections, selectedConnectionIds, selectConnections, isDrawingConnection } = useStore();
+  // toggles it; Canvas.tsx only needs to read it here. drawingMedium/
+  // drawingStyle (part C) are the toolbar's medium/style selector -
+  // every new wire is drawn with whichever is currently chosen.
+  const { connections, selectedConnectionIds, selectConnections, isDrawingConnection, drawingMedium } = useStore();
 
   const toCanvasPoint = (stagePos: { x: number; y: number }): WirePoint => {
     const scale = canvasState.zoom;
@@ -254,7 +256,14 @@ export const Canvas: React.FC = () => {
     setDrawingPreview(null);
     if (!points || points.length < 2) return;
 
-    useStore.getState().addConnection({ points, medium: 'ELECTRICAL', style: 'NORMAL', state: 'LIVE' });
+    // Read medium/style straight from the store rather than this
+    // render's destructured drawingMedium/drawingStyle: the window
+    // keydown handler below registers this function once (empty deps),
+    // so a value captured from render-scope would go stale the moment
+    // the toolbar's selector changes after mount - the same reason
+    // drawingPointsRef exists instead of just closing over drawingPoints.
+    const { drawingMedium: medium, drawingStyle: style } = useStore.getState();
+    useStore.getState().addConnection({ points, medium, style, state: 'LIVE' });
     useStore.getState().saveHistory();
 
     // Readable, UUID-free feedback: if the new wire actually touches a
@@ -276,8 +285,10 @@ export const Canvas: React.FC = () => {
   // Grid-snap Alt bypass, tracked once, globally, for the whole canvas -
   // plus the wire-drawing tool's own keyboard shortcuts (Enter finishes,
   // Escape cancels the whole in-progress wire, Backspace undoes the last
-  // bend), registered once so they always see the latest drawing state
-  // through the ref above rather than a stale closure.
+  // bend, 1/2/3 pick the medium a new wire is drawn with - part C, same
+  // three choices as the toolbar's selector), registered once so they
+  // always see the latest drawing state through the ref above rather
+  // than a stale closure.
   useEffect(() => {
     const isTypingInField = () => {
       const el = document.activeElement as HTMLElement | null;
@@ -294,6 +305,12 @@ export const Canvas: React.FC = () => {
       } else if (e.key === 'Backspace' && drawingPointsRef.current) {
         e.preventDefault();
         setDrawingPoints(prev => (prev ? removeLastWirePoint(prev) : prev));
+      } else if (e.key === '1') {
+        useStore.getState().setDrawingMedium('ELECTRICAL');
+      } else if (e.key === '2') {
+        useStore.getState().setDrawingMedium('WATER');
+      } else if (e.key === '3') {
+        useStore.getState().setDrawingMedium('VENTILATION');
       }
     };
     const handleKeyUp = (e: KeyboardEvent) => { if (e.key === 'Alt') isAltPressed = false; };
@@ -634,22 +651,24 @@ export const Canvas: React.FC = () => {
               onAltClickSegment={handleAltClickSegment}
             />
           ))}
-          {/* In-progress wire preview: a thin, neutral line through every
-              point placed so far plus the live (grid-snapped) cursor
-              position - never the real conductor color/thickness, this
-              is not a committed connection yet. */}
+          {/* In-progress wire preview: a thin line through every point
+              placed so far plus the live (grid-snapped) cursor position
+              - thinner than the real conductor (not a committed
+              connection yet), but already colored by the toolbar's
+              selected medium (part C) so what is about to be drawn is
+              visible before it lands. */}
           {drawingPoints && drawingPoints.length > 0 && (
             <>
               <Path
                 data={pathFromPoints(drawingPreview ? [...drawingPoints, drawingPreview] : drawingPoints)}
-                stroke={COLOR_DE_ENERGIZED}
+                stroke={getConductorCoreColor(drawingMedium, 'LIVE')}
                 strokeWidth={CONDUCTOR_WIDTH / 2}
                 lineCap="round"
                 lineJoin="round"
                 listening={false}
               />
               {drawingPoints.map((p, idx) => (
-                <Circle key={idx} x={p.x} y={p.y} radius={4} fill={COLOR_DE_ENERGIZED} listening={false} />
+                <Circle key={idx} x={p.x} y={p.y} radius={4} fill={getConductorCoreColor(drawingMedium, 'LIVE')} listening={false} />
               ))}
             </>
           )}

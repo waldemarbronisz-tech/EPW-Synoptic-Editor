@@ -70,7 +70,9 @@ export const ScadaMeterAdapter: React.FC<SymbolProps> = ({ obj }) => {
 
 export const ScadaBoundaryPointAdapter: React.FC<SymbolProps> = ({ obj }) => {
   const direction: BoundaryDirection = obj.boundaryDirection === 'SINK' ? 'SINK' : 'SOURCE';
-  const medium: BoundaryMedium = obj.boundaryMedium === 'WATER' ? 'WATER' : 'ELECTRICAL';
+  const medium: BoundaryMedium =
+    obj.boundaryMedium === 'WATER' ? 'WATER' :
+    obj.boundaryMedium === 'VENTILATION' ? 'VENTILATION' : 'ELECTRICAL';
   const portSide: BoundaryPortSide =
     obj.boundaryPortSide === 'BOTTOM' || obj.boundaryPortSide === 'LEFT' || obj.boundaryPortSide === 'RIGHT'
       ? obj.boundaryPortSide

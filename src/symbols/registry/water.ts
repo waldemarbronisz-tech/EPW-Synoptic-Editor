@@ -4,7 +4,8 @@ import type { SymbolDefinition } from '../SymbolRegistry';
 // Drain Valve and Drain stay visible; Valve and Gate Valve are hidden
 // (redundant with Ball/Solenoid/Gate variants already covering the
 // visible set). See electrical.ts's header comment for the terminals
-// convention.
+// convention, and its part A2 addendum for why defaultWidth/
+// defaultHeight below are now GRID_SIZE multiples too.
 export const waterSymbols: Record<string, SymbolDefinition> = {
   'water.valve': {
     type: 'water.valve',
@@ -21,8 +22,8 @@ export const waterSymbols: Record<string, SymbolDefinition> = {
     type: 'water.pump',
     label: 'Pump',
     category: 'Water',
-    defaultWidth: 60,
-    defaultHeight: 60,
+    defaultWidth: 64,
+    defaultHeight: 64,
     allowedStates: ['OFF', 'RUNNING', 'FAULT'],
     defaultState: 'OFF',
     connectionPoints: [{id: 'IN', x: 0, y: 0.5, domain: 'water', direction: 'in'}, {id: 'OUT', x: 1, y: 0.5, domain: 'water', direction: 'out'}],
@@ -33,7 +34,7 @@ export const waterSymbols: Record<string, SymbolDefinition> = {
     label: 'Tank',
     category: 'Water',
     defaultWidth: 80,
-    defaultHeight: 120,
+    defaultHeight: 128,
     allowedStates: ['NORMAL', 'LOW', 'HIGH', 'FAULT'],
     defaultState: 'NORMAL',
     connectionPoints: [{id: 'IN', x: 0, y: 0.5, domain: 'water', direction: 'in'}, {id: 'OUT', x: 1, y: 0.5, domain: 'water', direction: 'out'}],
@@ -54,19 +55,19 @@ export const waterSymbols: Record<string, SymbolDefinition> = {
     type: 'water.ball_valve',
     label: 'Ball Valve',
     category: 'Water',
-    defaultWidth: 50,
-    defaultHeight: 40,
+    defaultWidth: 48,
+    defaultHeight: 48,
     allowedStates: ['CLOSED', 'OPENING', 'OPEN', 'CLOSING', 'FAULT'],
     defaultState: 'CLOSED',
     connectionPoints: [{id: 'IN', x: 0, y: 0.5, domain: 'water', direction: 'in'}, {id: 'OUT', x: 1, y: 0.5, domain: 'water', direction: 'out'}],
-    terminals: [{ id: 'IN', x: 0, y: 16, medium: 'WATER' }, { id: 'OUT', x: 48, y: 16, medium: 'WATER' }]
+    terminals: [{ id: 'IN', x: 0, y: 32, medium: 'WATER' }, { id: 'OUT', x: 48, y: 32, medium: 'WATER' }]
   },
   'water.solenoid_valve': {
     type: 'water.solenoid_valve',
     label: 'Solenoid Valve',
     category: 'Water',
-    defaultWidth: 50,
-    defaultHeight: 60,
+    defaultWidth: 48,
+    defaultHeight: 64,
     allowedStates: ['CLOSED', 'OPENING', 'OPEN', 'CLOSING', 'FAULT'],
     defaultState: 'CLOSED',
     connectionPoints: [{id: 'IN', x: 0, y: 0.5, domain: 'water', direction: 'in'}, {id: 'OUT', x: 1, y: 0.5, domain: 'water', direction: 'out'}],
@@ -76,19 +77,19 @@ export const waterSymbols: Record<string, SymbolDefinition> = {
     type: 'water.drain_valve',
     label: 'Drain Valve',
     category: 'Water',
-    defaultWidth: 50,
-    defaultHeight: 40,
+    defaultWidth: 48,
+    defaultHeight: 48,
     allowedStates: ['CLOSED', 'OPEN', 'FAULT'],
     defaultState: 'CLOSED',
     connectionPoints: [{id: 'IN', x: 0, y: 0.5, domain: 'water', direction: 'in'}, {id: 'OUT', x: 1, y: 0.5, domain: 'water', direction: 'out'}],
-    terminals: [{ id: 'IN', x: 0, y: 16, medium: 'WATER' }, { id: 'OUT', x: 48, y: 16, medium: 'WATER' }]
+    terminals: [{ id: 'IN', x: 0, y: 32, medium: 'WATER' }, { id: 'OUT', x: 48, y: 32, medium: 'WATER' }]
   },
   'water.drain': {
     type: 'water.drain',
     label: 'Drain',
     category: 'Water',
-    defaultWidth: 40,
-    defaultHeight: 20,
+    defaultWidth: 48,
+    defaultHeight: 16,
     allowedStates: ['NORMAL', 'FAULT'],
     defaultState: 'NORMAL',
     connectionPoints: [{id: 'IN', x: 0, y: 0.5, domain: 'water', direction: 'in'}, {id: 'OUT', x: 1, y: 0.5, domain: 'water', direction: 'out'}],

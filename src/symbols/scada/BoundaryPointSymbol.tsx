@@ -7,10 +7,10 @@
 import React from 'react';
 import { Group, Line } from 'react-konva';
 import { LabelFrameSymbol, getLabelFrameSize } from './LabelFrameSymbol';
-import { COLOR_OUTLINE, COLOR_ENERGIZED, COLOR_WATER } from '../../theme/ScadaTheme';
+import { COLOR_OUTLINE, COLOR_ENERGIZED, COLOR_WATER, VENTILATION_ACTIVE } from '../../theme/ScadaTheme';
 
 export type BoundaryDirection = 'SOURCE' | 'SINK';
-export type BoundaryMedium = 'ELECTRICAL' | 'WATER';
+export type BoundaryMedium = 'ELECTRICAL' | 'WATER' | 'VENTILATION';
 export type BoundaryPortSide = 'TOP' | 'BOTTOM' | 'LEFT' | 'RIGHT';
 
 // No discrete state machine, same as the label frame it is built on.
@@ -88,7 +88,7 @@ export const BoundaryPointSymbol: React.FC<BoundaryPointSymbolProps> = ({ label,
   const perpX = -outY * ARROW_HALF_WIDTH;
   const perpY = outX * ARROW_HALF_WIDTH;
 
-  const arrowColor = medium === 'WATER' ? COLOR_WATER : COLOR_ENERGIZED;
+  const arrowColor = medium === 'WATER' ? COLOR_WATER : medium === 'VENTILATION' ? VENTILATION_ACTIVE : COLOR_ENERGIZED;
 
   return (
     <Group>

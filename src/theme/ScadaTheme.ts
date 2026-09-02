@@ -27,16 +27,29 @@ export const COLOR_LAMP_LIT = '#FFE800';          // lampa swiecaca
 export const COLOR_WATER = '#2848D8';             // woda
 export const COLOR_WHITE = '#FFFFFF';             // biel
 
+// Ventilation (third medium, feat/media-and-proportions part B): gold
+// reads clearly against both power's red and water's blue, and against
+// the cyan canvas background - ACTIVE is a duct actually moving air,
+// INACTIVE is a stopped/idle one, the same LIVE/DEAD split every other
+// medium's conductor color already makes.
+export const VENTILATION_ACTIVE = '#C89000';      // wentylacja aktywna
+export const VENTILATION_INACTIVE = '#8A7A50';    // wentylacja nieaktywna
+
 // ---- Geometry ----
 
-export const CONDUCTOR_WIDTH = 11;   // grubosc rdzenia przewodu
-export const CONDUCTOR_OUTLINE = 6;  // laczna grubosc konturu (po 3 z kazdej strony)
-export const SYMBOL_STROKE = 6;      // grubosc kreski wewnatrz symbolu
+// Conductor/symbol proportions derived directly from the grid (feat/
+// media-and-proportions, part A): a conductor riding half a grid cell
+// reads as a wire under an apparatus symbol, not the other way round -
+// the earlier values (11/6/22) made a breaker on a power run get lost
+// inside its own cable, confirmed by eye in the running app.
+export const CONDUCTOR_WIDTH = 8;    // grubosc rdzenia przewodu - pol oczka siatki
+export const CONDUCTOR_OUTLINE = 4;  // laczna grubosc konturu (po 2 z kazdej strony)
+export const SYMBOL_STROKE = 5;      // grubosc kreski wewnatrz symbolu
 export const OUTLINE_WIDTH = 5;      // kontur ksztaltow wypelnionych (default; a
                                       // symbol may specify its own different
                                       // outline width when the task's spec for
                                       // that symbol gives one explicitly)
-export const BUSBAR_HEIGHT = 22;     // wysokosc szyny zbiorczej
+export const BUSBAR_HEIGHT = 16;     // wysokosc szyny zbiorczej - dokladnie jedno oczko
 export const GRID_SIZE = 16;
 
 // ---- Bridge into CSS -----------------------------------------------------
@@ -62,4 +75,6 @@ export function applyScadaCssVariables(target: HTMLElement = document.documentEl
   target.style.setProperty('--scada-alarm', COLOR_ALARM);
   target.style.setProperty('--scada-lamp-lit', COLOR_LAMP_LIT);
   target.style.setProperty('--scada-water', COLOR_WATER);
+  target.style.setProperty('--scada-ventilation-active', VENTILATION_ACTIVE);
+  target.style.setProperty('--scada-ventilation-inactive', VENTILATION_INACTIVE);
 }

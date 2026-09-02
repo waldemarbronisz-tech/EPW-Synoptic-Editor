@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Group, Rect, Circle, Arc } from 'react-konva';
 import type { SymbolProps } from '../SymbolRenderer';
+import { SYMBOL_STROKE } from '../../theme/ScadaTheme';
 
 export const PumpSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
   const w = obj.width;
@@ -36,7 +37,7 @@ export const PumpSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
       <Rect x={w*0.2} y={h*0.8} width={w*0.6} height={h*0.2} fill="#34495e" />
 
       {/* Main Pump Body */}
-      <Circle x={w/2} y={h/2} radius={radius} fill={color} stroke="#2c3e50" strokeWidth={2} />
+      <Circle x={w/2} y={h/2} radius={radius} fill={color} stroke="#2c3e50" strokeWidth={SYMBOL_STROKE} />
 
       {/* Impeller representation */}
       <Group x={w/2} y={h/2} rotation={isRunning ? angle : 0}>
@@ -46,10 +47,10 @@ export const PumpSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
       </Group>
 
       {/* Outlet */}
-      <Rect x={w/2} y={0} width={w*0.2} height={h*0.2} fill={color} stroke="#2c3e50" strokeWidth={1} />
+      <Rect x={w/2} y={0} width={w*0.2} height={h*0.2} fill={color} stroke="#2c3e50" strokeWidth={SYMBOL_STROKE} />
 
       {isFault && (
-        <Rect width={w} height={h} fill="rgba(255, 0, 0, 0.3)" stroke="red" strokeWidth={2} />
+        <Rect width={w} height={h} fill="rgba(255, 0, 0, 0.3)" stroke="red" strokeWidth={SYMBOL_STROKE} />
       )}
     </Group>
   );

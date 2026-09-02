@@ -1,7 +1,7 @@
 import React from 'react';
 import { Group, Path } from 'react-konva';
 import type { SynopticConnection } from '../store';
-import { COLOR_DE_ENERGIZED, COLOR_ENERGIZED, COLOR_WATER, CONDUCTOR_OUTLINE, CONDUCTOR_WIDTH, COLOR_OUTLINE, COLOR_WHITE, BUSBAR_HEIGHT } from '../theme/ScadaTheme';
+import { COLOR_DE_ENERGIZED, COLOR_ENERGIZED, COLOR_WATER, CONDUCTOR_OUTLINE, CONDUCTOR_WIDTH, COLOR_OUTLINE, COLOR_WHITE, BUSBAR_HEIGHT, VENTILATION_ACTIVE, VENTILATION_INACTIVE } from '../theme/ScadaTheme';
 
 export interface ConnectionProps {
   conn: SynopticConnection;
@@ -25,16 +25,24 @@ export function pathFromPoints(points: { x: number; y: number }[]): string {
   return points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
 }
 
+/**
+ * Color carries medium and state, and nothing else. Water does not have
+ * an energized/de-energized concept - it always reads as water.
+ * Ventilation does: LIVE/DEAD maps to a duct actually moving air versus
+ * a stopped one, the gold pair from ScadaTheme.
+ */
+// oxlint-disable-next-line react/only-export-components -- kept beside the component it belongs to; testable in isolation without a Konva/Stage tree.
+export function getConductorCoreColor(medium: SynopticConnection['medium'], state: SynopticConnection['state']): string {
+  if (medium === 'WATER') return COLOR_WATER;
+  if (medium === 'VENTILATION') return state === 'DEAD' ? VENTILATION_INACTIVE : VENTILATION_ACTIVE;
+  return state === 'DEAD' ? COLOR_DE_ENERGIZED : COLOR_ENERGIZED;
+}
+
 export const ConnectionLine: React.FC<ConnectionProps> = ({ conn, isSelected, onSelect }) => {
   if (!conn.points || conn.points.length < 2) return null;
 
   const path = pathFromPoints(conn.points);
-
-  // Color carries medium and state, and nothing else. Water does not
-  // have an energized/de-energized concept - it always reads as water.
-  const coreColor = conn.medium === 'WATER'
-    ? COLOR_WATER
-    : (conn.state === 'DEAD' ? COLOR_DE_ENERGIZED : COLOR_ENERGIZED);
+  const coreColor = getConductorCoreColor(conn.medium, conn.state);
 
   // A busbar/manifold is just a much thicker wire (style BUS) - not a
   // symbol any more. Touchable anywhere along its length because

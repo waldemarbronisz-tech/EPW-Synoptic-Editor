@@ -1,6 +1,7 @@
 import React from 'react';
 import { Group, Rect, Path } from 'react-konva';
 import type { SymbolProps } from '../SymbolRenderer';
+import { SYMBOL_STROKE } from '../../theme/ScadaTheme';
 
 export const SolenoidValveSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
   const w = obj.width;
@@ -18,7 +19,7 @@ export const SolenoidValveSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
   return (
     <Group>
       {/* Solenoid Coil Box */}
-      <Rect x={w*0.3} y={0} width={w*0.4} height={h*0.4} fill="#2980b9" stroke="#2c3e50" strokeWidth={1} />
+      <Rect x={w*0.3} y={0} width={w*0.4} height={h*0.4} fill="#2980b9" stroke="#2c3e50" strokeWidth={SYMBOL_STROKE} />
 
       {/* Actuator stem */}
       <Rect x={w/2 - 2} y={h*0.4} width={4} height={h*0.25} fill="#2c3e50" />
@@ -28,11 +29,11 @@ export const SolenoidValveSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
         data={bowTiePath}
         fill={fillColor}
         stroke="#2c3e50"
-        strokeWidth={1}
+        strokeWidth={SYMBOL_STROKE}
       />
 
       {isFault && (
-        <Rect width={w} height={h} fill="rgba(255, 0, 0, 0.3)" stroke="red" strokeWidth={2} />
+        <Rect width={w} height={h} fill="rgba(255, 0, 0, 0.3)" stroke="red" strokeWidth={SYMBOL_STROKE} />
       )}
     </Group>
   );
