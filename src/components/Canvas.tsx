@@ -1,14 +1,18 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Stage, Layer, Rect, Circle, Group, Transformer } from 'react-konva';
+import { Stage, Layer, Rect, Circle, Group, Transformer, Path } from 'react-konva';
 import { useStore } from '../store';
-import type { SynopticObject } from '../store';
+import type { SynopticObject, SynopticConnection, WirePoint } from '../store';
 import { SymbolRenderer } from '../symbols/SymbolRenderer';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
-import { ConnectionLine } from './ConnectionLine';
+import { ConnectionLine, pathFromPoints } from './ConnectionLine';
 import { ObjectLabelRenderer } from './ObjectLabelRenderer';
-import { COLOR_CANVAS_BACKGROUND, COLOR_OUTLINE, COLOR_WATER, COLOR_WHITE } from '../theme/ScadaTheme';
+import { COLOR_CANVAS_BACKGROUND, COLOR_OUTLINE, COLOR_WATER, COLOR_WHITE, COLOR_DE_ENERGIZED, CONDUCTOR_WIDTH } from '../theme/ScadaTheme';
 import { snapValue } from '../utils/GridSnap';
 import { getObjectTerminals } from '../utils/Terminals';
+import {
+  snapPointToGrid, appendWirePoint, removeLastWirePoint,
+  reorthogonalizeAfterMove, insertBendOnSegment, nearestPointOnPolyline
+} from '../utils/WireDrawing';
 
 // Momentary Alt-key bypass for grid snapping. Deliberately outside React
 // state: every ObjectNode's drag handlers need the CURRENT key state at
@@ -39,8 +43,8 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, gridSize }: {
   // utils/Terminals.ts. The old click-a-port-to-drag-a-wire interaction
   // (onPortMouseDown/Up/Click, the busbar's dynamic-port onMouseUp
   // special case) is gone entirely; a terminal is purely a visual hint
-  // now (radius 6, shown on hover) of where a freehand-drawn wire (see
-  // the next commit) actually needs to end to connect.
+  // now (radius 6, shown on hover) of where a freehand-drawn wire
+  // actually needs to end to connect - simply sharing that grid point.
   const terminals = getObjectTerminals(obj);
 
   return (
@@ -126,6 +130,85 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, gridSize }: {
   );
 };
 
+// A finished wire: draws itself (ConnectionLine), can be dragged whole
+// (translating every point, grid-snapped), and - while selected - shows
+// a draggable handle at each of its own points so a bend can be grabbed
+// and moved without breaking orthogonality (WireDrawing.
+// reorthogonalizeAfterMove fixes up its two neighboring segments).
+// Alt+click on a segment (not a handle) inserts a brand new bend there.
+const ConnectionNode = ({ conn, isSelected, onSelect, gridSize, onAltClickSegment }: {
+  conn: SynopticConnection,
+  isSelected: boolean,
+  onSelect: () => void,
+  gridSize: number,
+  onAltClickSegment: (conn: SynopticConnection, worldPoint: WirePoint) => void,
+}) => {
+  const moveGroupRef = useRef<any>(null);
+
+  return (
+    <React.Fragment>
+      <Group
+        ref={moveGroupRef}
+        draggable={isSelected}
+        onDragMove={(e) => {
+          e.target.x(snapValue(e.target.x(), gridSize, isAltPressed));
+          e.target.y(snapValue(e.target.y(), gridSize, isAltPressed));
+        }}
+        onDragEnd={(e) => {
+          const dx = e.target.x();
+          const dy = e.target.y();
+          if (dx !== 0 || dy !== 0) {
+            useStore.getState().updateConnection(conn.id, {
+              points: conn.points.map(p => ({ x: p.x + dx, y: p.y + dy }))
+            });
+            useStore.getState().saveHistory();
+          }
+          e.target.x(0);
+          e.target.y(0);
+        }}
+      >
+        <ConnectionLine
+          conn={conn}
+          isSelected={isSelected}
+          onSelect={(e: any) => {
+            if (e?.evt?.altKey) {
+              e.cancelBubble = true;
+              const stage = e.target.getStage();
+              const pos = stage?.getPointerPosition();
+              if (!pos) return;
+              const { panX, panY, zoom } = useStore.getState().canvasState;
+              onAltClickSegment(conn, snapPointToGrid((pos.x - panX) / zoom, (pos.y - panY) / zoom));
+              return;
+            }
+            onSelect();
+          }}
+        />
+      </Group>
+      {isSelected && conn.points.map((p, idx) => (
+        <Circle
+          key={idx}
+          x={p.x}
+          y={p.y}
+          radius={6}
+          fill={COLOR_WHITE}
+          stroke={COLOR_OUTLINE}
+          strokeWidth={1.5}
+          draggable
+          onDragMove={(e) => {
+            e.target.x(snapValue(e.target.x(), gridSize, isAltPressed));
+            e.target.y(snapValue(e.target.y(), gridSize, isAltPressed));
+          }}
+          onDragEnd={(e) => {
+            const newPoints = reorthogonalizeAfterMove(conn.points, idx, { x: e.target.x(), y: e.target.y() });
+            useStore.getState().updateConnection(conn.id, { points: newPoints });
+            useStore.getState().saveHistory();
+          }}
+        />
+      ))}
+    </React.Fragment>
+  );
+};
+
 export const Canvas: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<any>(null);
@@ -142,8 +225,63 @@ export const Canvas: React.FC = () => {
   const isPanningRef = useRef(false);
   const lastPanPosRef = useRef({ x: 0, y: 0 });
 
+  // Freehand wire drawing (usterka B): points already placed, and the
+  // live (grid-snapped) cursor position for the preview segment. A ref
+  // mirrors the state so the window-level keydown handler (registered
+  // once) always reads the current points, never a stale closure.
+  const [drawingPoints, setDrawingPoints] = useState<WirePoint[] | null>(null);
+  const [drawingPreview, setDrawingPreview] = useState<WirePoint | null>(null);
+  const drawingPointsRef = useRef<WirePoint[] | null>(null);
+  useEffect(() => { drawingPointsRef.current = drawingPoints; }, [drawingPoints]);
+
+  // isDrawingConnection/setDrawingMode is the same store pair the old
+  // click-two-ports tool used, repurposed (not renamed) for the freehand
+  // wire tool - Toolbar.tsx's existing "Rysuj polaczenie" button already
+  // toggles it; Canvas.tsx only needs to read it here.
+  const { connections, selectedConnectionIds, selectConnections, isDrawingConnection } = useStore();
+
+  const toCanvasPoint = (stagePos: { x: number; y: number }): WirePoint => {
+    const scale = canvasState.zoom;
+    return snapPointToGrid((stagePos.x - canvasState.panX) / scale, (stagePos.y - canvasState.panY) / scale);
+  };
+
+  const finishDrawing = () => {
+    const points = drawingPointsRef.current;
+    setDrawingPoints(null);
+    setDrawingPreview(null);
+    if (!points || points.length < 2) return;
+
+    useStore.getState().addConnection({ points, medium: 'ELECTRICAL', style: 'NORMAL', state: 'LIVE' });
+    useStore.getState().saveHistory();
+    // Which terminals this wire actually touches is a net-resolution
+    // question (NetResolver) - its own follow-up commit; for now, a
+    // plain confirmation that the wire itself was committed.
+    useStore.getState().addMessage('[INFO] Wire drawn');
+  };
+
+  // Grid-snap Alt bypass, tracked once, globally, for the whole canvas -
+  // plus the wire-drawing tool's own keyboard shortcuts (Enter finishes,
+  // Escape cancels the whole in-progress wire, Backspace undoes the last
+  // bend), registered once so they always see the latest drawing state
+  // through the ref above rather than a stale closure.
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Alt') isAltPressed = true; };
+    const isTypingInField = () => {
+      const el = document.activeElement as HTMLElement | null;
+      return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Alt') isAltPressed = true;
+      if (isTypingInField()) return;
+      if (e.key === 'Escape' && drawingPointsRef.current) {
+        setDrawingPoints(null);
+        setDrawingPreview(null);
+      } else if (e.key === 'Enter' && drawingPointsRef.current) {
+        finishDrawing();
+      } else if (e.key === 'Backspace' && drawingPointsRef.current) {
+        e.preventDefault();
+        setDrawingPoints(prev => (prev ? removeLastWirePoint(prev) : prev));
+      }
+    };
     const handleKeyUp = (e: KeyboardEvent) => { if (e.key === 'Alt') isAltPressed = false; };
     // Also cleared on window blur - Alt released outside the window (e.g.
     // while alt-tabbing) would otherwise never fire its own keyup here.
@@ -156,6 +294,7 @@ export const Canvas: React.FC = () => {
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('blur', handleBlur);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -208,6 +347,17 @@ export const Canvas: React.FC = () => {
       return;
     }
 
+    if (isDrawingConnection) {
+      // Every click while the wire tool is active places a point - it
+      // does not matter what is underneath (empty canvas or an object),
+      // a wire lands wherever the click itself snapped to.
+      const pos = e.target.getStage().getPointerPosition();
+      if (!pos) return;
+      const point = toCanvasPoint(pos);
+      setDrawingPoints(prev => appendWirePoint(prev || [], point));
+      return;
+    }
+
     // Check if clicking on empty stage
     const clickedOnEmpty = e.target === e.target.getStage() || e.target.name() === 'grid';
     if (clickedOnEmpty) {
@@ -229,6 +379,11 @@ export const Canvas: React.FC = () => {
   };
 
   const handleMouseMove = (e: any) => {
+    if (isDrawingConnection && drawingPointsRef.current) {
+      const pos = e.target.getStage()?.getPointerPosition();
+      if (pos) setDrawingPreview(toCanvasPoint(pos));
+    }
+
     if (isPanningRef.current) {
       const dx = e.evt.clientX - lastPanPosRef.current.x;
       const dy = e.evt.clientY - lastPanPosRef.current.y;
@@ -269,6 +424,10 @@ export const Canvas: React.FC = () => {
       return;
     }
 
+    if (isDrawingConnection) {
+      return;
+    }
+
     if (selectionStartRef.current && selectionBox) {
       // Find objects inside selection rect
       const box = selectionBox;
@@ -288,6 +447,20 @@ export const Canvas: React.FC = () => {
 
     selectionStartRef.current = null;
     setSelectionBox(null);
+  };
+
+  const handleDblClick = () => {
+    if (isDrawingConnection && drawingPointsRef.current) {
+      finishDrawing();
+    }
+  };
+
+  const handleAltClickSegment = (conn: SynopticConnection, worldPoint: WirePoint) => {
+    const nearest = nearestPointOnPolyline(conn.points, worldPoint);
+    if (!nearest) return;
+    const newPoints = insertBendOnSegment(conn.points, nearest.segmentIndex, nearest.point);
+    useStore.getState().updateConnection(conn.id, { points: newPoints });
+    useStore.getState().saveHistory();
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -401,8 +574,6 @@ export const Canvas: React.FC = () => {
     return lines;
   };
 
-  const { connections, selectedConnectionIds, selectConnections } = useStore();
-
   return (
     <div
       className="canvas-container"
@@ -422,7 +593,9 @@ export const Canvas: React.FC = () => {
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        style={{ cursor: selectionStartRef.current ? 'crosshair' : 'default' }}
+        onDblClick={handleDblClick}
+        onDblTap={handleDblClick}
+        style={{ cursor: isDrawingConnection ? 'crosshair' : (selectionStartRef.current ? 'crosshair' : 'default') }}
       >
         <Layer>
           <Rect x={0} y={0} width={useStore.getState().canvasConfig.width} height={useStore.getState().canvasConfig.height} fill={useStore.getState().canvasConfig.background} />
@@ -432,17 +605,38 @@ export const Canvas: React.FC = () => {
         <Layer>
           {/* Node-based wiring model: a connection draws itself straight
               through its own points array now - no from/to object lookup
-              needed here at all (that whole indirection is gone). There
-              is no way to draw a NEW one yet in this commit - the
-              freehand drawing tool is the very next one. */}
+              needed here at all (that whole indirection is gone). A
+              finished wire can be selected, dragged as a whole, or have
+              one of its own bends grabbed and moved (ConnectionNode). */}
           {connections.map(conn => (
-            <ConnectionLine
+            <ConnectionNode
               key={conn.id}
               conn={conn}
               isSelected={selectedConnectionIds.includes(conn.id)}
               onSelect={() => selectConnections([conn.id], false)}
+              gridSize={gridSize}
+              onAltClickSegment={handleAltClickSegment}
             />
           ))}
+          {/* In-progress wire preview: a thin, neutral line through every
+              point placed so far plus the live (grid-snapped) cursor
+              position - never the real conductor color/thickness, this
+              is not a committed connection yet. */}
+          {drawingPoints && drawingPoints.length > 0 && (
+            <>
+              <Path
+                data={pathFromPoints(drawingPreview ? [...drawingPoints, drawingPreview] : drawingPoints)}
+                stroke={COLOR_DE_ENERGIZED}
+                strokeWidth={CONDUCTOR_WIDTH / 2}
+                lineCap="round"
+                lineJoin="round"
+                listening={false}
+              />
+              {drawingPoints.map((p, idx) => (
+                <Circle key={idx} x={p.x} y={p.y} radius={4} fill={COLOR_DE_ENERGIZED} listening={false} />
+              ))}
+            </>
+          )}
           {[...objects].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)).map((obj) => (
             <ObjectNode
               key={obj.id}
