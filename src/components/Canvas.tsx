@@ -13,6 +13,9 @@ import {
   snapPointToGrid, appendWirePoint, removeLastWirePoint,
   reorthogonalizeAfterMove, insertBendOnSegment, nearestPointOnPolyline
 } from '../utils/WireDrawing';
+import { resolveNets, getJunctionPoints } from '../project/NetResolver';
+import { describeObject } from '../utils/ObjectDisplay';
+import { WireNodeSymbol } from '../symbols/scada/WireNodeSymbol';
 
 // Momentary Alt-key bypass for grid snapping. Deliberately outside React
 // state: every ObjectNode's drag handlers need the CURRENT key state at
@@ -253,10 +256,21 @@ export const Canvas: React.FC = () => {
 
     useStore.getState().addConnection({ points, medium: 'ELECTRICAL', style: 'NORMAL', state: 'LIVE' });
     useStore.getState().saveHistory();
-    // Which terminals this wire actually touches is a net-resolution
-    // question (NetResolver) - its own follow-up commit; for now, a
-    // plain confirmation that the wire itself was committed.
-    useStore.getState().addMessage('[INFO] Wire drawn');
+
+    // Readable, UUID-free feedback: if the new wire actually touches a
+    // terminal - possibly by landing on the MIDDLE of another wire's
+    // segment, e.g. tapping into a busbar - name what it joined.
+    const store = useStore.getState();
+    const justAdded = store.connections[store.connections.length - 1];
+    const nets = resolveNets(store.connections, store.objects);
+    const net = nets.find(n => n.connectionIds.includes(justAdded.id));
+    if (net && net.terminals.length > 0) {
+      const uniqueObjIds = [...new Set(net.terminals.map(t => t.objId))];
+      const names = uniqueObjIds.map(id => describeObject(store.objects.find(o => o.id === id))).join(', ');
+      store.addMessage(`[INFO] Wire connected: ${names}`);
+    } else {
+      store.addMessage('[INFO] Wire drawn (not touching any terminal yet)');
+    }
   };
 
   // Grid-snap Alt bypass, tracked once, globally, for the whole canvas -
@@ -468,6 +482,8 @@ export const Canvas: React.FC = () => {
     e.dataTransfer.dropEffect = 'move';
   };
 
+  const junctionPoints = getJunctionPoints(connections, objects);
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     if (!stageRef.current || !containerRef.current) return;
@@ -646,6 +662,19 @@ export const Canvas: React.FC = () => {
               onChange={(newAttrs) => updateObject(obj.id, newAttrs)}
               gridSize={gridSize}
             />
+          ))}
+          {/* Topology junctions: a wire node (from the SCADA library)
+              wherever 3+ segments, or 2 segments and a terminal, meet at
+              one grid point - computed purely from geometry by
+              NetResolver.getJunctionPoints. Rendered AFTER (on top of)
+              every object: a junction routinely lands exactly at a
+              terminal, which is often inside the object's own drawn
+              shape, and painting it underneath would leave it invisible,
+              hidden by the object itself. */}
+          {junctionPoints.map((j, idx) => (
+            <Group key={`junc-${idx}`} x={j.x - 75} y={j.y - 75} listening={false}>
+              <WireNodeSymbol />
+            </Group>
           ))}
           {selectionBox && (
             <Rect
