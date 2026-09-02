@@ -5,7 +5,7 @@ import {
   Undo, Redo, Copy, ClipboardPaste, Trash2,
   BringToFront, SendToBack, AlignLeft, AlignCenter, AlignRight,
   AlignVerticalSpaceAround, AlignHorizontalSpaceAround,
-  Lock, Unlock, RotateCcw, RotateCw, PenLine, Zap, Droplet, Wind
+  Lock, Unlock, RotateCcw, RotateCw, PenLine, Zap, Droplet, Wind, Gauge
 } from 'lucide-react';
 import { COLOR_ENERGIZED, COLOR_WATER, VENTILATION_ACTIVE, COLOR_WHITE, COLOR_RUN } from '../theme/ScadaTheme';
 
@@ -24,7 +24,8 @@ export const Toolbar: React.FC = () => {
     bringToFront, sendToBack, alignSelected, distributeSelected,
     lockSelected, unlockSelected, rotateSelected,
     isDrawingConnection, setDrawingMode,
-    drawingMedium, setDrawingMedium, drawingStyle, setDrawingStyle
+    drawingMedium, setDrawingMedium, drawingStyle, setDrawingStyle,
+    addMeter, selectedMeterIds, selectMeters
   } = useStore();
 
   return (
@@ -46,7 +47,26 @@ export const Toolbar: React.FC = () => {
       <div className="toolbar-group">
         <button title="Copy" onClick={copySelected}><Copy size={16} /></button>
         <button title="Paste" onClick={paste}><ClipboardPaste size={16} /></button>
-        <button title="Delete" onClick={() => deleteObjects(selectedIds, selectedConnectionIds)}><Trash2 size={16} /></button>
+        <button title="Delete" onClick={() => deleteObjects(selectedIds, selectedConnectionIds, selectedMeterIds)}><Trash2 size={16} /></button>
+      </div>
+
+      <div className="toolbar-divider" />
+
+      {/* The meter element (feat/meter-element): not a symbol, so it has
+          no Toolbox entry to drag from - this is how one gets placed.
+          Dropped at a fixed default spot and auto-selected so it can be
+          dragged into position right away, same as a pasted element. */}
+      <div className="toolbar-group">
+        <button
+          title="Dodaj Miernik"
+          onClick={() => {
+            addMeter({ x: 160, y: 160, width: 200, fontSize: 12, rows: [] });
+            const newest = useStore.getState().meters[useStore.getState().meters.length - 1];
+            if (newest) selectMeters([newest.id], false);
+          }}
+        >
+          <Gauge size={16} />
+        </button>
       </div>
 
       <div className="toolbar-divider" />
