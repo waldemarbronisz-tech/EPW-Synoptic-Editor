@@ -27,6 +27,14 @@ export const COLOR_LAMP_LIT = '#FFE800';          // lampa swiecaca
 export const COLOR_WATER = '#2848D8';             // woda
 export const COLOR_WHITE = '#FFFFFF';             // biel
 
+// Ventilation (third medium, feat/media-and-proportions part B): gold
+// reads clearly against both power's red and water's blue, and against
+// the cyan canvas background - ACTIVE is a duct actually moving air,
+// INACTIVE is a stopped/idle one, the same LIVE/DEAD split every other
+// medium's conductor color already makes.
+export const VENTILATION_ACTIVE = '#C89000';      // wentylacja aktywna
+export const VENTILATION_INACTIVE = '#8A7A50';    // wentylacja nieaktywna
+
 // ---- Geometry ----
 
 // Conductor/symbol proportions derived directly from the grid (feat/
@@ -67,4 +75,6 @@ export function applyScadaCssVariables(target: HTMLElement = document.documentEl
   target.style.setProperty('--scada-alarm', COLOR_ALARM);
   target.style.setProperty('--scada-lamp-lit', COLOR_LAMP_LIT);
   target.style.setProperty('--scada-water', COLOR_WATER);
+  target.style.setProperty('--scada-ventilation-active', VENTILATION_ACTIVE);
+  target.style.setProperty('--scada-ventilation-inactive', VENTILATION_INACTIVE);
 }

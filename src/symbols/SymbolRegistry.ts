@@ -21,7 +21,7 @@ export interface Terminal {
   id: string;
   x: number; // local px from top-left, multiple of GRID_SIZE
   y: number; // local px from top-left, multiple of GRID_SIZE
-  medium: 'ELECTRICAL' | 'WATER';
+  medium: 'ELECTRICAL' | 'WATER' | 'VENTILATION';
 }
 
 export interface SymbolDefinition {

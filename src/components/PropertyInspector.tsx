@@ -127,6 +127,7 @@ export const PropertyInspector: React.FC = () => {
               <select name="medium" value={selectedConn.medium} onChange={handleConnChange}>
                 <option value="ELECTRICAL">Electrical</option>
                 <option value="WATER">Water</option>
+                <option value="VENTILATION">Ventilation</option>
               </select>
             </div>
             <div className="property-row">
@@ -191,6 +192,10 @@ export const PropertyInspector: React.FC = () => {
                 <option value="OGROD" />
                 <option value="OCZYSZCZALNIA" />
                 <option value="NAWADNIANIE" />
+                <option value="CZERPNIA" />
+                <option value="WYRZUTNIA" />
+                <option value="CENTRALA" />
+                <option value="REKUPERATOR" />
               </datalist>
             )}
           </div>
@@ -402,6 +407,7 @@ export const PropertyInspector: React.FC = () => {
               <select name="boundaryMedium" value={selectedObj.boundaryMedium || 'ELECTRICAL'} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()}>
                 <option value="ELECTRICAL">Electrical</option>
                 <option value="WATER">Water</option>
+                <option value="VENTILATION">Ventilation</option>
               </select>
             </div>
             <div className="property-row">

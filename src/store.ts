@@ -79,7 +79,7 @@ export interface SynopticObject {
   // same convention as the label frame this symbol is built on. Every
   // other object leaves these undefined.
   boundaryDirection?: 'SOURCE' | 'SINK';
-  boundaryMedium?: 'ELECTRICAL' | 'WATER';
+  boundaryMedium?: 'ELECTRICAL' | 'WATER' | 'VENTILATION';
   boundaryPortSide?: 'TOP' | 'BOTTOM' | 'LEFT' | 'RIGHT';
 }
 
@@ -100,10 +100,15 @@ export interface WirePoint {
 // else references anything by id. fromId/fromPort/toId/toPort are gone
 // entirely - see NetResolver.ts for how wires and terminals are grouped
 // into nets from geometry alone.
+//
+// feat/media-and-proportions part B: VENTILATION joins ELECTRICAL/WATER
+// as a third medium value. This is a value added to the existing medium
+// field, not a change to the connection's shape - schema version stays
+// at 2 (see ProjectSchema.ts's CURRENT_SCHEMA_VERSION comment).
 export interface SynopticConnection {
   id: string;
   points: WirePoint[]; // minimum 2, every point on a GRID_SIZE node, every segment horizontal or vertical
-  medium: 'ELECTRICAL' | 'WATER';
+  medium: 'ELECTRICAL' | 'WATER' | 'VENTILATION';
   style: 'NORMAL' | 'BUS'; // BUS is a busbar/manifold: thicker, touchable anywhere along its length
   state: 'LIVE' | 'DEAD';
 }

@@ -16,7 +16,7 @@ export interface Net {
   id: string;
   connectionIds: string[];
   terminals: { objId: string; terminalId: string }[];
-  medium: 'ELECTRICAL' | 'WATER' | null;
+  medium: 'ELECTRICAL' | 'WATER' | 'VENTILATION' | null;
   state: 'LIVE' | 'DEAD' | null;
 }
 
@@ -160,18 +160,22 @@ export function resolveNets(connections: SynopticConnection[], items: SynopticOb
 export function validateNets(nets: Net[], items: SynopticObject[]): NetIssue[] {
   const issues: NetIssue[] = [];
   const worldTerminals = getAllWorldTerminals(items);
-  const terminalMedium = new Map<string, 'ELECTRICAL' | 'WATER'>();
+  const terminalMedium = new Map<string, 'ELECTRICAL' | 'WATER' | 'VENTILATION'>();
   worldTerminals.forEach(t => terminalMedium.set(`${t.objId}:${t.terminalId}`, t.medium));
   const objById = new Map(items.map(o => [o.id, o]));
 
   nets.forEach(net => {
+    // Three media now (ELECTRICAL, WATER, VENTILATION) - the check
+    // itself is unchanged, a Set naturally flags any 2+ of them mixed
+    // in one net: power tied to water, power tied to a duct, or water
+    // tied to a duct are all the same MIXED_MEDIUM error.
     const media = new Set(net.terminals.map(t => terminalMedium.get(`${t.objId}:${t.terminalId}`)).filter(Boolean));
     if (media.size > 1) {
       issues.push({
         severity: 'ERROR',
         code: 'MIXED_MEDIUM',
         netId: net.id,
-        message: `Net touches terminals of different media (${[...media].join(', ')}) - an electrical terminal plugged into a water net or vice versa`
+        message: `Net touches terminals of different media (${[...media].join(', ')}) - a terminal from one medium plugged into another medium's net`
       });
     }
 
