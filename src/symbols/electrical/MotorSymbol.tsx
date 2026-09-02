@@ -1,6 +1,7 @@
 import React from 'react';
 import { Group, Rect, Circle, Text } from 'react-konva';
 import type { SymbolProps } from '../SymbolRenderer';
+import { SYMBOL_STROKE } from '../../theme/ScadaTheme';
 
 export const MotorSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
   const w = obj.width;
@@ -11,10 +12,10 @@ export const MotorSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
 
   return (
     <Group>
-      <Rect width={w} height={h} fill="#bdc3c7" stroke="#7f8c8d" strokeWidth={1} cornerRadius={5} />
+      <Rect width={w} height={h} fill="#bdc3c7" stroke="#7f8c8d" strokeWidth={SYMBOL_STROKE} cornerRadius={5} />
 
       {/* Central circular part */}
-      <Circle x={w/2} y={h/2} radius={w*0.35} fill={isRunning ? "#2ecc71" : "#95a5a6"} stroke="#2c3e50" strokeWidth={2} />
+      <Circle x={w/2} y={h/2} radius={w*0.35} fill={isRunning ? "#2ecc71" : "#95a5a6"} stroke="#2c3e50" strokeWidth={SYMBOL_STROKE} />
 
       {/* 'M' text */}
       <Text
@@ -28,7 +29,7 @@ export const MotorSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
       />
 
       {isFault && (
-        <Rect width={w} height={h} fill="transparent" stroke="#e74c3c" strokeWidth={3} cornerRadius={5} />
+        <Rect width={w} height={h} fill="transparent" stroke="#e74c3c" strokeWidth={SYMBOL_STROKE} cornerRadius={5} />
       )}
     </Group>
   );

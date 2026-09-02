@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Group, Rect, Circle, Arc } from 'react-konva';
 import type { SymbolProps } from '../SymbolRenderer';
+import { SYMBOL_STROKE } from '../../theme/ScadaTheme';
 
 export const FanSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
   const w = obj.width;
@@ -31,7 +32,7 @@ export const FanSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
   return (
     <Group>
       {/* Casing */}
-      <Rect width={w} height={h} fill="#bdc3c7" stroke="#7f8c8d" strokeWidth={2} />
+      <Rect width={w} height={h} fill="#bdc3c7" stroke="#7f8c8d" strokeWidth={SYMBOL_STROKE} />
       <Circle x={w/2} y={h/2} radius={radius - 2} fill="#34495e" />
 
       {/* Blades */}
@@ -43,7 +44,7 @@ export const FanSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
       </Group>
 
       {isFault && (
-        <Rect width={w} height={h} fill="rgba(255, 0, 0, 0.3)" stroke="red" strokeWidth={2} />
+        <Rect width={w} height={h} fill="rgba(255, 0, 0, 0.3)" stroke="red" strokeWidth={SYMBOL_STROKE} />
       )}
     </Group>
   );

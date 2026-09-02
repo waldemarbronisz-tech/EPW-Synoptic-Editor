@@ -1,6 +1,7 @@
 import React from 'react';
 import { Group, Rect, Path, Circle } from 'react-konva';
 import type { SymbolProps } from '../SymbolRenderer';
+import { SYMBOL_STROKE } from '../../theme/ScadaTheme';
 
 export const BallValveSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
   const w = obj.width;
@@ -21,11 +22,11 @@ export const BallValveSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
         data={bowTiePath}
         fill={fillColor}
         stroke="#2c3e50"
-        strokeWidth={1}
+        strokeWidth={SYMBOL_STROKE}
       />
 
       {/* Circle center with lever handle */}
-      <Circle x={w/2} y={h/2} radius={w*0.15} fill="#ecf0f1" stroke="#2c3e50" strokeWidth={2} />
+      <Circle x={w/2} y={h/2} radius={w*0.15} fill="#ecf0f1" stroke="#2c3e50" strokeWidth={SYMBOL_STROKE} />
 
       {/* Lever handle */}
       {isClosed ? (
@@ -37,7 +38,7 @@ export const BallValveSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
       )}
 
       {isFault && (
-        <Rect width={w} height={h} fill="rgba(255, 0, 0, 0.3)" stroke="red" strokeWidth={2} />
+        <Rect width={w} height={h} fill="rgba(255, 0, 0, 0.3)" stroke="red" strokeWidth={SYMBOL_STROKE} />
       )}
     </Group>
   );

@@ -3,14 +3,20 @@ import type { SymbolDefinition } from '../SymbolRegistry';
 // All five of this file's symbols stay visible in the Object Library
 // (part E, CZUJNIKI) - none had connectionPoints before (sensors were
 // never wireable in the old port model at all); each gets one
-// ELECTRICAL terminal (power/signal feed) now.
+// ELECTRICAL terminal (power/signal feed) now. feat/media-and-
+// proportions part A2 brought defaultWidth/defaultHeight to GRID_SIZE
+// multiples (30, 40, 20 were not); the terminal x recomputed at the
+// same top-center fraction moved for pressure/level/leak sensor (24
+// used to snap down to 16, the new width's 24 snaps up to 32) but
+// landed back on its old coordinate for temperature/humidity sensor
+// (16 is exact for the new 32-wide default).
 export const instrumentationSymbols: Record<string, SymbolDefinition> = {
   'instrumentation.temperature_sensor': {
     type: 'instrumentation.temperature_sensor',
     label: 'Temp Sensor',
     category: 'Instrumentation',
-    defaultWidth: 30,
-    defaultHeight: 60,
+    defaultWidth: 32,
+    defaultHeight: 64,
     allowedStates: ['NORMAL', 'FAULT'],
     defaultState: 'NORMAL',
     terminals: [{ id: 'IN', x: 16, y: 0, medium: 'ELECTRICAL' }]
@@ -19,28 +25,28 @@ export const instrumentationSymbols: Record<string, SymbolDefinition> = {
     type: 'instrumentation.pressure_sensor',
     label: 'Pressure Sensor',
     category: 'Instrumentation',
-    defaultWidth: 40,
-    defaultHeight: 40,
+    defaultWidth: 48,
+    defaultHeight: 48,
     allowedStates: ['NORMAL', 'FAULT'],
     defaultState: 'NORMAL',
-    terminals: [{ id: 'IN', x: 16, y: 0, medium: 'ELECTRICAL' }]
+    terminals: [{ id: 'IN', x: 32, y: 0, medium: 'ELECTRICAL' }]
   },
   'instrumentation.level_sensor': {
     type: 'instrumentation.level_sensor',
     label: 'Level Sensor',
     category: 'Instrumentation',
-    defaultWidth: 40,
-    defaultHeight: 40,
+    defaultWidth: 48,
+    defaultHeight: 48,
     allowedStates: ['NORMAL', 'FAULT'],
     defaultState: 'NORMAL',
-    terminals: [{ id: 'IN', x: 16, y: 0, medium: 'ELECTRICAL' }]
+    terminals: [{ id: 'IN', x: 32, y: 0, medium: 'ELECTRICAL' }]
   },
   'instrumentation.humidity_sensor': {
     type: 'instrumentation.humidity_sensor',
     label: 'Humidity Sensor',
     category: 'Instrumentation',
-    defaultWidth: 30,
-    defaultHeight: 60,
+    defaultWidth: 32,
+    defaultHeight: 64,
     allowedStates: ['NORMAL', 'FAULT'],
     defaultState: 'NORMAL',
     terminals: [{ id: 'IN', x: 16, y: 0, medium: 'ELECTRICAL' }]
@@ -49,11 +55,11 @@ export const instrumentationSymbols: Record<string, SymbolDefinition> = {
     type: 'instrumentation.leak_sensor',
     label: 'Leak Sensor',
     category: 'Instrumentation',
-    defaultWidth: 40,
-    defaultHeight: 20,
+    defaultWidth: 48,
+    defaultHeight: 16,
     allowedStates: ['NORMAL', 'ACTIVE', 'FAULT'],
     defaultState: 'NORMAL',
-    terminals: [{ id: 'IN', x: 16, y: 0, medium: 'ELECTRICAL' }]
+    terminals: [{ id: 'IN', x: 32, y: 0, medium: 'ELECTRICAL' }]
   },
 
   // Automation

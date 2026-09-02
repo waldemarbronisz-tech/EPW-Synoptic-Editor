@@ -1,6 +1,7 @@
 import React from 'react';
 import { Group, Rect, Path } from 'react-konva';
 import type { SymbolProps } from '../SymbolRenderer';
+import { SYMBOL_STROKE } from '../../theme/ScadaTheme';
 
 export const TankSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
   const w = obj.width;
@@ -28,7 +29,7 @@ export const TankSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
   return (
     <Group>
       {/* Background/Empty Tank */}
-      <Path data={tankPath} fill="#ecf0f1" stroke="#2c3e50" strokeWidth={2} />
+      <Path data={tankPath} fill="#ecf0f1" stroke="#2c3e50" strokeWidth={SYMBOL_STROKE} />
 
       {/* Water Level */}
       <Rect
@@ -45,7 +46,7 @@ export const TankSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
       <Rect x={-5} y={h*0.85} width={10} height={2} fill="blue" />
 
       {isFault && (
-        <Rect width={w} height={h} fill="rgba(255, 0, 0, 0.3)" stroke="red" strokeWidth={2} />
+        <Rect width={w} height={h} fill="rgba(255, 0, 0, 0.3)" stroke="red" strokeWidth={SYMBOL_STROKE} />
       )}
     </Group>
   );

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Group, Rect, Path, Line } from 'react-konva';
 import type { SymbolProps } from '../SymbolRenderer';
+import { SYMBOL_STROKE } from '../../theme/ScadaTheme';
 
 export const DrainValveSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
   const w = obj.width;
@@ -20,15 +21,15 @@ export const DrainValveSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
         data={bowTiePath}
         fill={fillColor}
         stroke="#2c3e50"
-        strokeWidth={1}
+        strokeWidth={SYMBOL_STROKE}
       />
 
       {/* Downward drain line indicating discharge */}
-      <Line points={[w/2, h*0.4, w/2, h]} stroke="#2c3e50" strokeWidth={2} />
-      <Line points={[w*0.3, h, w*0.7, h]} stroke="#2c3e50" strokeWidth={2} />
+      <Line points={[w/2, h*0.4, w/2, h]} stroke="#2c3e50" strokeWidth={SYMBOL_STROKE} />
+      <Line points={[w*0.3, h, w*0.7, h]} stroke="#2c3e50" strokeWidth={SYMBOL_STROKE} />
 
       {isFault && (
-        <Rect width={w} height={h} fill="rgba(255, 0, 0, 0.3)" stroke="red" strokeWidth={2} />
+        <Rect width={w} height={h} fill="rgba(255, 0, 0, 0.3)" stroke="red" strokeWidth={SYMBOL_STROKE} />
       )}
     </Group>
   );
