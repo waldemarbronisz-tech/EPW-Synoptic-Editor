@@ -3,11 +3,12 @@ import { v4 as uuidv4 } from 'uuid';
 import { COLOR_CANVAS_BACKGROUND, GRID_SIZE } from './theme/ScadaTheme';
 import type { MeterRow } from './symbols/scada/MeterSymbol';
 import type { MeterElement } from './meter/MeterElement';
+import type { SignalPanelElement } from './elements/SignalPanelElement';
 import type { Device } from './project/DeviceSchema';
 import { cloneSelectionWithOffset } from './utils/CloneSelection';
 
 // Cap on how many undo/redo snapshots are kept; each entry is a full deep
-// copy of objects+connections+meters, so this bounds both memory and undo depth.
+// copy of objects+connections+meters+signalPanels, so this bounds both memory and undo depth.
 const MAX_HISTORY = 100;
 
 
@@ -15,6 +16,7 @@ export interface HistorySnapshot {
   objects: SynopticObject[];
   connections: SynopticConnection[];
   meters: MeterElement[];
+  signalPanels: SignalPanelElement[];
 }
 export interface SynopticObject {
   zIndex?: number;
@@ -142,12 +144,18 @@ interface AppState {
   // separate from objects - it is not a symbol, has no terminals, and
   // its height is never user-set (see MeterElement.ts).
   meters: MeterElement[];
+  // The signal panel element (feat/editing-and-signal-panel commit 6):
+  // the same mechanism as the meter, its own array - see
+  // elements/SignalPanelElement.ts.
+  signalPanels: SignalPanelElement[];
   selectedIds: string[];
   selectedConnectionIds: string[];
   selectedMeterIds: string[];
+  selectedSignalPanelIds: string[];
   canvasState: CanvasState;
   clipboard: SynopticObject[];
   clipboardMeters: MeterElement[];
+  clipboardSignalPanels: SignalPanelElement[];
   clipboardConnections: SynopticConnection[];
   history: HistorySnapshot[];
   historyIndex: number;
@@ -201,18 +209,22 @@ interface AppState {
   updateConnection: (id: string, updates: Partial<SynopticConnection>) => void;
   addMeter: (meter: Omit<MeterElement, 'id'>) => void;
   updateMeter: (id: string, updates: Partial<MeterElement>) => void;
-  deleteObjects: (ids: string[], connIds?: string[], meterIds?: string[]) => void;
+  addSignalPanel: (panel: Omit<SignalPanelElement, 'id'>) => void;
+  updateSignalPanel: (id: string, updates: Partial<SignalPanelElement>) => void;
+  deleteObjects: (ids: string[], connIds?: string[], meterIds?: string[], signalPanelIds?: string[]) => void;
   selectObjects: (ids: string[], multi?: boolean) => void;
   selectConnections: (ids: string[], multi?: boolean) => void;
   selectMeters: (ids: string[], multi?: boolean) => void;
-  // commit 3: replaces the whole selection with a mix of all three
+  selectSignalPanels: (ids: string[], multi?: boolean) => void;
+  // commit 3: replaces the whole selection with a mix of all four
   // kinds at once (the rubber-band's own result) - and Ctrl+A's "select
   // everything on screen".
-  selectMixed: (selection: { objectIds?: string[]; connectionIds?: string[]; meterIds?: string[] }) => void;
+  selectMixed: (selection: { objectIds?: string[]; connectionIds?: string[]; meterIds?: string[]; signalPanelIds?: string[] }) => void;
   selectAll: () => void;
   clearSelection: () => void;
-  // Arrow keys (commit 3): every selected object/meter/connection moves
-  // by (dx, dy) together, as one history entry per keypress.
+  // Arrow keys (commit 3): every selected object/meter/signalPanel/
+  // connection moves by (dx, dy) together, as one history entry per
+  // keypress.
   moveSelectionBy: (dx: number, dy: number) => void;
 
   // Clipboard
@@ -226,6 +238,7 @@ interface AppState {
   // covers both the new clone and the move as ONE history entry.
   duplicateObjectInPlace: (id: string) => void;
   duplicateMeterInPlace: (id: string) => void;
+  duplicateSignalPanelInPlace: (id: string) => void;
 
   // History
   undo: () => void;
@@ -263,14 +276,17 @@ export const useStore = create<AppState>((set, get) => ({
   objects: [],
   connections: [],
   meters: [],
+  signalPanels: [],
   selectedIds: [],
   selectedConnectionIds: [],
   selectedMeterIds: [],
+  selectedSignalPanelIds: [],
   canvasState: { zoom: 1, panX: 0, panY: 0 },
   clipboard: [],
   clipboardMeters: [],
+  clipboardSignalPanels: [],
   clipboardConnections: [],
-  history: [{ objects: [], connections: [], meters: [] }],
+  history: [{ objects: [], connections: [], meters: [], signalPanels: [] }],
   historyIndex: 0,
 
   projectName: 'New Project',
@@ -316,10 +332,11 @@ export const useStore = create<AppState>((set, get) => ({
   })),
 
   saveHistory: () => {
-    const { objects, connections, meters, history, historyIndex } = get();
+    const { objects, connections, meters, signalPanels, history, historyIndex } = get();
     const objectsJson = JSON.stringify(objects);
     const connectionsJson = JSON.stringify(connections);
     const metersJson = JSON.stringify(meters);
+    const signalPanelsJson = JSON.stringify(signalPanels);
 
     // Skip if nothing actually changed since the last entry (e.g. a field
     // was clicked into and blurred without editing) - don't clutter undo
@@ -329,7 +346,8 @@ export const useStore = create<AppState>((set, get) => ({
       lastEntry &&
       JSON.stringify(lastEntry.objects) === objectsJson &&
       JSON.stringify(lastEntry.connections) === connectionsJson &&
-      JSON.stringify(lastEntry.meters || []) === metersJson
+      JSON.stringify(lastEntry.meters || []) === metersJson &&
+      JSON.stringify(lastEntry.signalPanels || []) === signalPanelsJson
     ) {
       return;
     }
@@ -338,7 +356,8 @@ export const useStore = create<AppState>((set, get) => ({
     newHistory.push({
       objects: JSON.parse(objectsJson),
       connections: JSON.parse(connectionsJson),
-      meters: JSON.parse(metersJson)
+      meters: JSON.parse(metersJson),
+      signalPanels: JSON.parse(signalPanelsJson)
     });
 
     // Cap history length; drop oldest entries once the cap is exceeded.
@@ -406,6 +425,20 @@ export const useStore = create<AppState>((set, get) => ({
     }));
   },
 
+  addSignalPanel: (panel) => {
+    set((state) => ({
+      signalPanels: [...state.signalPanels, { ...panel, id: uuidv4() }]
+    }));
+    get().saveHistory();
+  },
+
+  updateSignalPanel: (id, updates) => {
+    set((state) => ({
+      signalPanels: state.signalPanels.map(p => p.id === id ? { ...p, ...updates } : p),
+      isDirty: true
+    }));
+  },
+
   // Bug fix (node-based wiring rewrite): deleting an object used to
   // cascade-delete every connection whose fromId/toId pointed at it. A
   // connection no longer references any object id at all - it is a free
@@ -413,25 +446,27 @@ export const useStore = create<AppState>((set, get) => ({
   // needs to cascade any more. A wire left dangling by a deleted object
   // simply stops being part of any net; it stays on the canvas exactly
   // like drawing a wire into empty space always could.
-  deleteObjects: (ids, connIds = [], meterIds = []) => {
-    if (ids.length === 0 && connIds.length === 0 && meterIds.length === 0) return;
+  deleteObjects: (ids, connIds = [], meterIds = [], signalPanelIds = []) => {
+    if (ids.length === 0 && connIds.length === 0 && meterIds.length === 0 && signalPanelIds.length === 0) return;
     set((state) => ({
       objects: state.objects.filter(obj => !ids.includes(obj.id)),
       selectedIds: state.selectedIds.filter(id => !ids.includes(id)),
       connections: state.connections.filter(c => !connIds.includes(c.id)),
       selectedConnectionIds: state.selectedConnectionIds.filter(id => !connIds.includes(id)),
       meters: state.meters.filter(m => !meterIds.includes(m.id)),
-      selectedMeterIds: state.selectedMeterIds.filter(id => !meterIds.includes(id))
+      selectedMeterIds: state.selectedMeterIds.filter(id => !meterIds.includes(id)),
+      signalPanels: state.signalPanels.filter(p => !signalPanelIds.includes(p.id)),
+      selectedSignalPanelIds: state.selectedSignalPanelIds.filter(id => !signalPanelIds.includes(id))
     }));
     get().saveHistory();
   },
 
   // multi (Shift held, commit 3) toggles WITHIN this one kind's array
-  // and leaves the other two kinds' current selection untouched - that
+  // and leaves the other kinds' current selection untouched - that
   // is what lets a Shift+click build a selection spanning objects,
-  // connections and meters together, one click at a time. A plain
-  // click (multi false) still replaces the whole selection with just
-  // this one kind, same as before.
+  // connections, meters and signal panels together, one click at a
+  // time. A plain click (multi false) still replaces the whole
+  // selection with just this one kind, same as before.
   selectObjects: (ids, multi = false) => set((state) => {
     if (multi) {
       const newSelection = [...state.selectedIds];
@@ -442,7 +477,7 @@ export const useStore = create<AppState>((set, get) => ({
       });
       return { selectedIds: newSelection };
     }
-    return { selectedIds: ids, selectedConnectionIds: [], selectedMeterIds: [] };
+    return { selectedIds: ids, selectedConnectionIds: [], selectedMeterIds: [], selectedSignalPanelIds: [] };
   }),
 
   selectConnections: (ids, multi = false) => set((state) => {
@@ -455,7 +490,7 @@ export const useStore = create<AppState>((set, get) => ({
       });
       return { selectedConnectionIds: newSelection };
     }
-    return { selectedConnectionIds: ids, selectedIds: [], selectedMeterIds: [] };
+    return { selectedConnectionIds: ids, selectedIds: [], selectedMeterIds: [], selectedSignalPanelIds: [] };
   }),
 
   selectMeters: (ids, multi = false) => set((state) => {
@@ -468,29 +503,44 @@ export const useStore = create<AppState>((set, get) => ({
       });
       return { selectedMeterIds: newSelection };
     }
-    return { selectedMeterIds: ids, selectedIds: [], selectedConnectionIds: [] };
+    return { selectedMeterIds: ids, selectedIds: [], selectedConnectionIds: [], selectedSignalPanelIds: [] };
   }),
 
-  // The rubber-band (commit 3) selects across all three kinds at once,
-  // in a single atomic replace - calling the three per-kind actions
-  // above in sequence would not work here, since a plain (non-multi)
-  // call to any one of them clears the other two.
+  selectSignalPanels: (ids, multi = false) => set((state) => {
+    if (multi) {
+      const newSelection = [...state.selectedSignalPanelIds];
+      ids.forEach(id => {
+        const index = newSelection.indexOf(id);
+        if (index >= 0) newSelection.splice(index, 1);
+        else newSelection.push(id);
+      });
+      return { selectedSignalPanelIds: newSelection };
+    }
+    return { selectedSignalPanelIds: ids, selectedIds: [], selectedConnectionIds: [], selectedMeterIds: [] };
+  }),
+
+  // The rubber-band (commit 3) selects across all four kinds at once,
+  // in a single atomic replace - calling the per-kind actions above in
+  // sequence would not work here, since a plain (non-multi) call to
+  // any one of them clears the others.
   selectMixed: (selection) => set({
     selectedIds: selection.objectIds || [],
     selectedConnectionIds: selection.connectionIds || [],
-    selectedMeterIds: selection.meterIds || []
+    selectedMeterIds: selection.meterIds || [],
+    selectedSignalPanelIds: selection.signalPanelIds || []
   }),
 
   selectAll: () => {
-    const { objects, connections, meters } = get();
+    const { objects, connections, meters, signalPanels } = get();
     set({
       selectedIds: objects.map(o => o.id),
       selectedConnectionIds: connections.map(c => c.id),
-      selectedMeterIds: meters.map(m => m.id)
+      selectedMeterIds: meters.map(m => m.id),
+      selectedSignalPanelIds: signalPanels.map(p => p.id)
     });
   },
 
-  clearSelection: () => set({ selectedIds: [], selectedConnectionIds: [], selectedMeterIds: [] }),
+  clearSelection: () => set({ selectedIds: [], selectedConnectionIds: [], selectedMeterIds: [], selectedSignalPanelIds: [] }),
 
   // Locked objects are skipped, same as an ordinary drag already
   // refuses to move them (draggable={!obj.locked} in Canvas.tsx) -
@@ -499,11 +549,12 @@ export const useStore = create<AppState>((set, get) => ({
   // of those always moves. A single set() call, then one saveHistory()
   // - one history entry per keypress, not per moved item.
   moveSelectionBy: (dx, dy) => {
-    const { selectedIds, selectedMeterIds, selectedConnectionIds } = get();
-    if (selectedIds.length === 0 && selectedMeterIds.length === 0 && selectedConnectionIds.length === 0) return;
+    const { selectedIds, selectedMeterIds, selectedConnectionIds, selectedSignalPanelIds } = get();
+    if (selectedIds.length === 0 && selectedMeterIds.length === 0 && selectedConnectionIds.length === 0 && selectedSignalPanelIds.length === 0) return;
     set((state) => ({
       objects: state.objects.map(o => (selectedIds.includes(o.id) && !o.locked) ? { ...o, x: o.x + dx, y: o.y + dy } : o),
       meters: state.meters.map(m => selectedMeterIds.includes(m.id) ? { ...m, x: m.x + dx, y: m.y + dy } : m),
+      signalPanels: state.signalPanels.map(p => selectedSignalPanelIds.includes(p.id) ? { ...p, x: p.x + dx, y: p.y + dy } : p),
       connections: state.connections.map(c => selectedConnectionIds.includes(c.id)
         ? { ...c, points: c.points.map(p => ({ x: p.x + dx, y: p.y + dy })) }
         : c)
@@ -521,13 +572,15 @@ export const useStore = create<AppState>((set, get) => ({
   // connection needs no relinking at all to stay attached to the
   // objects it was copied along with.
   copySelected: () => {
-    const { objects, selectedIds, meters, selectedMeterIds, connections, selectedConnectionIds } = get();
+    const { objects, selectedIds, meters, selectedMeterIds, signalPanels, selectedSignalPanelIds, connections, selectedConnectionIds } = get();
     const toCopy = objects.filter(obj => selectedIds.includes(obj.id));
     const metersToCopy = meters.filter(m => selectedMeterIds.includes(m.id));
+    const signalPanelsToCopy = signalPanels.filter(p => selectedSignalPanelIds.includes(p.id));
     const connectionsToCopy = connections.filter(c => selectedConnectionIds.includes(c.id));
     set({
       clipboard: JSON.parse(JSON.stringify(toCopy)),
       clipboardMeters: JSON.parse(JSON.stringify(metersToCopy)),
+      clipboardSignalPanels: JSON.parse(JSON.stringify(signalPanelsToCopy)),
       clipboardConnections: JSON.parse(JSON.stringify(connectionsToCopy))
     });
   },
@@ -536,18 +589,20 @@ export const useStore = create<AppState>((set, get) => ({
   // original, and always back on the grid (GRID_SIZE is itself the
   // grid's own pitch, so a grid-aligned source stays grid-aligned).
   paste: () => {
-    const { clipboard, clipboardMeters, clipboardConnections } = get();
-    if (clipboard.length === 0 && clipboardMeters.length === 0 && clipboardConnections.length === 0) return;
+    const { clipboard, clipboardMeters, clipboardSignalPanels, clipboardConnections } = get();
+    if (clipboard.length === 0 && clipboardMeters.length === 0 && clipboardSignalPanels.length === 0 && clipboardConnections.length === 0) return;
 
-    const cloned = cloneSelectionWithOffset(clipboard, clipboardMeters, clipboardConnections, GRID_SIZE, GRID_SIZE, uuidv4);
+    const cloned = cloneSelectionWithOffset(clipboard, clipboardMeters, clipboardSignalPanels, clipboardConnections, GRID_SIZE, GRID_SIZE, uuidv4);
 
     set((state) => ({
       objects: [...state.objects, ...cloned.objects],
       meters: [...state.meters, ...cloned.meters],
+      signalPanels: [...state.signalPanels, ...cloned.signalPanels],
       connections: [...state.connections, ...cloned.connections],
       selectedIds: cloned.objectIds,
       selectedConnectionIds: cloned.connectionIds,
-      selectedMeterIds: cloned.meterIds
+      selectedMeterIds: cloned.meterIds,
+      selectedSignalPanelIds: cloned.signalPanelIds
     }));
     get().saveHistory();
   },
@@ -557,21 +612,24 @@ export const useStore = create<AppState>((set, get) => ({
   // untouched (a subsequent Ctrl+V still pastes whatever was last
   // explicitly copied, not this duplicate).
   duplicateSelected: () => {
-    const { objects, selectedIds, meters, selectedMeterIds, connections, selectedConnectionIds } = get();
+    const { objects, selectedIds, meters, selectedMeterIds, signalPanels, selectedSignalPanelIds, connections, selectedConnectionIds } = get();
     const toDuplicate = objects.filter(obj => selectedIds.includes(obj.id));
     const metersToDuplicate = meters.filter(m => selectedMeterIds.includes(m.id));
+    const signalPanelsToDuplicate = signalPanels.filter(p => selectedSignalPanelIds.includes(p.id));
     const connectionsToDuplicate = connections.filter(c => selectedConnectionIds.includes(c.id));
-    if (toDuplicate.length === 0 && metersToDuplicate.length === 0 && connectionsToDuplicate.length === 0) return;
+    if (toDuplicate.length === 0 && metersToDuplicate.length === 0 && signalPanelsToDuplicate.length === 0 && connectionsToDuplicate.length === 0) return;
 
-    const cloned = cloneSelectionWithOffset(toDuplicate, metersToDuplicate, connectionsToDuplicate, GRID_SIZE, GRID_SIZE, uuidv4);
+    const cloned = cloneSelectionWithOffset(toDuplicate, metersToDuplicate, signalPanelsToDuplicate, connectionsToDuplicate, GRID_SIZE, GRID_SIZE, uuidv4);
 
     set((state) => ({
       objects: [...state.objects, ...cloned.objects],
       meters: [...state.meters, ...cloned.meters],
+      signalPanels: [...state.signalPanels, ...cloned.signalPanels],
       connections: [...state.connections, ...cloned.connections],
       selectedIds: cloned.objectIds,
       selectedConnectionIds: cloned.connectionIds,
-      selectedMeterIds: cloned.meterIds
+      selectedMeterIds: cloned.meterIds,
+      selectedSignalPanelIds: cloned.signalPanelIds
     }));
     get().saveHistory();
   },
@@ -590,6 +648,13 @@ export const useStore = create<AppState>((set, get) => ({
     set((state) => ({ meters: [...state.meters, clone] }));
   },
 
+  duplicateSignalPanelInPlace: (id) => {
+    const panel = get().signalPanels.find(p => p.id === id);
+    if (!panel) return;
+    const clone = { ...JSON.parse(JSON.stringify(panel)), id: uuidv4() };
+    set((state) => ({ signalPanels: [...state.signalPanels, clone] }));
+  },
+
   undo: () => {
     const { history, historyIndex } = get();
     if (historyIndex > 0) {
@@ -599,9 +664,11 @@ export const useStore = create<AppState>((set, get) => ({
         objects: JSON.parse(JSON.stringify(prevState.objects || [])),
         connections: JSON.parse(JSON.stringify(prevState.connections || [])),
         meters: JSON.parse(JSON.stringify(prevState.meters || [])),
+        signalPanels: JSON.parse(JSON.stringify(prevState.signalPanels || [])),
         selectedIds: [],
         selectedConnectionIds: [],
         selectedMeterIds: [],
+        selectedSignalPanelIds: [],
         isDirty: true
       });
     }
@@ -616,9 +683,11 @@ export const useStore = create<AppState>((set, get) => ({
         objects: JSON.parse(JSON.stringify(nextState.objects || [])),
         connections: JSON.parse(JSON.stringify(nextState.connections || [])),
         meters: JSON.parse(JSON.stringify(nextState.meters || [])),
+        signalPanels: JSON.parse(JSON.stringify(nextState.signalPanels || [])),
         selectedIds: [],
         selectedConnectionIds: [],
         selectedMeterIds: [],
+        selectedSignalPanelIds: [],
         isDirty: true
       });
     }

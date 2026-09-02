@@ -1,5 +1,6 @@
 import type { SynopticObject, SynopticConnection } from '../store';
 import type { MeterElement } from '../meter/MeterElement';
+import type { SignalPanelElement } from '../elements/SignalPanelElement';
 import type { Device } from './DeviceSchema';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 import { COLOR_CANVAS_BACKGROUND, GRID_SIZE } from '../theme/ScadaTheme';
@@ -32,6 +33,9 @@ export interface EPWProjectSchema {
   // additive fields (boundaryDirection/boundaryMedium/boundaryPortSide
   // etc.).
   meters?: MeterElement[];
+  // feat/editing-and-signal-panel commit 6: same treatment as meters
+  // above - optional, additive, no schema version bump.
+  signalPanels?: SignalPanelElement[];
   // feat/meter-element part B: the project's device list, per src/
   // project/DeviceSchema.ts's contract (this editor's first caller of
   // it - see raport.md for the full read path). Just the flat device

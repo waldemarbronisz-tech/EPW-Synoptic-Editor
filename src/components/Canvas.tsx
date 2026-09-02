@@ -18,6 +18,8 @@ import { describeObject } from '../utils/ObjectDisplay';
 import { WireNodeSymbol } from '../symbols/scada/WireNodeSymbol';
 import { MeterElementNode } from './MeterElementNode';
 import { computeMeterHeight } from '../meter/MeterElement';
+import { SignalPanelElementNode } from './SignalPanelElementNode';
+import { computeSignalPanelHeight } from '../elements/SignalPanelElement';
 import { isObjectFullyInBox, isMeterFullyInBox, isConnectionFullyInBox } from '../utils/SelectionBox';
 import { clampZoom, computeContentBounds, computeFitView, GRID_THIN_BELOW_ZOOM } from '../utils/CanvasView';
 
@@ -277,6 +279,7 @@ export const Canvas: React.FC = () => {
   const gridSize = canvasConfig.gridSize;
   const { objects, selectedIds, selectObjects, clearSelection, addObject, updateObject, canvasState, setCanvasState } = useStore();
   const { meters, selectedMeterIds, selectMeters, updateMeter, devices } = useStore();
+  const { signalPanels, selectedSignalPanelIds, selectSignalPanels, updateSignalPanel } = useStore();
   const { selectMixed } = useStore();
   const [size, setSize] = useState({ width: 800, height: 600 });
   // Mirrors `size` for the keydown handler below (registered once,
@@ -385,7 +388,7 @@ export const Canvas: React.FC = () => {
         // already in this effect.
         e.preventDefault();
         const s = useStore.getState();
-        s.deleteObjects(s.selectedIds, s.selectedConnectionIds, s.selectedMeterIds);
+        s.deleteObjects(s.selectedIds, s.selectedConnectionIds, s.selectedMeterIds, s.selectedSignalPanelIds);
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
         // Select everything on the current screen - objects,
         // connections and meters together.
@@ -602,25 +605,31 @@ export const Canvas: React.FC = () => {
     }
 
     if (selectionStartRef.current && selectionBox) {
-      // Rubber-band selection (commit 3): everything lying ENTIRELY
-      // within the box - objects, connections and meters together, not
-      // just whichever kind happens to be found first. Something
-      // poking out past the box's edge is left unselected.
+      // Rubber-band selection (commit 3, extended in commit 6 to signal
+      // panels): everything lying ENTIRELY within the box - objects,
+      // connections, meters and signal panels together, not just
+      // whichever kind happens to be found first. Something poking out
+      // past the box's edge is left unselected. isMeterFullyInBox's own
+      // signature ({x,y,width} + a separately-computed height) is
+      // already generic enough to reuse as-is for a signal panel - no
+      // new isSignalPanelFullyInBox needed, just its own height math.
       const box = selectionBox;
       const objectIds = objects.filter(obj => isObjectFullyInBox(obj, box)).map(o => o.id);
       const meterIds = meters.filter(m => isMeterFullyInBox(m, computeMeterHeight(m), box)).map(m => m.id);
+      const signalPanelIds = signalPanels.filter(p => isMeterFullyInBox(p, computeSignalPanelHeight(p), box)).map(p => p.id);
       const connectionIds = connections.filter(c => isConnectionFullyInBox(c, box)).map(c => c.id);
 
-      if (objectIds.length > 0 || meterIds.length > 0 || connectionIds.length > 0) {
+      if (objectIds.length > 0 || meterIds.length > 0 || signalPanelIds.length > 0 || connectionIds.length > 0) {
         if (e.evt.shiftKey) {
           // Shift+drag adds to whatever was already selected, per kind.
           selectMixed({
             objectIds: [...new Set([...selectedIds, ...objectIds])],
             connectionIds: [...new Set([...selectedConnectionIds, ...connectionIds])],
-            meterIds: [...new Set([...selectedMeterIds, ...meterIds])]
+            meterIds: [...new Set([...selectedMeterIds, ...meterIds])],
+            signalPanelIds: [...new Set([...selectedSignalPanelIds, ...signalPanelIds])]
           });
         } else {
-          selectMixed({ objectIds, connectionIds, meterIds });
+          selectMixed({ objectIds, connectionIds, meterIds, signalPanelIds });
         }
       }
       // An empty box selects nothing new - a non-shift click already
@@ -873,6 +882,23 @@ export const Canvas: React.FC = () => {
               }}
             />
           ))}
+          {/* The signal panel element (commit 6): same mechanism as the
+              meter, its own array - see elements/SignalPanelElement.ts.
+              Same layer 5 as the meter. */}
+          {signalPanels.map((panel) => (
+            <SignalPanelElementNode
+              key={panel.id}
+              panel={panel}
+              onSelect={(e: any) => selectSignalPanels([panel.id], !!e?.evt?.shiftKey)}
+              onDragStart={() => {
+                if (isAltPressed) useStore.getState().duplicateSignalPanelInPlace(panel.id);
+              }}
+              onDragEnd={(x, y) => {
+                updateSignalPanel(panel.id, { x: snapValue(x, gridSize, isAltPressed), y: snapValue(y, gridSize, isAltPressed) });
+                useStore.getState().saveHistory();
+              }}
+            />
+          ))}
           {/* Layer 6, labels: a SEPARATE pass over every object, drawn
               after every symbol/junction/meter so a label never falls
               under another object's own shape - each wrapped in its own
@@ -912,6 +938,20 @@ export const Canvas: React.FC = () => {
               y={meter.y}
               width={meter.width}
               height={computeMeterHeight(meter)}
+              stroke={COLOR_WHITE}
+              strokeWidth={2}
+              dash={[6, 4]}
+              fill="transparent"
+              listening={false}
+            />
+          ))}
+          {signalPanels.filter(p => selectedSignalPanelIds.includes(p.id)).map((panel) => (
+            <Rect
+              key={`panel-sel-${panel.id}`}
+              x={panel.x}
+              y={panel.y}
+              width={panel.width}
+              height={computeSignalPanelHeight(panel)}
               stroke={COLOR_WHITE}
               strokeWidth={2}
               dash={[6, 4]}

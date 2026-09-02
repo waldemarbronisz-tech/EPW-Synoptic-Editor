@@ -12,7 +12,7 @@ describe('Meter element - place/select/move/copy/delete', () => {
       objects: [], connections: [], meters: [],
       selectedIds: [], selectedConnectionIds: [], selectedMeterIds: [],
       clipboard: [], clipboardMeters: [],
-      history: [{ objects: [], connections: [], meters: [] }],
+      history: [{ objects: [], connections: [], meters: [], signalPanels: [] }],
       historyIndex: 0
     });
   });

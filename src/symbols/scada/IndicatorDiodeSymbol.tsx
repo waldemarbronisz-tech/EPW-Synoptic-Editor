@@ -28,7 +28,13 @@ export interface IndicatorDiodeSymbolProps {
   size: IndicatorDiodeSize;
 }
 
-const DIODE_OUTLINE_WIDTH = 3.5; // per this symbol's own spec, not OUTLINE_WIDTH
+// feat/editing-and-signal-panel commit 6: exported so the signal panel
+// element's own diode rows (SignalPanelElementNode.tsx) draw with
+// EXACTLY this symbol's own outline weight, not a coincidentally equal
+// duplicate of it - "use the existing Indicator Diode symbol where it
+// can be reused" extends to this constant, not just the color/radius
+// helpers above.
+export const DIODE_OUTLINE_WIDTH = 3.5; // per this symbol's own spec, not OUTLINE_WIDTH
 
 export const IndicatorDiodeSymbol: React.FC<IndicatorDiodeSymbolProps> = ({ state, size }) => {
   const radius = getIndicatorDiodeRadius(size);
