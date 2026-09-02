@@ -2,15 +2,17 @@ import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { COLOR_CANVAS_BACKGROUND, GRID_SIZE } from './theme/ScadaTheme';
 import type { MeterRow } from './symbols/scada/MeterSymbol';
+import type { MeterElement } from './meter/MeterElement';
 
 // Cap on how many undo/redo snapshots are kept; each entry is a full deep
-// copy of objects+connections, so this bounds both memory and undo depth.
+// copy of objects+connections+meters, so this bounds both memory and undo depth.
 const MAX_HISTORY = 100;
 
 
 export interface HistorySnapshot {
   objects: SynopticObject[];
   connections: SynopticConnection[];
+  meters: MeterElement[];
 }
 export interface SynopticObject {
   zIndex?: number;
@@ -134,10 +136,16 @@ interface AppState {
   };
   objects: SynopticObject[];
   connections: SynopticConnection[];
+  // The meter element (feat/meter-element): its own array, deliberately
+  // separate from objects - it is not a symbol, has no terminals, and
+  // its height is never user-set (see MeterElement.ts).
+  meters: MeterElement[];
   selectedIds: string[];
   selectedConnectionIds: string[];
+  selectedMeterIds: string[];
   canvasState: CanvasState;
   clipboard: SynopticObject[];
+  clipboardMeters: MeterElement[];
   history: HistorySnapshot[];
   historyIndex: number;
 
@@ -180,9 +188,12 @@ interface AppState {
   updateObjects: (updates: {id: string, updates: Partial<SynopticObject>}[]) => void;
   addConnection: (conn: Omit<SynopticConnection, 'id'>) => void;
   updateConnection: (id: string, updates: Partial<SynopticConnection>) => void;
-  deleteObjects: (ids: string[], connIds?: string[]) => void;
+  addMeter: (meter: Omit<MeterElement, 'id'>) => void;
+  updateMeter: (id: string, updates: Partial<MeterElement>) => void;
+  deleteObjects: (ids: string[], connIds?: string[], meterIds?: string[]) => void;
   selectObjects: (ids: string[], multi?: boolean) => void;
   selectConnections: (ids: string[], multi?: boolean) => void;
+  selectMeters: (ids: string[], multi?: boolean) => void;
   clearSelection: () => void;
 
   // Clipboard
@@ -224,11 +235,14 @@ export const useStore = create<AppState>((set, get) => ({
   },
   objects: [],
   connections: [],
+  meters: [],
   selectedIds: [],
   selectedConnectionIds: [],
+  selectedMeterIds: [],
   canvasState: { zoom: 1, panX: 0, panY: 0 },
   clipboard: [],
-  history: [{ objects: [], connections: [] }],
+  clipboardMeters: [],
+  history: [{ objects: [], connections: [], meters: [] }],
   historyIndex: 0,
 
   projectName: 'New Project',
@@ -273,9 +287,10 @@ export const useStore = create<AppState>((set, get) => ({
   })),
 
   saveHistory: () => {
-    const { objects, connections, history, historyIndex } = get();
+    const { objects, connections, meters, history, historyIndex } = get();
     const objectsJson = JSON.stringify(objects);
     const connectionsJson = JSON.stringify(connections);
+    const metersJson = JSON.stringify(meters);
 
     // Skip if nothing actually changed since the last entry (e.g. a field
     // was clicked into and blurred without editing) - don't clutter undo
@@ -284,7 +299,8 @@ export const useStore = create<AppState>((set, get) => ({
     if (
       lastEntry &&
       JSON.stringify(lastEntry.objects) === objectsJson &&
-      JSON.stringify(lastEntry.connections) === connectionsJson
+      JSON.stringify(lastEntry.connections) === connectionsJson &&
+      JSON.stringify(lastEntry.meters || []) === metersJson
     ) {
       return;
     }
@@ -292,7 +308,8 @@ export const useStore = create<AppState>((set, get) => ({
     let newHistory = history.slice(0, historyIndex + 1);
     newHistory.push({
       objects: JSON.parse(objectsJson),
-      connections: JSON.parse(connectionsJson)
+      connections: JSON.parse(connectionsJson),
+      meters: JSON.parse(metersJson)
     });
 
     // Cap history length; drop oldest entries once the cap is exceeded.
@@ -346,6 +363,20 @@ export const useStore = create<AppState>((set, get) => ({
     }));
   },
 
+  addMeter: (meter) => {
+    set((state) => ({
+      meters: [...state.meters, { ...meter, id: uuidv4() }]
+    }));
+    get().saveHistory();
+  },
+
+  updateMeter: (id, updates) => {
+    set((state) => ({
+      meters: state.meters.map(m => m.id === id ? { ...m, ...updates } : m),
+      isDirty: true
+    }));
+  },
+
   // Bug fix (node-based wiring rewrite): deleting an object used to
   // cascade-delete every connection whose fromId/toId pointed at it. A
   // connection no longer references any object id at all - it is a free
@@ -353,13 +384,15 @@ export const useStore = create<AppState>((set, get) => ({
   // needs to cascade any more. A wire left dangling by a deleted object
   // simply stops being part of any net; it stays on the canvas exactly
   // like drawing a wire into empty space always could.
-  deleteObjects: (ids, connIds = []) => {
-    if (ids.length === 0 && connIds.length === 0) return;
+  deleteObjects: (ids, connIds = [], meterIds = []) => {
+    if (ids.length === 0 && connIds.length === 0 && meterIds.length === 0) return;
     set((state) => ({
       objects: state.objects.filter(obj => !ids.includes(obj.id)),
       selectedIds: state.selectedIds.filter(id => !ids.includes(id)),
       connections: state.connections.filter(c => !connIds.includes(c.id)),
-      selectedConnectionIds: state.selectedConnectionIds.filter(id => !connIds.includes(id))
+      selectedConnectionIds: state.selectedConnectionIds.filter(id => !connIds.includes(id)),
+      meters: state.meters.filter(m => !meterIds.includes(m.id)),
+      selectedMeterIds: state.selectedMeterIds.filter(id => !meterIds.includes(id))
     }));
     get().saveHistory();
   },
@@ -373,9 +406,9 @@ export const useStore = create<AppState>((set, get) => ({
         if (index >= 0) newSelection.splice(index, 1);
         else newSelection.push(id);
       });
-      return { selectedIds: newSelection, selectedConnectionIds: [] };
+      return { selectedIds: newSelection, selectedConnectionIds: [], selectedMeterIds: [] };
     }
-    return { selectedIds: ids, selectedConnectionIds: [] };
+    return { selectedIds: ids, selectedConnectionIds: [], selectedMeterIds: [] };
   }),
 
   selectConnections: (ids, multi = false) => set((state) => {
@@ -386,22 +419,39 @@ export const useStore = create<AppState>((set, get) => ({
         if (index >= 0) newSelection.splice(index, 1);
         else newSelection.push(id);
       });
-      return { selectedConnectionIds: newSelection, selectedIds: [] };
+      return { selectedConnectionIds: newSelection, selectedIds: [], selectedMeterIds: [] };
     }
-    return { selectedConnectionIds: ids, selectedIds: [] };
+    return { selectedConnectionIds: ids, selectedIds: [], selectedMeterIds: [] };
   }),
 
-  clearSelection: () => set({ selectedIds: [], selectedConnectionIds: [] }),
+  selectMeters: (ids, multi = false) => set((state) => {
+    if (multi) {
+      const newSelection = [...state.selectedMeterIds];
+      ids.forEach(id => {
+        const index = newSelection.indexOf(id);
+        if (index >= 0) newSelection.splice(index, 1);
+        else newSelection.push(id);
+      });
+      return { selectedMeterIds: newSelection, selectedIds: [], selectedConnectionIds: [] };
+    }
+    return { selectedMeterIds: ids, selectedIds: [], selectedConnectionIds: [] };
+  }),
+
+  clearSelection: () => set({ selectedIds: [], selectedConnectionIds: [], selectedMeterIds: [] }),
 
   copySelected: () => {
-    const { objects, selectedIds } = get();
+    const { objects, selectedIds, meters, selectedMeterIds } = get();
     const toCopy = objects.filter(obj => selectedIds.includes(obj.id));
-    set({ clipboard: JSON.parse(JSON.stringify(toCopy)) });
+    const metersToCopy = meters.filter(m => selectedMeterIds.includes(m.id));
+    set({
+      clipboard: JSON.parse(JSON.stringify(toCopy)),
+      clipboardMeters: JSON.parse(JSON.stringify(metersToCopy))
+    });
   },
 
   paste: () => {
-    const { clipboard } = get();
-    if (clipboard.length === 0) return;
+    const { clipboard, clipboardMeters } = get();
+    if (clipboard.length === 0 && clipboardMeters.length === 0) return;
 
     const newIds: string[] = [];
     const newObjects = clipboard.map(obj => {
@@ -410,9 +460,19 @@ export const useStore = create<AppState>((set, get) => ({
       return { ...obj, id: newId, x: obj.x + 20, y: obj.y + 20 };
     });
 
+    const newMeterIds: string[] = [];
+    const newMeters = clipboardMeters.map(m => {
+      const newId = uuidv4();
+      newMeterIds.push(newId);
+      return { ...m, id: newId, x: m.x + 20, y: m.y + 20 };
+    });
+
     set((state) => ({
       objects: [...state.objects, ...newObjects],
-      selectedIds: newIds
+      meters: [...state.meters, ...newMeters],
+      selectedIds: newIds,
+      selectedConnectionIds: [],
+      selectedMeterIds: newMeterIds
     }));
     get().saveHistory();
   },
@@ -425,8 +485,10 @@ export const useStore = create<AppState>((set, get) => ({
         historyIndex: historyIndex - 1,
         objects: JSON.parse(JSON.stringify(prevState.objects || [])),
         connections: JSON.parse(JSON.stringify(prevState.connections || [])),
+        meters: JSON.parse(JSON.stringify(prevState.meters || [])),
         selectedIds: [],
         selectedConnectionIds: [],
+        selectedMeterIds: [],
         isDirty: true
       });
     }
@@ -440,8 +502,10 @@ export const useStore = create<AppState>((set, get) => ({
         historyIndex: historyIndex + 1,
         objects: JSON.parse(JSON.stringify(nextState.objects || [])),
         connections: JSON.parse(JSON.stringify(nextState.connections || [])),
+        meters: JSON.parse(JSON.stringify(nextState.meters || [])),
         selectedIds: [],
         selectedConnectionIds: [],
+        selectedMeterIds: [],
         isDirty: true
       });
     }

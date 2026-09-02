@@ -16,6 +16,8 @@ import {
 import { resolveNets, getJunctionPoints } from '../project/NetResolver';
 import { describeObject } from '../utils/ObjectDisplay';
 import { WireNodeSymbol } from '../symbols/scada/WireNodeSymbol';
+import { MeterElementNode } from './MeterElementNode';
+import { computeMeterHeight } from '../meter/MeterElement';
 
 // Momentary Alt-key bypass for grid snapping. Deliberately outside React
 // state: every ObjectNode's drag handlers need the CURRENT key state at
@@ -218,6 +220,7 @@ export const Canvas: React.FC = () => {
   const canvasConfig = useStore(state => state.canvasConfig);
   const gridSize = canvasConfig.gridSize;
   const { objects, selectedIds, selectObjects, clearSelection, addObject, updateObject, canvasState, setCanvasState } = useStore();
+  const { meters, selectedMeterIds, selectMeters, updateMeter } = useStore();
   const [size, setSize] = useState({ width: 800, height: 600 });
 
   // Selection Rect
@@ -470,9 +473,18 @@ export const Canvas: React.FC = () => {
           obj.y + obj.height * (obj.scaleY || 1) <= box.y + box.height
         );
       });
+      // Meters aren't SynopticObjects (no width/height field - height is
+      // always computed), so they get their own marquee check using
+      // their own width and computeMeterHeight.
+      const selectedMeters = meters.filter(m => {
+        const h = computeMeterHeight(m);
+        return m.x >= box.x && m.y >= box.y && m.x + m.width <= box.x + box.width && m.y + h <= box.y + box.height;
+      });
 
       if (selected.length > 0) {
         selectObjects(selected.map(s => s.id), e.evt.shiftKey);
+      } else if (selectedMeters.length > 0) {
+        selectMeters(selectedMeters.map(m => m.id), e.evt.shiftKey);
       }
     }
 
@@ -680,6 +692,20 @@ export const Canvas: React.FC = () => {
               onSelect={() => selectObjects([obj.id], false)}
               onChange={(newAttrs) => updateObject(obj.id, newAttrs)}
               gridSize={gridSize}
+            />
+          ))}
+          {/* The meter element (feat/meter-element): its own array, not
+              a symbol - see MeterElement.ts's own header comment. */}
+          {meters.map((meter) => (
+            <MeterElementNode
+              key={meter.id}
+              meter={meter}
+              isSelected={selectedMeterIds.includes(meter.id)}
+              onSelect={() => selectMeters([meter.id], false)}
+              onDragEnd={(x, y) => {
+                updateMeter(meter.id, { x: snapValue(x, gridSize, isAltPressed), y: snapValue(y, gridSize, isAltPressed) });
+                useStore.getState().saveHistory();
+              }}
             />
           ))}
           {/* Topology junctions: a wire node (from the SCADA library)

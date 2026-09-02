@@ -52,7 +52,8 @@ export class ProjectManager {
       },
       canvas: state.canvasConfig,
       objects: state.objects,
-      connections: state.connections || []
+      connections: state.connections || [],
+      meters: state.meters || []
     };
     const validation = validateProjectSchema(proj);
     if (!validation.valid) {
@@ -67,6 +68,7 @@ export class ProjectManager {
     useStore.setState({
       objects: project.objects,
       connections: project.connections || [],
+      meters: project.meters || [],
       projectName: project.project.name,
       projectMetadata: {
         description: project.project.description || "",
@@ -87,7 +89,11 @@ export class ProjectManager {
       },
       isDirty: isDirty,
       selectedIds: [],
-      history: [{ objects: JSON.parse(JSON.stringify(project.objects)), connections: JSON.parse(JSON.stringify(project.connections || [])) }],
+      history: [{
+        objects: JSON.parse(JSON.stringify(project.objects)),
+        connections: JSON.parse(JSON.stringify(project.connections || [])),
+        meters: JSON.parse(JSON.stringify(project.meters || []))
+      }],
       historyIndex: 0
     });
   }

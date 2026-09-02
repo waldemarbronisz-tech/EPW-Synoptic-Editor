@@ -1,4 +1,5 @@
 import type { SynopticObject, SynopticConnection } from '../store';
+import type { MeterElement } from '../meter/MeterElement';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 import { COLOR_CANVAS_BACKGROUND, GRID_SIZE } from '../theme/ScadaTheme';
 
@@ -23,6 +24,12 @@ export interface EPWProjectSchema {
   canvas: EPWCanvasSchema;
   objects: SynopticObject[];
   connections?: SynopticConnection[];
+  // feat/meter-element: optional and additive, same as connections
+  // above - an older project file simply has no meters (loads as an
+  // empty array), not an invalid one. Does not warrant a schema version
+  // bump, the same reasoning already applied to earlier additive fields
+  // (boundaryDirection/boundaryMedium/boundaryPortSide etc.).
+  meters?: MeterElement[];
 }
 
 // v2: node-based wiring. A connection is a freehand orthogonal polyline
