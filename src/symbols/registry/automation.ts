@@ -71,3 +71,8 @@ export const automationSymbols: Record<string, SymbolDefinition> = {
 
   // Measurements
 };
+
+// Object Library trim (node-based wiring task, part E): none of this
+// category's symbols are in the kept 22 - hidden as a whole rather than
+// repeating the flag on every entry above.
+Object.values(automationSymbols).forEach(def => { def.hiddenFromLibrary = true; });

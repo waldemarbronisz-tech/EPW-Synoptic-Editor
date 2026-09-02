@@ -40,3 +40,8 @@ export const measurementsSymbols: Record<string, SymbolDefinition> = {
 
   // Generic primitives
 };
+
+// Object Library trim (part E): none of this category's symbols are in
+// the kept 22 (the EKRAN group's "Miernik" is scada.meter, a different
+// symbol) - hidden as a whole rather than repeating the flag per entry.
+Object.values(measurementsSymbols).forEach(def => { def.hiddenFromLibrary = true; });

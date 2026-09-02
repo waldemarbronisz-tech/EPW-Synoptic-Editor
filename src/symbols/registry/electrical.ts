@@ -1,5 +1,17 @@
 import type { SymbolDefinition } from '../SymbolRegistry';
 
+// Object Library trim (node-based wiring task, part E): only Circuit
+// Breaker, Disconnect Switch, Motor, Indicator Lamp and Earth stay
+// visible from this file's 15 symbols. The other 10 (plus the busbar,
+// which is not a symbol at all any more - a bus is now a wire style)
+// get hiddenFromLibrary: true - still fully defined, still render
+// correctly for an already-placed instance, just not draggable from the
+// Toolbox. Every terminals coordinate below is a GRID_SIZE (16) multiple,
+// picked nearest to where connectionPoints' fraction used to land -
+// none of these symbols' own defaultWidth/defaultHeight are themselves
+// multiples of 16, so the terminal sits a few px from the exact visual
+// lead in some cases (the same pre-existing tension noted throughout
+// this codebase between the fixed symbol canvases and GRID_SIZE).
 export const electricalSymbols: Record<string, SymbolDefinition> = {
   'electrical.circuit_breaker': {
     type: 'electrical.circuit_breaker',
@@ -9,7 +21,8 @@ export const electricalSymbols: Record<string, SymbolDefinition> = {
     defaultHeight: 40,
     allowedStates: ['OPEN', 'CLOSED', 'TRIPPED', 'FAULT'],
     defaultState: 'OPEN',
-    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}]
+    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}],
+    terminals: [{ id: 'IN', x: 16, y: 0, medium: 'ELECTRICAL' }, { id: 'OUT', x: 16, y: 48, medium: 'ELECTRICAL' }]
   },
   'electrical.disconnect_switch': {
     type: 'electrical.disconnect_switch',
@@ -19,7 +32,8 @@ export const electricalSymbols: Record<string, SymbolDefinition> = {
     defaultHeight: 40,
     allowedStates: ['OPEN', 'CLOSED', 'FAULT'],
     defaultState: 'OPEN',
-    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}]
+    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}],
+    terminals: [{ id: 'IN', x: 16, y: 0, medium: 'ELECTRICAL' }, { id: 'OUT', x: 16, y: 48, medium: 'ELECTRICAL' }]
   },
   'electrical.contactor': {
     type: 'electrical.contactor',
@@ -29,7 +43,8 @@ export const electricalSymbols: Record<string, SymbolDefinition> = {
     defaultHeight: 40,
     allowedStates: ['OFF', 'ON', 'FAULT'],
     defaultState: 'OFF',
-    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}, {id: 'COIL', x: 0.8, y: 0.8, domain: 'electrical', direction: 'passive'}]
+    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}, {id: 'COIL', x: 0.8, y: 0.8, domain: 'electrical', direction: 'passive'}],
+    hiddenFromLibrary: true
   },
   'electrical.transformer': {
     type: 'electrical.transformer',
@@ -39,7 +54,8 @@ export const electricalSymbols: Record<string, SymbolDefinition> = {
     defaultHeight: 60,
     allowedStates: ['NORMAL', 'ENERGIZED', 'FAULT'],
     defaultState: 'NORMAL',
-    connectionPoints: [{id: 'PRIMARY', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'SECONDARY', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}]
+    connectionPoints: [{id: 'PRIMARY', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'SECONDARY', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}],
+    hiddenFromLibrary: true
   },
   'electrical.relay': {
     type: 'electrical.relay',
@@ -49,7 +65,8 @@ export const electricalSymbols: Record<string, SymbolDefinition> = {
     defaultHeight: 40,
     allowedStates: ['OFF', 'ON', 'FAULT'],
     defaultState: 'OFF',
-    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}, {id: 'COIL', x: 0.2, y: 0.8, domain: 'electrical', direction: 'passive'}]
+    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}, {id: 'COIL', x: 0.2, y: 0.8, domain: 'electrical', direction: 'passive'}],
+    hiddenFromLibrary: true
   },
   'electrical.fuse': {
     type: 'electrical.fuse',
@@ -59,7 +76,8 @@ export const electricalSymbols: Record<string, SymbolDefinition> = {
     defaultHeight: 40,
     allowedStates: ['NORMAL', 'BLOWN'],
     defaultState: 'NORMAL',
-    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}]
+    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}],
+    hiddenFromLibrary: true
   },
   'electrical.busbar': {
     type: 'electrical.busbar',
@@ -70,15 +88,11 @@ export const electricalSymbols: Record<string, SymbolDefinition> = {
     allowedStates: ['DEENERGIZED', 'ENERGIZED', 'FAULT'],
     defaultState: 'DEENERGIZED',
     isLine: true,
-    // Bug fix: this symbol had no connectionPoints and no dynamic-port
-    // support at all - zero ports reported, so no wire could ever attach
-    // to it. It shares the same name-ish "Busbar" a user reaches for
-    // first (listed here in Electrical, ahead of the SCADA folder), so
-    // this is very likely the busbar a "can't attach anything" report is
-    // actually about. Now uses the same edge-port mechanism as
-    // scada.busbar (see Canvas.tsx/PropertyInspector.tsx checks on this
-    // flag) - own width/height flow through unchanged.
-    supportsDynamicPorts: true
+    // A busbar is a wire style (SynopticConnection.style === 'BUS') now,
+    // not a symbol - hidden regardless of the old supportsDynamicPorts
+    // mechanism, which the node-based wiring model no longer uses.
+    supportsDynamicPorts: true,
+    hiddenFromLibrary: true
   },
   'electrical.indicator_lamp': {
     type: 'electrical.indicator_lamp',
@@ -88,7 +102,8 @@ export const electricalSymbols: Record<string, SymbolDefinition> = {
     defaultHeight: 30,
     allowedStates: ['OFF', 'ON', 'BLINK', 'FAULT'],
     defaultState: 'OFF',
-    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}]
+    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}],
+    terminals: [{ id: 'IN', x: 16, y: 0, medium: 'ELECTRICAL' }]
   },
   'electrical.generator': {
     type: 'electrical.generator',
@@ -98,7 +113,8 @@ export const electricalSymbols: Record<string, SymbolDefinition> = {
     defaultHeight: 60,
     allowedStates: ['OFF', 'RUNNING', 'FAULT'],
     defaultState: 'OFF',
-    connectionPoints: [{id: 'OUT', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}]
+    connectionPoints: [{id: 'OUT', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}],
+    hiddenFromLibrary: true
   },
   'electrical.grid_source': {
     type: 'electrical.grid_source',
@@ -108,7 +124,8 @@ export const electricalSymbols: Record<string, SymbolDefinition> = {
     defaultHeight: 60,
     allowedStates: ['ENERGIZED', 'DEENERGIZED', 'FAULT'],
     defaultState: 'ENERGIZED',
-    connectionPoints: [{id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}]
+    connectionPoints: [{id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}],
+    hiddenFromLibrary: true
   },
   'electrical.motor': {
     type: 'electrical.motor',
@@ -118,7 +135,8 @@ export const electricalSymbols: Record<string, SymbolDefinition> = {
     defaultHeight: 60,
     allowedStates: ['OFF', 'RUNNING', 'FAULT'],
     defaultState: 'OFF',
-    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}]
+    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}],
+    terminals: [{ id: 'IN', x: 32, y: 0, medium: 'ELECTRICAL' }]
   },
   'electrical.generic_load': {
     type: 'electrical.generic_load',
@@ -128,7 +146,8 @@ export const electricalSymbols: Record<string, SymbolDefinition> = {
     defaultHeight: 40,
     allowedStates: ['OFF', 'ON', 'FAULT'],
     defaultState: 'OFF',
-    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}]
+    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}],
+    hiddenFromLibrary: true
   },
   'electrical.terminal': {
     type: 'electrical.terminal',
@@ -138,7 +157,8 @@ export const electricalSymbols: Record<string, SymbolDefinition> = {
     defaultHeight: 20,
     allowedStates: ['NORMAL', 'FAULT'],
     defaultState: 'NORMAL',
-    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}]
+    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}],
+    hiddenFromLibrary: true
   },
   'electrical.rcd': {
     type: 'electrical.rcd',
@@ -148,7 +168,8 @@ export const electricalSymbols: Record<string, SymbolDefinition> = {
     defaultHeight: 60,
     allowedStates: ['CLOSED', 'OPEN', 'TRIPPED', 'FAULT'],
     defaultState: 'CLOSED',
-    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}]
+    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}],
+    hiddenFromLibrary: true
   },
   'electrical.spd': {
     type: 'electrical.spd',
@@ -158,7 +179,8 @@ export const electricalSymbols: Record<string, SymbolDefinition> = {
     defaultHeight: 60,
     allowedStates: ['NORMAL', 'FAULT'],
     defaultState: 'NORMAL',
-    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'GND', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}]
+    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}, {id: 'GND', x: 0.5, y: 1, domain: 'electrical', direction: 'passive'}],
+    hiddenFromLibrary: true
   },
   'electrical.cable_tray': {
     type: 'electrical.cable_tray',
@@ -167,7 +189,8 @@ export const electricalSymbols: Record<string, SymbolDefinition> = {
     defaultWidth: 100,
     defaultHeight: 20,
     allowedStates: ['NORMAL'],
-    defaultState: 'NORMAL'
+    defaultState: 'NORMAL',
+    hiddenFromLibrary: true
   },
   'electrical.earth': {
     type: 'electrical.earth',
@@ -177,7 +200,8 @@ export const electricalSymbols: Record<string, SymbolDefinition> = {
     defaultHeight: 40,
     allowedStates: ['NORMAL', 'FAULT'],
     defaultState: 'NORMAL',
-    connectionPoints: [{id: 'GND', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}]
+    connectionPoints: [{id: 'GND', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}],
+    terminals: [{ id: 'GND', x: 16, y: 0, medium: 'ELECTRICAL' }]
   },
 
   // Water
