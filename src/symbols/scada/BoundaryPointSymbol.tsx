@@ -18,7 +18,7 @@ export type BoundaryPortSide = 'TOP' | 'BOTTOM' | 'LEFT' | 'RIGHT';
 export const BOUNDARY_POINT_STATES: string[] = [];
 
 const MIN_WIDTH = 96;  // per this symbol's own spec
-const MAX_WIDTH = 200; // per this symbol's own spec
+const MAX_WIDTH = 220; // per this symbol's own spec
 const ARROW_LENGTH = 14;
 const ARROW_HALF_WIDTH = 5;
 const ARROW_OUTLINE_WIDTH = 1;

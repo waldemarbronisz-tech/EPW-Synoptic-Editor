@@ -1,5 +1,9 @@
 import type { SymbolDefinition } from '../SymbolRegistry';
 
+// Both of this file's symbols stay visible in the Object Library (part
+// E) - only ELECTRICAL is a valid terminal medium (the node-based wiring
+// model has no separate air/HVAC medium), so each gets one power feed
+// terminal.
 export const hvacSymbols: Record<string, SymbolDefinition> = {
   'hvac.fan': {
     type: 'hvac.fan',
@@ -8,7 +12,8 @@ export const hvacSymbols: Record<string, SymbolDefinition> = {
     defaultWidth: 50,
     defaultHeight: 50,
     allowedStates: ['OFF', 'RUNNING', 'FAULT'],
-    defaultState: 'OFF'
+    defaultState: 'OFF',
+    terminals: [{ id: 'IN', x: 32, y: 0, medium: 'ELECTRICAL' }]
   },
   'hvac.heater': {
     type: 'hvac.heater',
@@ -17,7 +22,8 @@ export const hvacSymbols: Record<string, SymbolDefinition> = {
     defaultWidth: 80,
     defaultHeight: 40,
     allowedStates: ['OFF', 'HEATING', 'FAULT'],
-    defaultState: 'OFF'
+    defaultState: 'OFF',
+    terminals: [{ id: 'IN', x: 48, y: 0, medium: 'ELECTRICAL' }]
   },
 
   // Instrumentation (Sensors & Displays)

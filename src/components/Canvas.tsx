@@ -1,20 +1,21 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Stage, Layer, Rect, Circle, Group, Transformer } from 'react-konva';
+import { Stage, Layer, Rect, Circle, Group, Transformer, Path } from 'react-konva';
 import { useStore } from '../store';
-import type { SynopticObject } from '../store';
+import type { SynopticObject, SynopticConnection, WirePoint } from '../store';
 import { SymbolRenderer } from '../symbols/SymbolRenderer';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
-import { ConnectionService } from '../project/ConnectionService';
-import { ConnectionLine } from './ConnectionLine';
+import { ConnectionLine, pathFromPoints } from './ConnectionLine';
 import { ObjectLabelRenderer } from './ObjectLabelRenderer';
-import { COLOR_ALARM, COLOR_CANVAS_BACKGROUND, COLOR_OUTLINE, COLOR_WATER, COLOR_WHITE } from '../theme/ScadaTheme';
-import { WireNodeSymbol } from '../symbols/scada/WireNodeSymbol';
-import { getBusbarEdgePorts } from '../symbols/scada/BusbarSymbol';
-import { getBoundaryPointWidth, getBoundaryPortFraction } from '../symbols/scada/BoundaryPointSymbol';
-import { getLabelFrameSize } from '../symbols/scada/LabelFrameSymbol';
+import { COLOR_CANVAS_BACKGROUND, COLOR_OUTLINE, COLOR_WATER, COLOR_WHITE, COLOR_DE_ENERGIZED, CONDUCTOR_WIDTH } from '../theme/ScadaTheme';
 import { snapValue } from '../utils/GridSnap';
-import { resolveConnectionPoint, getAbsolutePortPosition } from '../utils/GeometryUtils';
+import { getObjectTerminals } from '../utils/Terminals';
+import {
+  snapPointToGrid, appendWirePoint, removeLastWirePoint,
+  reorthogonalizeAfterMove, insertBendOnSegment, nearestPointOnPolyline
+} from '../utils/WireDrawing';
+import { resolveNets, getJunctionPoints } from '../project/NetResolver';
 import { describeObject } from '../utils/ObjectDisplay';
+import { WireNodeSymbol } from '../symbols/scada/WireNodeSymbol';
 
 // Momentary Alt-key bypass for grid snapping. Deliberately outside React
 // state: every ObjectNode's drag handlers need the CURRENT key state at
@@ -23,19 +24,12 @@ import { describeObject } from '../utils/ObjectDisplay';
 // the whole canvas by itself.
 let isAltPressed = false;
 
-
-
-
-const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMouseDown, onPortMouseUp, wireDragStart, gridSize }: {
+const ObjectNode = ({ obj, isSelected, onSelect, onChange, gridSize }: {
   gridSize: number,
   obj: SynopticObject,
   isSelected: boolean,
   onSelect: () => void,
   onChange: (newAttrs: Partial<SynopticObject>) => void,
-  onPortClick: (objId: string, portId: string) => void,
-  onPortMouseDown: (objId: string, portId: string, e: any) => void,
-  onPortMouseUp: (objId: string, portId: string, e: any) => void,
-  wireDragStart: any
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const shapeRef = useRef<any>(null);
@@ -48,7 +42,13 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
     }
   }, [isSelected]);
 
-  const def = getSymbolDefinition(obj.type);
+  // Node-based wiring model: a symbol has terminals now, not ports - see
+  // utils/Terminals.ts. The old click-a-port-to-drag-a-wire interaction
+  // (onPortMouseDown/Up/Click, the busbar's dynamic-port onMouseUp
+  // special case) is gone entirely; a terminal is purely a visual hint
+  // now (radius 6, shown on hover) of where a freehand-drawn wire
+  // actually needs to end to connect - simply sharing that grid point.
+  const terminals = getObjectTerminals(obj);
 
   return (
     <React.Fragment>
@@ -65,52 +65,6 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
         onTap={onSelect}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        onMouseUp={(e) => {
-          if (def?.supportsDynamicPorts) {
-            const stage = e.target.getStage();
-            const pos = stage?.getPointerPosition();
-            if (pos) {
-              const stageScale = stage?.scaleX() || 1;
-              const offsetX = stage?.x() || 0;
-              const offsetY = stage?.y() || 0;
-
-              const globalX = (pos.x - offsetX) / stageScale;
-              const globalY = (pos.y - offsetY) / stageScale;
-
-              // Calculate relative click percentage
-              const localX = globalX - obj.x;
-              const localY = globalY - obj.y;
-
-              // Use the object's own current width/height, not the symbol
-              // definition's static default - a resizable busbar's actual
-              // size can differ from it.
-              const w = obj.width * (obj.scaleX || 1);
-              const h = obj.height * (obj.scaleY || 1);
-
-              // In Canvas, object origin is top-left in our bounding box.
-              // So if w >= h (horizontal), percentage is localX / w.
-              let busPos = 0.5;
-              if (w >= h) {
-                busPos = localX / w;
-              } else {
-                busPos = localY / h;
-              }
-              busPos = Math.max(0, Math.min(1, busPos));
-              const posPercent = Math.round(busPos * 100);
-
-              // Both busbars (scada.busbar and, since the usterka-1 fix,
-              // electrical.busbar too - every def.supportsDynamicPorts
-              // symbol today is one of these two) have ports along BOTH
-              // their top and bottom edges, not just a single center row -
-              // pick the edge closer to where the user clicked. The
-              // legacy unprefixed dyn_NN center-row format is still
-              // resolved for backward compatibility (resolveConnectionPoint),
-              // it just is not generated for new connections any more.
-              const dynamicPortId = `dyn_${localY < h / 2 ? 'top' : 'bot'}_${posPercent}`;
-              onPortMouseUp(obj.id, dynamicPortId, e);
-            }
-          }
-        }}
         onDragMove={(e) => {
           // Snap during drag for visual feedback (doesn't mutate store yet).
           // Held Alt bypasses this exactly as it bypasses the final snap
@@ -132,26 +86,6 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
           const scaleX = node.scaleX();
           const scaleY = node.scaleY();
 
-          if (def?.supportsDynamicPorts) {
-            // A busbar's width field is the single source of truth for
-            // its size (the dynamic-port math keys on it directly) - fold
-            // the drag-resize scale into width instead of leaving it as a
-            // separate multiplier, and reset scale to 1 so it stays that
-            // way. Goes through resizeBusbar so already-attached
-            // connections are reattached/reported exactly as a
-            // Properties-field width edit would.
-            onChange({
-              x: snapValue(node.x(), gridSize, isAltPressed),
-              y: snapValue(node.y(), gridSize, isAltPressed),
-              scaleX: 1,
-              scaleY: 1,
-            });
-            useStore.getState().resizeBusbar(obj.id, obj.width * scaleX);
-            node.scaleX(1);
-            node.scaleY(1);
-            return;
-          }
-
           onChange({
             x: snapValue(node.x(), gridSize, isAltPressed),
             y: snapValue(node.y(), gridSize, isAltPressed),
@@ -166,107 +100,20 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
         {/* Render Designation/Name Label */}
         <ObjectLabelRenderer obj={obj} onChange={onChange} />
 
-        {/* Ports highlight on hover (or while a wire is being dragged)
-            only, per usterka D3 - not on selection, not permanently: a
-            schematic with every port on every object always visible
-            reads as unreadable clutter. Radius 6, contrasting fill,
-            black outline, exactly the task's spec. */}
-        {(isHovered || wireDragStart) && def?.connectionPoints?.map((cp, idx) => (
-           <Circle
-             key={`cp-${idx}`}
-             x={cp.x * obj.width}
-             y={cp.y * obj.height}
-             radius={6}
-             fill={wireDragStart ? COLOR_ALARM : COLOR_WATER}
-             stroke={COLOR_OUTLINE}
-             strokeWidth={1}
-             hitStrokeWidth={15}
-             onMouseEnter={(e: any) => {
-                const container = e.target.getStage()?.container();
-                if (container) container.style.cursor = 'crosshair';
-                e.target.scale({ x: 1.5, y: 1.5 });
-                e.target.getLayer()?.batchDraw();
-             }}
-             onMouseLeave={(e: any) => {
-                const container = e.target.getStage()?.container();
-                if (container) container.style.cursor = 'default';
-                e.target.scale({ x: 1, y: 1 });
-                e.target.getLayer()?.batchDraw();
-             }}
-             onClick={(e) => {
-                 e.cancelBubble = true;
-                 onPortClick(obj.id, cp.id);
-               }}
-               onTap={(e) => {
-                 e.cancelBubble = true;
-                 onPortClick(obj.id, cp.id);
-               }}
-               onMouseDown={(e) => {
-                 e.cancelBubble = true;
-                 onPortMouseDown(obj.id, cp.id, e);
-               }}
-               onMouseUp={(e) => {
-                 e.cancelBubble = true;
-                 onPortMouseUp(obj.id, cp.id, e);
-               }}
-           />
-        ))}
-
-        {/* Busbar (scada.busbar and electrical.busbar - any
-            def.supportsDynamicPorts symbol, all of which are busbars
-            today): ports along both edges, shown only on hover (or while
-            a wire is being dragged) - visible at all times, it would read
-            as a comb rather than a busbar. Height comes from the object's
-            own current height, not a constant borrowed from the other
-            busbar's fixed size. */}
-        {def?.supportsDynamicPorts && (isHovered || wireDragStart) && [
-          ...getBusbarEdgePorts(obj.width, 'top', obj.height).map((p, idx) => ({ ...p, key: `bus-top-${idx}`, portId: `dyn_top_${Math.round((p.x / Math.max(obj.width, 1)) * 100)}` })),
-          ...getBusbarEdgePorts(obj.width, 'bottom', obj.height).map((p, idx) => ({ ...p, key: `bus-bot-${idx}`, portId: `dyn_bot_${Math.round((p.x / Math.max(obj.width, 1)) * 100)}` }))
-        ].map(p => (
+        {/* Terminals highlight on hover only (usterka D3's precedent,
+            carried forward) - radius 6, contrasting fill, black outline. */}
+        {isHovered && terminals.map((t) => (
           <Circle
-            key={p.key}
-            x={p.x}
-            y={p.y}
+            key={`term-${t.id}`}
+            x={t.x}
+            y={t.y}
             radius={6}
-            fill={COLOR_WHITE}
+            fill={COLOR_WATER}
             stroke={COLOR_OUTLINE}
-            strokeWidth={1.5}
-            hitStrokeWidth={12}
-            onMouseDown={(e) => { e.cancelBubble = true; onPortMouseDown(obj.id, p.portId, e); }}
-            onMouseUp={(e) => { e.cancelBubble = true; onPortMouseUp(obj.id, p.portId, e); }}
-            onClick={(e) => { e.cancelBubble = true; onPortClick(obj.id, p.portId); }}
-            onTap={(e) => { e.cancelBubble = true; onPortClick(obj.id, p.portId); }}
+            strokeWidth={1}
+            listening={false}
           />
         ))}
-
-        {/* Boundary point (scada.boundary_point): exactly one port, on
-            whichever side boundaryPortSide names - shown only on hover
-            (or while a wire is being dragged), same convention as every
-            other port on the canvas. Position uses the same
-            label/sublabel-driven width and portSide fraction the symbol
-            itself renders with (BoundaryPointSymbol), not obj.width, so
-            the hit target always lands exactly on the drawn port. */}
-        {obj.type === 'scada.boundary_point' && (isHovered || wireDragStart) && (() => {
-          const bpWidth = getBoundaryPointWidth(obj.designation || obj.name || 'LABEL', obj.description || obj.text || '');
-          const { height: bpHeight } = getLabelFrameSize(obj.designation || obj.name || 'LABEL', obj.description || obj.text || '');
-          const side = obj.boundaryPortSide === 'BOTTOM' || obj.boundaryPortSide === 'LEFT' || obj.boundaryPortSide === 'RIGHT' ? obj.boundaryPortSide : 'TOP';
-          const { x: fx, y: fy } = getBoundaryPortFraction(side);
-          return (
-            <Circle
-              x={fx * bpWidth}
-              y={fy * bpHeight}
-              radius={6}
-              fill={wireDragStart ? COLOR_ALARM : COLOR_WATER}
-              stroke={COLOR_OUTLINE}
-              strokeWidth={1}
-              hitStrokeWidth={15}
-              onMouseDown={(e) => { e.cancelBubble = true; onPortMouseDown(obj.id, 'PORT', e); }}
-              onMouseUp={(e) => { e.cancelBubble = true; onPortMouseUp(obj.id, 'PORT', e); }}
-              onClick={(e) => { e.cancelBubble = true; onPortClick(obj.id, 'PORT'); }}
-              onTap={(e) => { e.cancelBubble = true; onPortClick(obj.id, 'PORT'); }}
-            />
-          );
-        })()}
       </Group>
       {isSelected && !obj.locked && (
         <Transformer
@@ -277,16 +124,90 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, onPortClick, onPortMo
             }
             return newBox;
           }}
-          // Usterka D2: a selected object wasn't clearly visible - a
-          // dashed, contrasting outline around it, separate from the
-          // resize-scale handle squares (anchorStroke/anchorFill,
-          // untouched below). Same white-reads-as-selected convention
-          // ConnectionLine.tsx already uses for a selected wire.
           borderStroke={COLOR_WHITE}
           borderStrokeWidth={2}
           borderDash={[6, 4]}
         />
       )}
+    </React.Fragment>
+  );
+};
+
+// A finished wire: draws itself (ConnectionLine), can be dragged whole
+// (translating every point, grid-snapped), and - while selected - shows
+// a draggable handle at each of its own points so a bend can be grabbed
+// and moved without breaking orthogonality (WireDrawing.
+// reorthogonalizeAfterMove fixes up its two neighboring segments).
+// Alt+click on a segment (not a handle) inserts a brand new bend there.
+const ConnectionNode = ({ conn, isSelected, onSelect, gridSize, onAltClickSegment }: {
+  conn: SynopticConnection,
+  isSelected: boolean,
+  onSelect: () => void,
+  gridSize: number,
+  onAltClickSegment: (conn: SynopticConnection, worldPoint: WirePoint) => void,
+}) => {
+  const moveGroupRef = useRef<any>(null);
+
+  return (
+    <React.Fragment>
+      <Group
+        ref={moveGroupRef}
+        draggable={isSelected}
+        onDragMove={(e) => {
+          e.target.x(snapValue(e.target.x(), gridSize, isAltPressed));
+          e.target.y(snapValue(e.target.y(), gridSize, isAltPressed));
+        }}
+        onDragEnd={(e) => {
+          const dx = e.target.x();
+          const dy = e.target.y();
+          if (dx !== 0 || dy !== 0) {
+            useStore.getState().updateConnection(conn.id, {
+              points: conn.points.map(p => ({ x: p.x + dx, y: p.y + dy }))
+            });
+            useStore.getState().saveHistory();
+          }
+          e.target.x(0);
+          e.target.y(0);
+        }}
+      >
+        <ConnectionLine
+          conn={conn}
+          isSelected={isSelected}
+          onSelect={(e: any) => {
+            if (e?.evt?.altKey) {
+              e.cancelBubble = true;
+              const stage = e.target.getStage();
+              const pos = stage?.getPointerPosition();
+              if (!pos) return;
+              const { panX, panY, zoom } = useStore.getState().canvasState;
+              onAltClickSegment(conn, snapPointToGrid((pos.x - panX) / zoom, (pos.y - panY) / zoom));
+              return;
+            }
+            onSelect();
+          }}
+        />
+      </Group>
+      {isSelected && conn.points.map((p, idx) => (
+        <Circle
+          key={idx}
+          x={p.x}
+          y={p.y}
+          radius={6}
+          fill={COLOR_WHITE}
+          stroke={COLOR_OUTLINE}
+          strokeWidth={1.5}
+          draggable
+          onDragMove={(e) => {
+            e.target.x(snapValue(e.target.x(), gridSize, isAltPressed));
+            e.target.y(snapValue(e.target.y(), gridSize, isAltPressed));
+          }}
+          onDragEnd={(e) => {
+            const newPoints = reorthogonalizeAfterMove(conn.points, idx, { x: e.target.x(), y: e.target.y() });
+            useStore.getState().updateConnection(conn.id, { points: newPoints });
+            useStore.getState().saveHistory();
+          }}
+        />
+      ))}
     </React.Fragment>
   );
 };
@@ -307,16 +228,74 @@ export const Canvas: React.FC = () => {
   const isPanningRef = useRef(false);
   const lastPanPosRef = useRef({ x: 0, y: 0 });
 
-  // Connection Drawing
-  const [drawStartPort, setDrawStartPort] = useState<{objId: string, portId: string} | null>(null);
-  const [wireDragStart, setWireDragStart] = useState<{objId: string, portId: string} | null>(null);
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  // Freehand wire drawing (usterka B): points already placed, and the
+  // live (grid-snapped) cursor position for the preview segment. A ref
+  // mirrors the state so the window-level keydown handler (registered
+  // once) always reads the current points, never a stale closure.
+  const [drawingPoints, setDrawingPoints] = useState<WirePoint[] | null>(null);
+  const [drawingPreview, setDrawingPreview] = useState<WirePoint | null>(null);
+  const drawingPointsRef = useRef<WirePoint[] | null>(null);
+  useEffect(() => { drawingPointsRef.current = drawingPoints; }, [drawingPoints]);
 
-  // Grid-snap Alt bypass: tracked once, globally, for the whole canvas -
-  // not local React state, since a keypress must never re-render every
-  // object on the canvas just to update a modifier flag.
+  // isDrawingConnection/setDrawingMode is the same store pair the old
+  // click-two-ports tool used, repurposed (not renamed) for the freehand
+  // wire tool - Toolbar.tsx's existing "Rysuj polaczenie" button already
+  // toggles it; Canvas.tsx only needs to read it here.
+  const { connections, selectedConnectionIds, selectConnections, isDrawingConnection } = useStore();
+
+  const toCanvasPoint = (stagePos: { x: number; y: number }): WirePoint => {
+    const scale = canvasState.zoom;
+    return snapPointToGrid((stagePos.x - canvasState.panX) / scale, (stagePos.y - canvasState.panY) / scale);
+  };
+
+  const finishDrawing = () => {
+    const points = drawingPointsRef.current;
+    setDrawingPoints(null);
+    setDrawingPreview(null);
+    if (!points || points.length < 2) return;
+
+    useStore.getState().addConnection({ points, medium: 'ELECTRICAL', style: 'NORMAL', state: 'LIVE' });
+    useStore.getState().saveHistory();
+
+    // Readable, UUID-free feedback: if the new wire actually touches a
+    // terminal - possibly by landing on the MIDDLE of another wire's
+    // segment, e.g. tapping into a busbar - name what it joined.
+    const store = useStore.getState();
+    const justAdded = store.connections[store.connections.length - 1];
+    const nets = resolveNets(store.connections, store.objects);
+    const net = nets.find(n => n.connectionIds.includes(justAdded.id));
+    if (net && net.terminals.length > 0) {
+      const uniqueObjIds = [...new Set(net.terminals.map(t => t.objId))];
+      const names = uniqueObjIds.map(id => describeObject(store.objects.find(o => o.id === id))).join(', ');
+      store.addMessage(`[INFO] Wire connected: ${names}`);
+    } else {
+      store.addMessage('[INFO] Wire drawn (not touching any terminal yet)');
+    }
+  };
+
+  // Grid-snap Alt bypass, tracked once, globally, for the whole canvas -
+  // plus the wire-drawing tool's own keyboard shortcuts (Enter finishes,
+  // Escape cancels the whole in-progress wire, Backspace undoes the last
+  // bend), registered once so they always see the latest drawing state
+  // through the ref above rather than a stale closure.
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Alt') isAltPressed = true; };
+    const isTypingInField = () => {
+      const el = document.activeElement as HTMLElement | null;
+      return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Alt') isAltPressed = true;
+      if (isTypingInField()) return;
+      if (e.key === 'Escape' && drawingPointsRef.current) {
+        setDrawingPoints(null);
+        setDrawingPreview(null);
+      } else if (e.key === 'Enter' && drawingPointsRef.current) {
+        finishDrawing();
+      } else if (e.key === 'Backspace' && drawingPointsRef.current) {
+        e.preventDefault();
+        setDrawingPoints(prev => (prev ? removeLastWirePoint(prev) : prev));
+      }
+    };
     const handleKeyUp = (e: KeyboardEvent) => { if (e.key === 'Alt') isAltPressed = false; };
     // Also cleared on window blur - Alt released outside the window (e.g.
     // while alt-tabbing) would otherwise never fire its own keyup here.
@@ -329,6 +308,7 @@ export const Canvas: React.FC = () => {
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('blur', handleBlur);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -381,6 +361,17 @@ export const Canvas: React.FC = () => {
       return;
     }
 
+    if (isDrawingConnection) {
+      // Every click while the wire tool is active places a point - it
+      // does not matter what is underneath (empty canvas or an object),
+      // a wire lands wherever the click itself snapped to.
+      const pos = e.target.getStage().getPointerPosition();
+      if (!pos) return;
+      const point = toCanvasPoint(pos);
+      setDrawingPoints(prev => appendWirePoint(prev || [], point));
+      return;
+    }
+
     // Check if clicking on empty stage
     const clickedOnEmpty = e.target === e.target.getStage() || e.target.name() === 'grid';
     if (clickedOnEmpty) {
@@ -402,14 +393,9 @@ export const Canvas: React.FC = () => {
   };
 
   const handleMouseMove = (e: any) => {
-    if (wireDragStart) {
+    if (isDrawingConnection && drawingPointsRef.current) {
       const pos = e.target.getStage()?.getPointerPosition();
-      if (pos) {
-        setMousePos({
-           x: (pos.x - canvasState.panX) / canvasState.zoom,
-           y: (pos.y - canvasState.panY) / canvasState.zoom
-        });
-      }
+      if (pos) setDrawingPreview(toCanvasPoint(pos));
     }
 
     if (isPanningRef.current) {
@@ -452,9 +438,7 @@ export const Canvas: React.FC = () => {
       return;
     }
 
-    if (useStore.getState().isDrawingConnection) {
-      selectionStartRef.current = null;
-      setSelectionBox(null);
+    if (isDrawingConnection) {
       return;
     }
 
@@ -479,10 +463,26 @@ export const Canvas: React.FC = () => {
     setSelectionBox(null);
   };
 
+  const handleDblClick = () => {
+    if (isDrawingConnection && drawingPointsRef.current) {
+      finishDrawing();
+    }
+  };
+
+  const handleAltClickSegment = (conn: SynopticConnection, worldPoint: WirePoint) => {
+    const nearest = nearestPointOnPolyline(conn.points, worldPoint);
+    if (!nearest) return;
+    const newPoints = insertBendOnSegment(conn.points, nearest.segmentIndex, nearest.point);
+    useStore.getState().updateConnection(conn.id, { points: newPoints });
+    useStore.getState().saveHistory();
+  };
+
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
   };
+
+  const junctionPoints = getJunctionPoints(connections, objects);
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -590,56 +590,6 @@ export const Canvas: React.FC = () => {
     return lines;
   };
 
-  const {
-    connections,
-    selectedConnectionIds,
-    selectConnections,
-    isDrawingConnection,
-    setDrawingMode,
-  } = useStore();
-
-  const handlePortMouseDown = (objId: string, portId: string, _e: any) => {
-    setWireDragStart({ objId, portId });
-  };
-  const handlePortMouseUp = (objId: string, portId: string, _e: any) => {
-    if (wireDragStart && wireDragStart.objId !== objId) {
-      const success = ConnectionService.tryCreateConnection(
-        wireDragStart.objId,
-        wireDragStart.portId,
-        objId,
-        portId
-      );
-      if (success) {
-        setDrawingMode(false);
-      }
-    }
-    setWireDragStart(null);
-  };
-  const handlePortClick = (objId: string, portId: string) => {
-    if (!isDrawingConnection) return;
-
-    if (!drawStartPort) {
-      setDrawStartPort({ objId, portId });
-      // Bug fix: objId is a UUID, never shown to the user - describeObject
-      // reads back designation, falling back to the symbol's own label.
-      useStore.getState().addMessage(`[INFO] Connection started from ${describeObject(objects.find(o => o.id === objId))}:${portId}`);
-    } else {
-      if (drawStartPort.objId !== objId) {
-        const success = ConnectionService.tryCreateConnection(
-          drawStartPort.objId, drawStartPort.portId,
-          objId, portId
-        );
-        if (success) {
-          useStore.getState().addMessage(`[INFO] Connection created`);
-        } else {
-          useStore.getState().addMessage(`[WARN] Connection failed (invalid rules)`);
-        }
-      }
-      setDrawStartPort(null);
-      setDrawingMode(false);
-    }
-  };
-
   return (
     <div
       className="canvas-container"
@@ -659,7 +609,9 @@ export const Canvas: React.FC = () => {
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        style={{ cursor: selectionStartRef.current ? 'crosshair' : 'default' }}
+        onDblClick={handleDblClick}
+        onDblTap={handleDblClick}
+        style={{ cursor: isDrawingConnection ? 'crosshair' : (selectionStartRef.current ? 'crosshair' : 'default') }}
       >
         <Layer>
           <Rect x={0} y={0} width={useStore.getState().canvasConfig.width} height={useStore.getState().canvasConfig.height} fill={useStore.getState().canvasConfig.background} />
@@ -667,37 +619,40 @@ export const Canvas: React.FC = () => {
           {drawGrid()}
         </Layer>
         <Layer>
+          {/* Node-based wiring model: a connection draws itself straight
+              through its own points array now - no from/to object lookup
+              needed here at all (that whole indirection is gone). A
+              finished wire can be selected, dragged as a whole, or have
+              one of its own bends grabbed and moved (ConnectionNode). */}
           {connections.map(conn => (
-            <ConnectionLine
+            <ConnectionNode
               key={conn.id}
               conn={conn}
-              fromObj={objects.find(o => o.id === conn.fromId)}
-              toObj={objects.find(o => o.id === conn.toId)}
               isSelected={selectedConnectionIds.includes(conn.id)}
               onSelect={() => selectConnections([conn.id], false)}
+              gridSize={gridSize}
+              onAltClickSegment={handleAltClickSegment}
             />
           ))}
-          {wireDragStart && (() => {
-            const fromObj = objects.find(o => o.id === wireDragStart.objId);
-            if (!fromObj) return null;
-            return (
-              <ConnectionLine
-                key="drawing-wire"
-                conn={{
-                  id: 'temp',
-                  fromId: wireDragStart.objId,
-                  fromPort: wireDragStart.portId,
-                  toId: 'cursor',
-                  toPort: 'cursor',
-                  type: 'preview'
-                }}
-                fromObj={fromObj}
-                toObj={{...fromObj, width: 0, height: 0, x: mousePos.x, y: mousePos.y, rotation: 0} as any}
-                isSelected={false}
-                onSelect={() => {}}
+          {/* In-progress wire preview: a thin, neutral line through every
+              point placed so far plus the live (grid-snapped) cursor
+              position - never the real conductor color/thickness, this
+              is not a committed connection yet. */}
+          {drawingPoints && drawingPoints.length > 0 && (
+            <>
+              <Path
+                data={pathFromPoints(drawingPreview ? [...drawingPoints, drawingPreview] : drawingPoints)}
+                stroke={COLOR_DE_ENERGIZED}
+                strokeWidth={CONDUCTOR_WIDTH / 2}
+                lineCap="round"
+                lineJoin="round"
+                listening={false}
               />
-            );
-          })()}
+              {drawingPoints.map((p, idx) => (
+                <Circle key={idx} x={p.x} y={p.y} radius={4} fill={COLOR_DE_ENERGIZED} listening={false} />
+              ))}
+            </>
+          )}
           {[...objects].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)).map((obj) => (
             <ObjectNode
               key={obj.id}
@@ -705,64 +660,22 @@ export const Canvas: React.FC = () => {
               isSelected={selectedIds.includes(obj.id)}
               onSelect={() => selectObjects([obj.id], false)}
               onChange={(newAttrs) => updateObject(obj.id, newAttrs)}
-              onPortClick={handlePortClick}
-              onPortMouseDown={handlePortMouseDown}
-              onPortMouseUp={handlePortMouseUp}
-              wireDragStart={wireDragStart}
               gridSize={gridSize}
             />
           ))}
-          {/* Topology Junctions: a wire node (from the SCADA library)
-              wherever three or more conductors meet at the same port.
-              Rendered AFTER (on top of) every object, not before - a
-              junction lands exactly at a port, which is routinely right
-              at (or inside) the object's own drawn shape, and painting
-              it underneath left it invisible, hidden by the object
-              itself. (This used to be two near-identical copies of the
-              same block, one of them missing dyn_ port support -
-              collapsed into one, keeping the more complete version.) */}
-          {(() => {
-             const junctions: {x: number, y: number}[] = [];
-             const pointMap = new Map<string, number>();
-
-             connections.forEach(c => {
-                 const key1 = `${c.fromId}:${c.fromPort}`;
-                 const key2 = `${c.toId}:${c.toPort}`;
-                 pointMap.set(key1, (pointMap.get(key1) || 0) + 1);
-                 pointMap.set(key2, (pointMap.get(key2) || 0) + 1);
-             });
-
-             pointMap.forEach((count, key) => {
-                 if (count > 2) { // 3 or more wires meeting at a port is definitely a junction
-                     const [objId, portId] = key.split(':');
-                     const obj = objects.find(o => o.id === objId);
-                     if (obj) {
-                         // Bug fix (usterka: port accepts more than one wire):
-                         // this used to reimplement port resolution by hand,
-                         // with only a crude dyn_NN fallback - it silently
-                         // mispositioned (or skipped entirely) the junction
-                         // dot for the SCADA busbar's dyn_top_NN/dyn_bot_NN
-                         // ports and for the boundary point's PORT id, both
-                         // of which multi-wire ports now routinely use.
-                         // resolveConnectionPoint/getAbsolutePortPosition are
-                         // the one shared, already-correct implementation
-                         // every other port position on the canvas goes
-                         // through - reused here instead of a second copy.
-                         const port = resolveConnectionPoint(obj, portId);
-                         if (port) {
-                             junctions.push(getAbsolutePortPosition(obj, port));
-                         }
-                     }
-                 }
-             });
-             // WireNodeSymbol draws itself centered on its own local (75,75) -
-             // offset the wrapping Group so that point lands on the junction.
-             return junctions.map((j, idx) => (
-               <Group key={`junc-${idx}`} x={j.x - 75} y={j.y - 75} listening={false}>
-                 <WireNodeSymbol />
-               </Group>
-             ));
-          })()}
+          {/* Topology junctions: a wire node (from the SCADA library)
+              wherever 3+ segments, or 2 segments and a terminal, meet at
+              one grid point - computed purely from geometry by
+              NetResolver.getJunctionPoints. Rendered AFTER (on top of)
+              every object: a junction routinely lands exactly at a
+              terminal, which is often inside the object's own drawn
+              shape, and painting it underneath would leave it invisible,
+              hidden by the object itself. */}
+          {junctionPoints.map((j, idx) => (
+            <Group key={`junc-${idx}`} x={j.x - 75} y={j.y - 75} listening={false}>
+              <WireNodeSymbol />
+            </Group>
+          ))}
           {selectionBox && (
             <Rect
               x={selectionBox.x}

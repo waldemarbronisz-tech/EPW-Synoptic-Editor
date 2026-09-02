@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '../store';
-import type { SynopticObject, SynopticConnection } from '../store';
+import type { SynopticObject } from '../store';
 import { getBusbarEdgePorts } from '../symbols/scada/BusbarSymbol';
 import { resolveConnectionPoint } from '../utils/GeometryUtils';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
@@ -130,83 +130,13 @@ describe('Dynamic port resolution (GeometryUtils.resolveConnectionPoint)', () =>
   });
 });
 
-describe('Busbar resize reattachment (store.resizeBusbar)', () => {
-  beforeEach(() => {
-    useStore.setState({
-      objects: [],
-      connections: [],
-      messages: [],
-      history: [{ objects: [], connections: [] } as any],
-      historyIndex: 0
-    });
-  });
-
-  function makeConn(overrides: Partial<SynopticConnection> = {}): SynopticConnection {
-    return {
-      id: 'C1', fromId: 'DEV1', fromPort: 'OUT', toId: 'BUS1', toPort: 'dyn_top_90', type: 'electrical_ac',
-      ...overrides
-    };
-  }
-
-  it('growing the busbar leaves an attached connection untouched and posts no message', () => {
-    useStore.setState({
-      objects: [makeBusbar({ width: 320 })],
-      connections: [makeConn({ toPort: 'dyn_top_50' })] // index 10 of 20 at width 320
-    });
-
-    useStore.getState().resizeBusbar('BUS1', 640);
-
-    const conn = useStore.getState().connections[0];
-    expect(conn.toPort).toBe('dyn_top_50');
-    expect(useStore.getState().messages.length).toBe(0);
-  });
-
-  it('shrinking the busbar past an attached port reattaches it to the nearest surviving port and posts a message', () => {
-    // width 320, GRID_SIZE 16 -> 20 ports (indices 0..19). A port at 90%
-    // resolves to index round(0.9 * 320 / 16) = 18 - well within range.
-    useStore.setState({
-      objects: [makeBusbar({ width: 320 })],
-      connections: [makeConn({ toPort: 'dyn_top_90' })]
-    });
-
-    // Shrink to width 64 -> only 4 ports survive (indices 0..3). The old
-    // port (index 18) no longer exists and must reattach to index 3.
-    useStore.getState().resizeBusbar('BUS1', 64);
-
-    const conn = useStore.getState().connections[0];
-    expect(conn.toPort).not.toBe('dyn_top_90');
-    expect(conn.toPort).toMatch(/^dyn_top_\d+$/);
-    expect(useStore.getState().objects[0].width).toBe(64);
-
-    const messages = useStore.getState().messages;
-    expect(messages.length).toBe(1);
-    expect(messages[0].text).toContain('reattached');
-  });
-
-  it('resize commits exactly one history entry', () => {
-    useStore.setState({
-      objects: [makeBusbar({ width: 320 })],
-      connections: [makeConn({ toPort: 'dyn_top_90' })],
-      history: [{ objects: [makeBusbar({ width: 320 })], connections: [makeConn({ toPort: 'dyn_top_90' })] } as any],
-      historyIndex: 0
-    });
-
-    const lenBefore = useStore.getState().history.length;
-    useStore.getState().resizeBusbar('BUS1', 64);
-    expect(useStore.getState().history.length).toBe(lenBefore + 1);
-  });
-
-  it('a connection unrelated to the resized busbar is left alone', () => {
-    useStore.setState({
-      objects: [makeBusbar({ width: 320 }), makeBusbar({ id: 'BUS2', width: 320 })],
-      connections: [makeConn({ id: 'C2', toId: 'BUS2', toPort: 'dyn_top_90' })]
-    });
-
-    useStore.getState().resizeBusbar('BUS1', 32);
-
-    expect(useStore.getState().connections[0].toPort).toBe('dyn_top_90');
-  });
-});
+// The old store.resizeBusbar action and its dyn_top_NN reattachment
+// mechanism are gone entirely under the node-based wiring model (a
+// busbar is now a BUS-style wire, not a resizable symbol with dynamic
+// ports) - the describe block that used to live here (four tests) tested
+// exactly that removed action and was deleted along with it, not
+// replaced: resizing a wire's own length is just dragging its endpoint,
+// already covered by the wire-drawing tests.
 
 function makeDevice(overrides: Partial<SynopticObject> = {}): SynopticObject {
   return {
@@ -392,14 +322,14 @@ describe('Boundary point width (getBoundaryPointWidth)', () => {
     expect(getBoundaryPointWidth('X', '')).toBe(96);
   });
 
-  it('clamps a long label/sublabel down to the 200px maximum', () => {
-    expect(getBoundaryPointWidth('A VERY LONG BOUNDARY LABEL INDEED', 'AN EQUALLY LONG SUBLABEL TEXT')).toBe(200);
+  it('clamps a long label/sublabel down to the 220px maximum', () => {
+    expect(getBoundaryPointWidth('A VERY LONG BOUNDARY LABEL INDEED', 'AN EQUALLY LONG SUBLABEL TEXT')).toBe(220);
   });
 
   it('hugs a mid-length label between the two bounds', () => {
     const width = getBoundaryPointWidth('WORKSHOP', '400V AC');
     expect(width).toBeGreaterThan(96);
-    expect(width).toBeLessThan(200);
+    expect(width).toBeLessThan(220);
   });
 });
 
@@ -504,8 +434,12 @@ describe('A port accepts more than one connection (ConnectionService, usterka fi
     const sinkB = makeBoundaryPoint({ id: 'B', boundaryDirection: 'SINK', boundaryMedium: 'ELECTRICAL' });
     const sinkC = makeBoundaryPoint({ id: 'C', boundaryDirection: 'SINK', boundaryMedium: 'ELECTRICAL' });
 
+    // Plain fixtures, not real SynopticConnection objects - validateConnection's
+    // existingConnections param is untyped (any[]) and only ever reads
+    // fromId/fromPort/toId/toPort/type off them, the old port-era shape
+    // this describe block is deliberately still exercising.
     const existing = [
-      { id: 'C1', fromId: 'SRC', fromPort: 'PORT', toId: 'A', toPort: 'PORT', type: 'electrical_ac' } as SynopticConnection
+      { id: 'C1', fromId: 'SRC', fromPort: 'PORT', toId: 'A', toPort: 'PORT', type: 'electrical_ac' }
     ];
 
     // Source port SRC:PORT is already used by C1 above - a second wire
@@ -514,7 +448,7 @@ describe('A port accepts more than one connection (ConnectionService, usterka fi
     expect(second.valid).toBe(true);
     expect(second.code).toBeUndefined();
 
-    existing.push({ id: 'C2', fromId: 'SRC', fromPort: 'PORT', toId: 'B', toPort: 'PORT', type: 'electrical_ac' } as SynopticConnection);
+    existing.push({ id: 'C2', fromId: 'SRC', fromPort: 'PORT', toId: 'B', toPort: 'PORT', type: 'electrical_ac' });
 
     const third = ConnectionService.validateConnection(source, 'PORT', sinkC, 'PORT', existing);
     expect(third.valid).toBe(true);
@@ -525,8 +459,8 @@ describe('A port accepts more than one connection (ConnectionService, usterka fi
     const sourceC = makeBoundaryPoint({ id: 'C', boundaryDirection: 'SOURCE', boundaryMedium: 'ELECTRICAL' });
 
     const existing = [
-      { id: 'C1', fromId: 'A', fromPort: 'PORT', toId: 'SNK', toPort: 'PORT', type: 'electrical_ac' } as SynopticConnection,
-      { id: 'C2', fromId: 'B', fromPort: 'PORT', toId: 'SNK', toPort: 'PORT', type: 'electrical_ac' } as SynopticConnection
+      { id: 'C1', fromId: 'A', fromPort: 'PORT', toId: 'SNK', toPort: 'PORT', type: 'electrical_ac' },
+      { id: 'C2', fromId: 'B', fromPort: 'PORT', toId: 'SNK', toPort: 'PORT', type: 'electrical_ac' }
     ];
 
     const result = ConnectionService.validateConnection(sourceC, 'PORT', sink, 'PORT', existing);
@@ -572,37 +506,9 @@ describe('Readable object identification for Messages (describeObject)', () => {
   });
 });
 
-describe('Connection-created Messages contain no UUID (usterka D1 fix)', () => {
-  beforeEach(() => {
-    useStore.setState({ objects: [], connections: [], messages: [], history: [{ objects: [], connections: [] } as any], historyIndex: 0 });
-  });
-
-  it('posts a readable Polaczono message using designations, with no UUID anywhere in it', () => {
-    const q1 = makeDevice({ id: 'uuid-aaaa', type: 'electrical.circuit_breaker', designation: '-Q1', width: 40, height: 40 });
-    const k1 = makeDevice({ id: 'uuid-bbbb', type: 'electrical.contactor', designation: '-K1', width: 40, height: 40 });
-    useStore.setState({ objects: [q1, k1] });
-
-    const ok = ConnectionService.tryCreateConnection(q1.id, 'OUT', k1.id, 'IN');
-    expect(ok).toBe(true);
-
-    const messages = useStore.getState().messages;
-    const last = messages[messages.length - 1].text;
-    expect(last).toContain('-Q1');
-    expect(last).toContain('-K1');
-    expect(UUID_PATTERN.test(last)).toBe(false);
-  });
-
-  it('falls back to the symbol label (not the id) when designation is unset', () => {
-    const q1 = makeDevice({ id: 'uuid-cccc', type: 'electrical.circuit_breaker', designation: '', width: 40, height: 40 });
-    const k1 = makeDevice({ id: 'uuid-dddd', type: 'electrical.contactor', designation: '', width: 40, height: 40 });
-    useStore.setState({ objects: [q1, k1] });
-
-    ConnectionService.tryCreateConnection(q1.id, 'OUT', k1.id, 'IN');
-
-    const messages = useStore.getState().messages;
-    const last = messages[messages.length - 1].text;
-    expect(UUID_PATTERN.test(last)).toBe(false);
-    expect(last).not.toContain(q1.id);
-    expect(last).not.toContain(k1.id);
-  });
-});
+// ConnectionService.tryCreateConnection (the mechanism the two tests
+// that used to live here exercised) is gone under the node-based wiring
+// model - finishing a wire no longer creates a from/to port pair, so
+// there is nothing left for it to do. The "no UUID in Messages" bar it
+// checked is carried forward by new tests alongside the wire-finishing
+// action itself (see wire-drawing.test.ts).

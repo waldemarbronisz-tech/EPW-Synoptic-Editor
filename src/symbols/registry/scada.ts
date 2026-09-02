@@ -20,7 +20,11 @@ export const scadaSymbols: Record<string, SymbolDefinition> = {
     connectionPoints: [
       { id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive' },
       { id: 'OUT', x: 0.5, y: 1, domain: 'electrical', direction: 'passive' }
-    ]
+    ],
+    // Object Library trim (part E): not in the kept 22 (the plain,
+    // pre-SCADA-restyle electrical.* equivalents are what stayed
+    // visible instead) - hidden, not deleted.
+    hiddenFromLibrary: true
   },
   'scada.busbar': {
     type: 'scada.busbar',
@@ -31,7 +35,11 @@ export const scadaSymbols: Record<string, SymbolDefinition> = {
     allowedStates: ['LIVE', 'DEAD'],
     defaultState: 'DEAD',
     isLine: true,
-    supportsDynamicPorts: true
+    // A busbar is a wire style now (SynopticConnection.style === 'BUS'),
+    // not a symbol - hidden regardless of the old supportsDynamicPorts
+    // mechanism, which the node-based wiring model no longer uses.
+    supportsDynamicPorts: true,
+    hiddenFromLibrary: true
   },
   'scada.wire_node': {
     type: 'scada.wire_node',
@@ -40,7 +48,11 @@ export const scadaSymbols: Record<string, SymbolDefinition> = {
     defaultWidth: 150,
     defaultHeight: 150,
     allowedStates: [],
-    defaultState: ''
+    defaultState: '',
+    // Its component (WireNodeSymbol) is still used directly by Canvas.tsx
+    // to draw every automatic junction dot - only the drag-it-yourself
+    // library entry is hidden, not the symbol or its rendering.
+    hiddenFromLibrary: true
   },
   'scada.label_frame': {
     type: 'scada.label_frame',
@@ -50,7 +62,9 @@ export const scadaSymbols: Record<string, SymbolDefinition> = {
     defaultHeight: 150,
     allowedStates: [],
     defaultState: '',
-    connectionPoints: [{ id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive' }]
+    connectionPoints: [{ id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive' }],
+    // EKRAN: "Opis tekstowy". 150x150 -> (75,0) snapped to the grid.
+    terminals: [{ id: 'IN', x: 80, y: 0, medium: 'ELECTRICAL' }]
   },
   'scada.motor': {
     type: 'scada.motor',
@@ -60,7 +74,10 @@ export const scadaSymbols: Record<string, SymbolDefinition> = {
     defaultHeight: 150,
     allowedStates: ['RUN', 'STOP', 'FAULT'],
     defaultState: 'STOP',
-    connectionPoints: [{ id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive' }]
+    connectionPoints: [{ id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive' }],
+    // Object Library trim (part E): not in the kept 22 - electrical.motor
+    // stayed visible instead.
+    hiddenFromLibrary: true
   },
   'scada.pilot_lamp': {
     type: 'scada.pilot_lamp',
@@ -69,7 +86,10 @@ export const scadaSymbols: Record<string, SymbolDefinition> = {
     defaultWidth: 150,
     defaultHeight: 150,
     allowedStates: ['ON', 'OFF'],
-    defaultState: 'OFF'
+    defaultState: 'OFF',
+    // Object Library trim (part E): not in the kept 22 -
+    // electrical.indicator_lamp stayed visible instead.
+    hiddenFromLibrary: true
   },
   'scada.socket': {
     type: 'scada.socket',
@@ -79,7 +99,8 @@ export const scadaSymbols: Record<string, SymbolDefinition> = {
     defaultHeight: 150,
     allowedStates: ['LIVE', 'DEAD'],
     defaultState: 'DEAD',
-    connectionPoints: [{ id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive' }]
+    connectionPoints: [{ id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive' }],
+    hiddenFromLibrary: true
   },
   'scada.indicator_diode': {
     type: 'scada.indicator_diode',
@@ -88,7 +109,9 @@ export const scadaSymbols: Record<string, SymbolDefinition> = {
     defaultWidth: 150,
     defaultHeight: 150,
     allowedStates: ['ON', 'OFF', 'QUALITY'],
-    defaultState: 'OFF'
+    defaultState: 'OFF',
+    // EKRAN: "Dioda sygnalizacyjna". 150x150 -> (75,0) snapped to the grid.
+    terminals: [{ id: 'IN', x: 80, y: 0, medium: 'ELECTRICAL' }]
   },
   'scada.meter': {
     type: 'scada.meter',
@@ -97,18 +120,22 @@ export const scadaSymbols: Record<string, SymbolDefinition> = {
     defaultWidth: 160,
     defaultHeight: 100,
     allowedStates: [],
-    defaultState: ''
+    defaultState: '',
+    // EKRAN: "Miernik". 160x100 -> (80,0), already an exact grid multiple.
+    terminals: [{ id: 'IN', x: 80, y: 0, medium: 'ELECTRICAL' }]
   },
   'scada.boundary_point': {
     type: 'scada.boundary_point',
     label: 'Boundary Point',
     category: 'SCADA',
     // Its real rendered size hugs the label/sublabel text (clamped to
-    // 96-200px wide) - same as the label frame it is built on, these are
+    // 96-220px wide) - same as the label frame it is built on, these are
     // just the initial values a freshly dropped instance starts with.
-    // No connectionPoints here: its single port's position depends on
-    // the per-instance boundaryPortSide, so it is resolved dynamically
-    // (GeometryUtils.resolveConnectionPoint) rather than listed statically.
+    // No static terminals here: its single terminal's position depends
+    // on the per-instance boundaryPortSide, so it is resolved
+    // dynamically (utils/Terminals.ts's getObjectTerminals) rather than
+    // listed statically, the same way the old port model special-cased
+    // it in GeometryUtils.resolveConnectionPoint.
     defaultWidth: 150,
     defaultHeight: 60,
     allowedStates: [],
