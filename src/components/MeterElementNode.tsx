@@ -12,7 +12,7 @@ import { computeMeterHeight } from '../meter/MeterElement';
 import { resolveMeterRow, getMeterDanglingRows } from '../meter/MeterResolver';
 import type { Device } from '../project/DeviceSchema';
 import { useStore } from '../store';
-import { COLOR_PANEL, COLOR_OUTLINE, COLOR_VALUE_FIELD, COLOR_TEXT, COLOR_DE_ENERGIZED, COLOR_ALARM, COLOR_WHITE } from '../theme/ScadaTheme';
+import { COLOR_PANEL, COLOR_OUTLINE, COLOR_VALUE_FIELD, COLOR_TEXT, COLOR_DE_ENERGIZED, COLOR_ALARM } from '../theme/ScadaTheme';
 
 // Dimension literals local to this element, same convention every other
 // scada/ symbol already follows (ScadaTheme.ts holds colors and the
@@ -34,7 +34,6 @@ const MONOSPACE_FONT = 'Consolas, "Courier New", monospace'; // fixed character 
 export interface MeterElementNodeProps {
   meter: MeterElement;
   devices: Device[];
-  isSelected: boolean;
   // Receives the raw Konva event (onClick={onSelect} forwards it
   // positionally) so the caller can read Shift for multi-select.
   onSelect: (e?: any) => void;
@@ -45,6 +44,15 @@ export interface MeterElementNodeProps {
   // unaffected.
   onDragStart?: () => void;
 }
+// commit 5 (drawing layers): isSelected/the dashed selection outline
+// used to live here, drawn as the last child of this meter's own
+// Group - which only ever put it above THIS meter's own drawing, not
+// necessarily above a later-drawn meter or symbol. It is now drawn by
+// Canvas.tsx directly in its own final "zaznaczenie i uchwyty" pass,
+// from nothing more than meter.x/y/width and the same computeMeterHeight
+// this file already calls - no Konva ref needed, since a meter never
+// rotates or scales. Same appearance, same trigger (isSelected from
+// the store), just relocated in the render tree.
 
 // Preview values (the middle of a device's own range - not a live
 // reading) draw in a visibly different shade than a manually-entered
@@ -60,7 +68,7 @@ function colorForRow(colorKind: 'NORMAL' | 'PREVIEW' | 'MISSING'): string {
   return COLOR_TEXT;
 }
 
-export const MeterElementNode: React.FC<MeterElementNodeProps> = ({ meter, devices, isSelected, onSelect, onDragEnd, onDragStart }) => {
+export const MeterElementNode: React.FC<MeterElementNodeProps> = ({ meter, devices, onSelect, onDragEnd, onDragStart }) => {
   const fontSize = meter.fontSize || 12;
   const height = computeMeterHeight(meter);
   const hasTitle = !!meter.title;
@@ -160,17 +168,6 @@ export const MeterElementNode: React.FC<MeterElementNodeProps> = ({ meter, devic
         );
       })}
 
-      {isSelected && (
-        <Rect
-          width={meter.width}
-          height={height}
-          stroke={COLOR_WHITE}
-          strokeWidth={2}
-          dash={[6, 4]}
-          fill="transparent"
-          listening={false}
-        />
-      )}
     </Group>
   );
 };

@@ -33,26 +33,32 @@ let isAltPressed = false;
 // without waiting for a React re-render to notice the key state.
 let isSpacePressed = false;
 
-const ObjectNode = ({ obj, isSelected, onSelect, onChange, gridSize }: {
+// isSelected is no longer a prop here (commit 5) - the Transformer that
+// used to read it moved out to its own top-level pass (
+// ObjectTransformerHandle below), and nothing else in this component's
+// own rendering depends on selection state.
+const ObjectNode = ({ obj, onSelect, onChange, gridSize, onShapeRef }: {
   gridSize: number,
   obj: SynopticObject,
-  isSelected: boolean,
   // Receives the raw Konva event (onClick={onSelect} forwards it
   // positionally) so the caller can read Shift for multi-select - see
   // Canvas.tsx's own call site.
   onSelect: (e?: any) => void,
   onChange: (newAttrs: Partial<SynopticObject>) => void,
+  // Layers (commit 5): the Transformer for a selected object is no
+  // longer rendered here - it moves to its own top-level pass
+  // (ObjectTransformerHandle below) so a selection's resize handles
+  // always draw ABOVE every symbol, never just above this one object's
+  // own. This reports the Group's own Konva node up to Canvas so that
+  // later pass can still attach a Transformer to it.
+  onShapeRef: (id: string, node: any) => void,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const shapeRef = useRef<any>(null);
-  const trRef = useRef<any>(null);
 
   useEffect(() => {
-    if (isSelected && trRef.current) {
-      trRef.current.nodes([shapeRef.current]);
-      trRef.current.getLayer().batchDraw();
-    }
-  }, [isSelected]);
+    onShapeRef(obj.id, shapeRef.current);
+  });
 
   // Node-based wiring model: a symbol has terminals now, not ports - see
   // utils/Terminals.ts. The old click-a-port-to-drag-a-wire interaction
@@ -63,7 +69,6 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, gridSize }: {
   const terminals = getObjectTerminals(obj);
 
   return (
-    <React.Fragment>
       <Group
         ref={shapeRef}
         x={obj.x}
@@ -120,8 +125,6 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, gridSize }: {
         }}
       >
         <SymbolRenderer obj={obj} />
-        {/* Render Designation/Name Label */}
-        <ObjectLabelRenderer obj={obj} onChange={onChange} />
 
         {/* Terminals highlight on hover only (usterka D3's precedent,
             carried forward) - radius 6, contrasting fill, black outline. */}
@@ -138,21 +141,43 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, gridSize }: {
           />
         ))}
       </Group>
-      {isSelected && !obj.locked && (
-        <Transformer
-          ref={trRef}
-          boundBoxFunc={(oldBox, newBox) => {
-            if (newBox.width < 10 || newBox.height < 10) {
-              return oldBox;
-            }
-            return newBox;
-          }}
-          borderStroke={COLOR_WHITE}
-          borderStrokeWidth={2}
-          borderDash={[6, 4]}
-        />
-      )}
-    </React.Fragment>
+  );
+};
+
+// Layer 7 (commit 5): the resize/rotate handles for one selected,
+// unlocked object - rendered in Canvas's own final "zaznaczenie i
+// uchwyty" pass so they always draw above every symbol, not just above
+// this one object's own (two overlapping objects, the later one drawn
+// after the selected one, used to be able to cover its handles - this
+// is what that bug looked like). Attaches to `node` (the target
+// object's own Konva Group, reported via ObjectNode's onShapeRef) -
+// resize/rotate itself is still handled by that Group's own existing
+// onTransformEnd, unchanged; this component only draws the handles.
+const ObjectTransformerHandle = ({ node }: { node: any }) => {
+  const trRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (node && trRef.current) {
+      trRef.current.nodes([node]);
+      trRef.current.getLayer()?.batchDraw();
+    }
+  });
+
+  if (!node) return null;
+
+  return (
+    <Transformer
+      ref={trRef}
+      boundBoxFunc={(oldBox, newBox) => {
+        if (newBox.width < 10 || newBox.height < 10) {
+          return oldBox;
+        }
+        return newBox;
+      }}
+      borderStroke={COLOR_WHITE}
+      borderStrokeWidth={2}
+      borderDash={[6, 4]}
+    />
   );
 };
 
@@ -238,6 +263,16 @@ const ConnectionNode = ({ conn, isSelected, onSelect, gridSize, onAltClickSegmen
 export const Canvas: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<any>(null);
+  // Layers (commit 5): every ObjectNode reports its own Konva Group node
+  // here (see ObjectNode's onShapeRef) so the separate, later-drawn
+  // selection/handles pass (ObjectTransformerHandle) can still attach a
+  // Transformer to the right node without owning a ref to it directly -
+  // a plain mutable Map, not React state: a Konva node reference itself
+  // never needs to trigger a re-render when it changes.
+  const objectShapeRefs = useRef<Map<string, any>>(new Map());
+  const registerObjectShapeRef = (id: string, node: any) => {
+    objectShapeRefs.current.set(id, node);
+  };
   const canvasConfig = useStore(state => state.canvasConfig);
   const gridSize = canvasConfig.gridSize;
   const { objects, selectedIds, selectObjects, clearSelection, addObject, updateObject, canvasState, setCanvasState } = useStore();
@@ -799,20 +834,35 @@ export const Canvas: React.FC = () => {
             <ObjectNode
               key={obj.id}
               obj={obj}
-              isSelected={selectedIds.includes(obj.id)}
               onSelect={(e: any) => selectObjects([obj.id], !!e?.evt?.shiftKey)}
               onChange={(newAttrs) => updateObject(obj.id, newAttrs)}
               gridSize={gridSize}
+              onShapeRef={registerObjectShapeRef}
             />
           ))}
+          {/* Topology junctions (layer 4 - deliberately ABOVE symbols,
+              not below as the task's own layer list literally orders
+              them): a wire node (from the SCADA library) wherever 3+
+              segments, or 2 segments and a terminal, meet at one grid
+              point - computed purely from geometry by NetResolver.
+              getJunctionPoints. A junction routinely lands exactly at a
+              terminal, which is often inside the object's own drawn
+              shape, and painting it underneath would leave it
+              invisible, hidden by the object itself - this deliberate
+              deviation preserves that earlier fix; see raport.md. */}
+          {junctionPoints.map((j, idx) => (
+            <Group key={`junc-${idx}`} x={j.x - 75} y={j.y - 75} listening={false}>
+              <WireNodeSymbol />
+            </Group>
+          ))}
           {/* The meter element (feat/meter-element): its own array, not
-              a symbol - see MeterElement.ts's own header comment. */}
+              a symbol - see MeterElement.ts's own header comment. Layer
+              5 - after every symbol and junction, before labels. */}
           {meters.map((meter) => (
             <MeterElementNode
               key={meter.id}
               meter={meter}
               devices={devices}
-              isSelected={selectedMeterIds.includes(meter.id)}
               onSelect={(e: any) => selectMeters([meter.id], !!e?.evt?.shiftKey)}
               onDragStart={() => {
                 if (isAltPressed) useStore.getState().duplicateMeterInPlace(meter.id);
@@ -823,18 +873,51 @@ export const Canvas: React.FC = () => {
               }}
             />
           ))}
-          {/* Topology junctions: a wire node (from the SCADA library)
-              wherever 3+ segments, or 2 segments and a terminal, meet at
-              one grid point - computed purely from geometry by
-              NetResolver.getJunctionPoints. Rendered AFTER (on top of)
-              every object: a junction routinely lands exactly at a
-              terminal, which is often inside the object's own drawn
-              shape, and painting it underneath would leave it invisible,
-              hidden by the object itself. */}
-          {junctionPoints.map((j, idx) => (
-            <Group key={`junc-${idx}`} x={j.x - 75} y={j.y - 75} listening={false}>
-              <WireNodeSymbol />
+          {/* Layer 6, labels: a SEPARATE pass over every object, drawn
+              after every symbol/junction/meter so a label never falls
+              under another object's own shape - each wrapped in its own
+              Group carrying the exact same x/y/rotation/scale transform
+              ObjectNode's own Group already applies (ObjectLabelRenderer's
+              own local coordinates and rotation-cancelling math are
+              unchanged, only which Group they are nested inside). */}
+          {objects.map((obj) => (
+            <Group
+              key={`label-${obj.id}`}
+              x={obj.x}
+              y={obj.y}
+              rotation={obj.rotation || 0}
+              scaleX={obj.scaleX || 1}
+              scaleY={obj.scaleY || 1}
+              visible={obj.visible !== false}
+            >
+              <ObjectLabelRenderer obj={obj} onChange={(newAttrs) => updateObject(obj.id, newAttrs)} />
             </Group>
+          ))}
+          {/* Layer 7, selection and handles - always topmost. The
+              in-progress wire's own preview stays in layer 2 (przewody)
+              above, since it is a wire, not a selection. */}
+          {selectedIds.filter(id => {
+            const obj = objects.find(o => o.id === id);
+            return obj && !obj.locked;
+          }).map((id) => (
+            <ObjectTransformerHandle
+              key={`tr-${id}`}
+              node={objectShapeRefs.current.get(id)}
+            />
+          ))}
+          {meters.filter(m => selectedMeterIds.includes(m.id)).map((meter) => (
+            <Rect
+              key={`meter-sel-${meter.id}`}
+              x={meter.x}
+              y={meter.y}
+              width={meter.width}
+              height={computeMeterHeight(meter)}
+              stroke={COLOR_WHITE}
+              strokeWidth={2}
+              dash={[6, 4]}
+              fill="transparent"
+              listening={false}
+            />
           ))}
           {selectionBox && (
             <Rect
