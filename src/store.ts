@@ -205,7 +205,15 @@ interface AppState {
   selectObjects: (ids: string[], multi?: boolean) => void;
   selectConnections: (ids: string[], multi?: boolean) => void;
   selectMeters: (ids: string[], multi?: boolean) => void;
+  // commit 3: replaces the whole selection with a mix of all three
+  // kinds at once (the rubber-band's own result) - and Ctrl+A's "select
+  // everything on screen".
+  selectMixed: (selection: { objectIds?: string[]; connectionIds?: string[]; meterIds?: string[] }) => void;
+  selectAll: () => void;
   clearSelection: () => void;
+  // Arrow keys (commit 3): every selected object/meter/connection moves
+  // by (dx, dy) together, as one history entry per keypress.
+  moveSelectionBy: (dx: number, dy: number) => void;
 
   // Clipboard
   copySelected: () => void;
@@ -418,16 +426,21 @@ export const useStore = create<AppState>((set, get) => ({
     get().saveHistory();
   },
 
+  // multi (Shift held, commit 3) toggles WITHIN this one kind's array
+  // and leaves the other two kinds' current selection untouched - that
+  // is what lets a Shift+click build a selection spanning objects,
+  // connections and meters together, one click at a time. A plain
+  // click (multi false) still replaces the whole selection with just
+  // this one kind, same as before.
   selectObjects: (ids, multi = false) => set((state) => {
     if (multi) {
-      // Toggle selection if already selected, otherwise add
       const newSelection = [...state.selectedIds];
       ids.forEach(id => {
         const index = newSelection.indexOf(id);
         if (index >= 0) newSelection.splice(index, 1);
         else newSelection.push(id);
       });
-      return { selectedIds: newSelection, selectedConnectionIds: [], selectedMeterIds: [] };
+      return { selectedIds: newSelection };
     }
     return { selectedIds: ids, selectedConnectionIds: [], selectedMeterIds: [] };
   }),
@@ -440,7 +453,7 @@ export const useStore = create<AppState>((set, get) => ({
         if (index >= 0) newSelection.splice(index, 1);
         else newSelection.push(id);
       });
-      return { selectedConnectionIds: newSelection, selectedIds: [], selectedMeterIds: [] };
+      return { selectedConnectionIds: newSelection };
     }
     return { selectedConnectionIds: ids, selectedIds: [], selectedMeterIds: [] };
   }),
@@ -453,12 +466,50 @@ export const useStore = create<AppState>((set, get) => ({
         if (index >= 0) newSelection.splice(index, 1);
         else newSelection.push(id);
       });
-      return { selectedMeterIds: newSelection, selectedIds: [], selectedConnectionIds: [] };
+      return { selectedMeterIds: newSelection };
     }
     return { selectedMeterIds: ids, selectedIds: [], selectedConnectionIds: [] };
   }),
 
+  // The rubber-band (commit 3) selects across all three kinds at once,
+  // in a single atomic replace - calling the three per-kind actions
+  // above in sequence would not work here, since a plain (non-multi)
+  // call to any one of them clears the other two.
+  selectMixed: (selection) => set({
+    selectedIds: selection.objectIds || [],
+    selectedConnectionIds: selection.connectionIds || [],
+    selectedMeterIds: selection.meterIds || []
+  }),
+
+  selectAll: () => {
+    const { objects, connections, meters } = get();
+    set({
+      selectedIds: objects.map(o => o.id),
+      selectedConnectionIds: connections.map(c => c.id),
+      selectedMeterIds: meters.map(m => m.id)
+    });
+  },
+
   clearSelection: () => set({ selectedIds: [], selectedConnectionIds: [], selectedMeterIds: [] }),
+
+  // Locked objects are skipped, same as an ordinary drag already
+  // refuses to move them (draggable={!obj.locked} in Canvas.tsx) -
+  // arrow-key movement is not a back door around a lock. Meters and
+  // connections have no lock flag of their own, so every selected one
+  // of those always moves. A single set() call, then one saveHistory()
+  // - one history entry per keypress, not per moved item.
+  moveSelectionBy: (dx, dy) => {
+    const { selectedIds, selectedMeterIds, selectedConnectionIds } = get();
+    if (selectedIds.length === 0 && selectedMeterIds.length === 0 && selectedConnectionIds.length === 0) return;
+    set((state) => ({
+      objects: state.objects.map(o => (selectedIds.includes(o.id) && !o.locked) ? { ...o, x: o.x + dx, y: o.y + dy } : o),
+      meters: state.meters.map(m => selectedMeterIds.includes(m.id) ? { ...m, x: m.x + dx, y: m.y + dy } : m),
+      connections: state.connections.map(c => selectedConnectionIds.includes(c.id)
+        ? { ...c, points: c.points.map(p => ({ x: p.x + dx, y: p.y + dy })) }
+        : c)
+    }));
+    get().saveHistory();
+  },
 
   // copySelected reads all three selection arrays at once - objects,
   // meters AND connections - so a selection spanning more than one

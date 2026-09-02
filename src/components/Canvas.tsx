@@ -18,6 +18,7 @@ import { describeObject } from '../utils/ObjectDisplay';
 import { WireNodeSymbol } from '../symbols/scada/WireNodeSymbol';
 import { MeterElementNode } from './MeterElementNode';
 import { computeMeterHeight } from '../meter/MeterElement';
+import { isObjectFullyInBox, isMeterFullyInBox, isConnectionFullyInBox } from '../utils/SelectionBox';
 
 // Momentary Alt-key bypass for grid snapping. Deliberately outside React
 // state: every ObjectNode's drag handlers need the CURRENT key state at
@@ -30,7 +31,10 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, gridSize }: {
   gridSize: number,
   obj: SynopticObject,
   isSelected: boolean,
-  onSelect: () => void,
+  // Receives the raw Konva event (onClick={onSelect} forwards it
+  // positionally) so the caller can read Shift for multi-select - see
+  // Canvas.tsx's own call site.
+  onSelect: (e?: any) => void,
   onChange: (newAttrs: Partial<SynopticObject>) => void,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -155,7 +159,7 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, gridSize }: {
 const ConnectionNode = ({ conn, isSelected, onSelect, gridSize, onAltClickSegment }: {
   conn: SynopticConnection,
   isSelected: boolean,
-  onSelect: () => void,
+  onSelect: (multi: boolean) => void,
   gridSize: number,
   onAltClickSegment: (conn: SynopticConnection, worldPoint: WirePoint) => void,
 }) => {
@@ -196,7 +200,7 @@ const ConnectionNode = ({ conn, isSelected, onSelect, gridSize, onAltClickSegmen
               onAltClickSegment(conn, snapPointToGrid((pos.x - panX) / zoom, (pos.y - panY) / zoom));
               return;
             }
-            onSelect();
+            onSelect(!!e?.evt?.shiftKey);
           }}
         />
       </Group>
@@ -232,6 +236,7 @@ export const Canvas: React.FC = () => {
   const gridSize = canvasConfig.gridSize;
   const { objects, selectedIds, selectObjects, clearSelection, addObject, updateObject, canvasState, setCanvasState } = useStore();
   const { meters, selectedMeterIds, selectMeters, updateMeter, devices } = useStore();
+  const { selectMixed } = useStore();
   const [size, setSize] = useState({ width: 800, height: 600 });
 
   // Selection Rect
@@ -319,6 +324,36 @@ export const Canvas: React.FC = () => {
       } else if (e.key === 'Backspace' && drawingPointsRef.current) {
         e.preventDefault();
         setDrawingPoints(prev => (prev ? removeLastWirePoint(prev) : prev));
+      } else if (e.key === 'Escape') {
+        // Not mid-draw (the branch above already handled that case) -
+        // Escape just clears whatever is currently selected.
+        useStore.getState().clearSelection();
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        // Reads the CURRENT selection from the store rather than this
+        // render's destructured selectedIds/selectedConnectionIds/
+        // selectedMeterIds - this handler is registered once (empty
+        // deps below), so a value closed over from render-scope would
+        // go stale the moment the selection changes after mount, the
+        // same reasoning behind every other useStore.getState() call
+        // already in this effect.
+        e.preventDefault();
+        const s = useStore.getState();
+        s.deleteObjects(s.selectedIds, s.selectedConnectionIds, s.selectedMeterIds);
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+        // Select everything on the current screen - objects,
+        // connections and meters together.
+        e.preventDefault();
+        useStore.getState().selectAll();
+      } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        // One grid cell per press, ten with Shift held - one history
+        // entry per keypress (moveSelectionBy itself calls saveHistory
+        // exactly once), including on a held-key auto-repeat, where
+        // every repeat is its own keydown event and so its own press.
+        e.preventDefault();
+        const step = gridSize * (e.shiftKey ? 10 : 1);
+        const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
+        const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
+        useStore.getState().moveSelectionBy(dx, dy);
       } else if (e.key === '1') {
         useStore.getState().setDrawingMedium('ELECTRICAL');
       } else if (e.key === '2') {
@@ -488,29 +523,29 @@ export const Canvas: React.FC = () => {
     }
 
     if (selectionStartRef.current && selectionBox) {
-      // Find objects inside selection rect
+      // Rubber-band selection (commit 3): everything lying ENTIRELY
+      // within the box - objects, connections and meters together, not
+      // just whichever kind happens to be found first. Something
+      // poking out past the box's edge is left unselected.
       const box = selectionBox;
-      const selected = objects.filter(obj => {
-        return (
-          obj.x >= box.x &&
-          obj.y >= box.y &&
-          obj.x + obj.width * (obj.scaleX || 1) <= box.x + box.width &&
-          obj.y + obj.height * (obj.scaleY || 1) <= box.y + box.height
-        );
-      });
-      // Meters aren't SynopticObjects (no width/height field - height is
-      // always computed), so they get their own marquee check using
-      // their own width and computeMeterHeight.
-      const selectedMeters = meters.filter(m => {
-        const h = computeMeterHeight(m);
-        return m.x >= box.x && m.y >= box.y && m.x + m.width <= box.x + box.width && m.y + h <= box.y + box.height;
-      });
+      const objectIds = objects.filter(obj => isObjectFullyInBox(obj, box)).map(o => o.id);
+      const meterIds = meters.filter(m => isMeterFullyInBox(m, computeMeterHeight(m), box)).map(m => m.id);
+      const connectionIds = connections.filter(c => isConnectionFullyInBox(c, box)).map(c => c.id);
 
-      if (selected.length > 0) {
-        selectObjects(selected.map(s => s.id), e.evt.shiftKey);
-      } else if (selectedMeters.length > 0) {
-        selectMeters(selectedMeters.map(m => m.id), e.evt.shiftKey);
+      if (objectIds.length > 0 || meterIds.length > 0 || connectionIds.length > 0) {
+        if (e.evt.shiftKey) {
+          // Shift+drag adds to whatever was already selected, per kind.
+          selectMixed({
+            objectIds: [...new Set([...selectedIds, ...objectIds])],
+            connectionIds: [...new Set([...selectedConnectionIds, ...connectionIds])],
+            meterIds: [...new Set([...selectedMeterIds, ...meterIds])]
+          });
+        } else {
+          selectMixed({ objectIds, connectionIds, meterIds });
+        }
       }
+      // An empty box selects nothing new - a non-shift click already
+      // cleared any previous selection back in handleMouseDown.
     }
 
     selectionStartRef.current = null;
@@ -683,7 +718,7 @@ export const Canvas: React.FC = () => {
               key={conn.id}
               conn={conn}
               isSelected={selectedConnectionIds.includes(conn.id)}
-              onSelect={() => selectConnections([conn.id], false)}
+              onSelect={(multi: boolean) => selectConnections([conn.id], multi)}
               gridSize={gridSize}
               onAltClickSegment={handleAltClickSegment}
             />
@@ -714,7 +749,7 @@ export const Canvas: React.FC = () => {
               key={obj.id}
               obj={obj}
               isSelected={selectedIds.includes(obj.id)}
-              onSelect={() => selectObjects([obj.id], false)}
+              onSelect={(e: any) => selectObjects([obj.id], !!e?.evt?.shiftKey)}
               onChange={(newAttrs) => updateObject(obj.id, newAttrs)}
               gridSize={gridSize}
             />
@@ -727,7 +762,7 @@ export const Canvas: React.FC = () => {
               meter={meter}
               devices={devices}
               isSelected={selectedMeterIds.includes(meter.id)}
-              onSelect={() => selectMeters([meter.id], false)}
+              onSelect={(e: any) => selectMeters([meter.id], !!e?.evt?.shiftKey)}
               onDragStart={() => {
                 if (isAltPressed) useStore.getState().duplicateMeterInPlace(meter.id);
               }}

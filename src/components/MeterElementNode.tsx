@@ -35,7 +35,9 @@ export interface MeterElementNodeProps {
   meter: MeterElement;
   devices: Device[];
   isSelected: boolean;
-  onSelect: () => void;
+  // Receives the raw Konva event (onClick={onSelect} forwards it
+  // positionally) so the caller can read Shift for multi-select.
+  onSelect: (e?: any) => void;
   onDragEnd: (x: number, y: number) => void;
   // feat/editing-and-signal-panel commit 2: Alt+drag leaves a copy
   // behind at this exact spot the instant the drag starts - optional
