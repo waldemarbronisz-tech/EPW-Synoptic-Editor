@@ -3,7 +3,7 @@ import { useStore } from '../store';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 
 export const PropertyInspector: React.FC = () => {
-  const { objects, connections, selectedIds, selectedConnectionIds, updateObject } = useStore();
+  const { objects, connections, selectedIds, selectedConnectionIds, updateObject, updateConnection } = useStore();
 
   if (selectedIds.length === 0 && selectedConnectionIds.length === 0) {
     return (
@@ -62,6 +62,13 @@ export const PropertyInspector: React.FC = () => {
     }
   };
 
+  const handleConnChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    if (!selectedConn) return;
+    const { name, value } = e.target;
+    updateConnection(selectedConn.id, { [name]: value } as any);
+    useStore.getState().saveHistory();
+  };
+
   const handleCustomPropertyChange = (key: string, value: string) => {
     if (!selectedObj) return;
     updateObject(selectedObj.id, {
@@ -105,27 +112,36 @@ export const PropertyInspector: React.FC = () => {
   };
 
   if (selectedConn) {
-    // Node-based wiring model: a connection is a freehand polyline now,
-    // not a from/to port pair - there is no source/target object or
-    // port to show any more. Read-only for this commit; the editable
-    // medium/style/state UI is its own follow-up commit.
     return (
       <div className="property-inspector">
         <div className="inspector-header">Connection Properties</div>
         <div className="inspector-content">
           <div className="property-group">
+            {/* Node-based wiring model: a connection is a freehand
+                polyline, not a from/to port pair - there is no source/
+                target object or port to show any more. Medium/style/
+                state are what a wire actually is now. */}
             <div className="property-group-title">Wire</div>
             <div className="property-row">
               <label>Medium</label>
-              <input type="text" value={selectedConn.medium} disabled />
+              <select name="medium" value={selectedConn.medium} onChange={handleConnChange}>
+                <option value="ELECTRICAL">Electrical</option>
+                <option value="WATER">Water</option>
+              </select>
             </div>
             <div className="property-row">
               <label>Style</label>
-              <input type="text" value={selectedConn.style} disabled />
+              <select name="style" value={selectedConn.style} onChange={handleConnChange}>
+                <option value="NORMAL">Normal</option>
+                <option value="BUS">Bus (busbar / manifold)</option>
+              </select>
             </div>
             <div className="property-row">
               <label>State</label>
-              <input type="text" value={selectedConn.state} disabled />
+              <select name="state" value={selectedConn.state} onChange={handleConnChange}>
+                <option value="LIVE">Live</option>
+                <option value="DEAD">Dead</option>
+              </select>
             </div>
             <div className="property-row">
               <label>Points</label>
@@ -153,7 +169,30 @@ export const PropertyInspector: React.FC = () => {
           </div>
           <div className="property-row">
             <label>Designation</label>
-            <input type="text" name="designation" value={selectedObj.designation || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
+            <input
+              type="text"
+              name="designation"
+              value={selectedObj.designation || ''}
+              onChange={handleChange}
+              onBlur={() => useStore.getState().saveHistory()}
+              list={selectedObj.type === 'scada.boundary_point' ? 'boundary-point-labels' : undefined}
+            />
+            {selectedObj.type === 'scada.boundary_point' && (
+              // Ready-made suggestions for a boundary point's label, per
+              // its own spec - a suggestion, not a restriction: any text
+              // the user types is accepted, this only offers common ones.
+              <datalist id="boundary-point-labels">
+                <option value="ZKP" />
+                <option value="PGE Dystrybucja" />
+                <option value="STUDNIA" />
+                <option value="DOM" />
+                <option value="WARSZTAT" />
+                <option value="MAGAZYN" />
+                <option value="OGROD" />
+                <option value="OCZYSZCZALNIA" />
+                <option value="NAWADNIANIE" />
+              </datalist>
+            )}
           </div>
           <div className="property-row">
             <label>Name</label>

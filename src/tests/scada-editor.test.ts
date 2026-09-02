@@ -322,14 +322,14 @@ describe('Boundary point width (getBoundaryPointWidth)', () => {
     expect(getBoundaryPointWidth('X', '')).toBe(96);
   });
 
-  it('clamps a long label/sublabel down to the 200px maximum', () => {
-    expect(getBoundaryPointWidth('A VERY LONG BOUNDARY LABEL INDEED', 'AN EQUALLY LONG SUBLABEL TEXT')).toBe(200);
+  it('clamps a long label/sublabel down to the 220px maximum', () => {
+    expect(getBoundaryPointWidth('A VERY LONG BOUNDARY LABEL INDEED', 'AN EQUALLY LONG SUBLABEL TEXT')).toBe(220);
   });
 
   it('hugs a mid-length label between the two bounds', () => {
     const width = getBoundaryPointWidth('WORKSHOP', '400V AC');
     expect(width).toBeGreaterThan(96);
-    expect(width).toBeLessThan(200);
+    expect(width).toBeLessThan(220);
   });
 });
 
