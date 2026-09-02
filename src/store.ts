@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { COLOR_CANVAS_BACKGROUND, GRID_SIZE } from './theme/ScadaTheme';
 import type { MeterRow } from './symbols/scada/MeterSymbol';
 import type { MeterElement } from './meter/MeterElement';
+import type { Device } from './project/DeviceSchema';
 
 // Cap on how many undo/redo snapshots are kept; each entry is a full deep
 // copy of objects+connections+meters, so this bounds both memory and undo depth.
@@ -156,6 +157,14 @@ interface AppState {
   isDirty: boolean;
   messages: Message[];
 
+  // feat/meter-element part B: the project's device list (src/project/
+  // DeviceSchema.ts's contract) - the first thing in this editor that
+  // ever reads it. Read-only from every UI's perspective (the meter's
+  // device picker, MeterResolver.ts); nothing here authors or edits a
+  // device - see ProjectManager.ts for how this round-trips with a
+  // project file, and raport.md for the full path description.
+  devices: Device[];
+
   // Connection Drawing Mode
   isDrawingConnection: boolean;
   setDrawingMode: (active: boolean) => void;
@@ -250,6 +259,7 @@ export const useStore = create<AppState>((set, get) => ({
   fileHandle: null,
   isDirty: false,
   messages: [],
+  devices: [],
   isDrawingConnection: false,
   snapToGridEnabled: true,
   drawingMedium: 'ELECTRICAL',

@@ -220,7 +220,7 @@ export const Canvas: React.FC = () => {
   const canvasConfig = useStore(state => state.canvasConfig);
   const gridSize = canvasConfig.gridSize;
   const { objects, selectedIds, selectObjects, clearSelection, addObject, updateObject, canvasState, setCanvasState } = useStore();
-  const { meters, selectedMeterIds, selectMeters, updateMeter } = useStore();
+  const { meters, selectedMeterIds, selectMeters, updateMeter, devices } = useStore();
   const [size, setSize] = useState({ width: 800, height: 600 });
 
   // Selection Rect
@@ -700,6 +700,7 @@ export const Canvas: React.FC = () => {
             <MeterElementNode
               key={meter.id}
               meter={meter}
+              devices={devices}
               isSelected={selectedMeterIds.includes(meter.id)}
               onSelect={() => selectMeters([meter.id], false)}
               onDragEnd={(x, y) => {

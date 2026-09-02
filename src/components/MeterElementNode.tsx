@@ -1,12 +1,18 @@
-// Konva rendering for the meter element (feat/meter-element, part A).
-// Deliberately its own component, not a case inside SymbolRenderer.tsx -
-// a meter is not a symbol (see MeterElement.ts's own header comment).
+// Konva rendering for the meter element (feat/meter-element, part A -
+// panel/title/rows; part B - resolving a device-linked row's label/
+// unit/format/preview value, and reporting a dangling device
+// reference). Deliberately its own component, not a case inside
+// SymbolRenderer.tsx - a meter is not a symbol (see MeterElement.ts's
+// own header comment).
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Group, Rect, Text, Line } from 'react-konva';
 import type { MeterElement } from '../meter/MeterElement';
-import { computeMeterHeight, formatManualRowValue } from '../meter/MeterElement';
-import { COLOR_PANEL, COLOR_OUTLINE, COLOR_VALUE_FIELD, COLOR_TEXT, COLOR_WHITE } from '../theme/ScadaTheme';
+import { computeMeterHeight } from '../meter/MeterElement';
+import { resolveMeterRow, getMeterDanglingRows } from '../meter/MeterResolver';
+import type { Device } from '../project/DeviceSchema';
+import { useStore } from '../store';
+import { COLOR_PANEL, COLOR_OUTLINE, COLOR_VALUE_FIELD, COLOR_TEXT, COLOR_DE_ENERGIZED, COLOR_ALARM, COLOR_WHITE } from '../theme/ScadaTheme';
 
 // Dimension literals local to this element, same convention every other
 // scada/ symbol already follows (ScadaTheme.ts holds colors and the
@@ -27,12 +33,27 @@ const MONOSPACE_FONT = 'Consolas, "Courier New", monospace'; // fixed character 
 
 export interface MeterElementNodeProps {
   meter: MeterElement;
+  devices: Device[];
   isSelected: boolean;
   onSelect: () => void;
   onDragEnd: (x: number, y: number) => void;
 }
 
-export const MeterElementNode: React.FC<MeterElementNodeProps> = ({ meter, isSelected, onSelect, onDragEnd }) => {
+// Preview values (the middle of a device's own range - not a live
+// reading) draw in a visibly different shade than a manually-entered
+// value, so it never reads as real data for even a second - reusing
+// the existing "de-energized/inactive" gray rather than inventing a
+// new color, same as GRANICE requires (every color from ScadaTheme).
+// A dangling device reference draws in the alarm color: this is the
+// one case worth the user's attention, even though the element still
+// renders normally around it.
+function colorForRow(colorKind: 'NORMAL' | 'PREVIEW' | 'MISSING'): string {
+  if (colorKind === 'PREVIEW') return COLOR_DE_ENERGIZED;
+  if (colorKind === 'MISSING') return COLOR_ALARM;
+  return COLOR_TEXT;
+}
+
+export const MeterElementNode: React.FC<MeterElementNodeProps> = ({ meter, devices, isSelected, onSelect, onDragEnd }) => {
   const fontSize = meter.fontSize || 12;
   const height = computeMeterHeight(meter);
   const hasTitle = !!meter.title;
@@ -40,6 +61,26 @@ export const MeterElementNode: React.FC<MeterElementNodeProps> = ({ meter, isSel
   const titleBlockHeight = hasTitle ? fontSize * TITLE_HEIGHT_FACTOR + TITLE_DIVIDER_GAP : 0;
   const valueFieldWidth = meter.width * VALUE_FIELD_WIDTH_FRACTION;
   const valueFieldX = meter.width - PADDING_X - valueFieldWidth;
+
+  // A dangling row is not a hard error - the meter still draws - but
+  // the user should hear about it once, not on every re-render. Fired
+  // from an effect (never during render itself), keyed on a signature
+  // of the current dangling set so it only fires again when that set
+  // actually changes (a fresh device list load, a row's device field
+  // edited, etc.), not on every unrelated re-render.
+  const danglingSignatureRef = useRef<string>('');
+  useEffect(() => {
+    const issues = getMeterDanglingRows(meter, devices);
+    const signature = issues.map(i => `${i.rowIndex}:${i.deviceId}`).join(',');
+    if (signature === danglingSignatureRef.current) return;
+    danglingSignatureRef.current = signature;
+    const meterName = meter.title || meter.id;
+    issues.forEach(issue => {
+      useStore.getState().addMessage(
+        `[WARNING] Meter "${meterName}", row ${issue.rowIndex + 1}: device "${issue.deviceId}" not found`
+      );
+    });
+  }, [meter, devices]);
 
   return (
     <Group
@@ -74,12 +115,7 @@ export const MeterElementNode: React.FC<MeterElementNodeProps> = ({ meter, isSel
 
       {meter.rows.map((row, i) => {
         const rowY = PADDING_Y + titleBlockHeight + i * rowHeight;
-        // Part A: a device-linked row's value is Part B's job - blank
-        // for now (an empty value field, not an exception) until
-        // MeterResolver.ts lands. A manual row already shows its own
-        // "value unit" text right away.
-        const label = row.label;
-        const valueText = row.device ? '' : formatManualRowValue(row);
+        const display = resolveMeterRow(row, devices);
 
         return (
           <Group key={i}>
@@ -87,7 +123,7 @@ export const MeterElementNode: React.FC<MeterElementNodeProps> = ({ meter, isSel
               x={PADDING_X}
               y={rowY + (rowHeight - fontSize) / 2}
               width={valueFieldX - PADDING_X}
-              text={label}
+              text={display.label}
               fontSize={fontSize}
               fill={COLOR_TEXT}
               ellipsis
@@ -106,11 +142,11 @@ export const MeterElementNode: React.FC<MeterElementNodeProps> = ({ meter, isSel
               x={valueFieldX}
               y={rowY + (rowHeight - fontSize) / 2}
               width={valueFieldWidth - 6}
-              text={valueText}
+              text={display.valueText}
               fontSize={fontSize}
               fontFamily={MONOSPACE_FONT}
               align="right"
-              fill={COLOR_TEXT}
+              fill={colorForRow(display.colorKind)}
             />
           </Group>
         );

@@ -53,7 +53,8 @@ export class ProjectManager {
       canvas: state.canvasConfig,
       objects: state.objects,
       connections: state.connections || [],
-      meters: state.meters || []
+      meters: state.meters || [],
+      devices: state.devices || []
     };
     const validation = validateProjectSchema(proj);
     if (!validation.valid) {
@@ -69,6 +70,7 @@ export class ProjectManager {
       objects: project.objects,
       connections: project.connections || [],
       meters: project.meters || [],
+      devices: project.devices || [],
       projectName: project.project.name,
       projectMetadata: {
         description: project.project.description || "",
