@@ -4,6 +4,7 @@ import { COLOR_CANVAS_BACKGROUND, GRID_SIZE } from './theme/ScadaTheme';
 import type { MeterRow } from './symbols/scada/MeterSymbol';
 import type { MeterElement } from './meter/MeterElement';
 import type { Device } from './project/DeviceSchema';
+import { cloneSelectionWithOffset } from './utils/CloneSelection';
 
 // Cap on how many undo/redo snapshots are kept; each entry is a full deep
 // copy of objects+connections+meters, so this bounds both memory and undo depth.
@@ -147,6 +148,7 @@ interface AppState {
   canvasState: CanvasState;
   clipboard: SynopticObject[];
   clipboardMeters: MeterElement[];
+  clipboardConnections: SynopticConnection[];
   history: HistorySnapshot[];
   historyIndex: number;
 
@@ -208,6 +210,14 @@ interface AppState {
   // Clipboard
   copySelected: () => void;
   paste: () => void;
+  duplicateSelected: () => void;
+  // Alt+drag: a silent, unselected, no-history-entry-of-its-own clone
+  // left at the dragged item's own current position, the instant the
+  // drag starts - the item the user is actually dragging then keeps
+  // moving as it normally would, so the drag's own eventual saveHistory
+  // covers both the new clone and the move as ONE history entry.
+  duplicateObjectInPlace: (id: string) => void;
+  duplicateMeterInPlace: (id: string) => void;
 
   // History
   undo: () => void;
@@ -251,6 +261,7 @@ export const useStore = create<AppState>((set, get) => ({
   canvasState: { zoom: 1, panX: 0, panY: 0 },
   clipboard: [],
   clipboardMeters: [],
+  clipboardConnections: [],
   history: [{ objects: [], connections: [], meters: [] }],
   historyIndex: 0,
 
@@ -449,42 +460,83 @@ export const useStore = create<AppState>((set, get) => ({
 
   clearSelection: () => set({ selectedIds: [], selectedConnectionIds: [], selectedMeterIds: [] }),
 
+  // copySelected reads all three selection arrays at once - objects,
+  // meters AND connections - so a selection spanning more than one
+  // kind (today only reachable by setting more than one of
+  // selectedIds/selectedConnectionIds/selectedMeterIds directly; the
+  // rubber-band selection landing in commit 3 is what lets a user
+  // build one this way through the mouse) copies correctly as one
+  // unit. See utils/CloneSelection.ts's own header comment for why a
+  // connection needs no relinking at all to stay attached to the
+  // objects it was copied along with.
   copySelected: () => {
-    const { objects, selectedIds, meters, selectedMeterIds } = get();
+    const { objects, selectedIds, meters, selectedMeterIds, connections, selectedConnectionIds } = get();
     const toCopy = objects.filter(obj => selectedIds.includes(obj.id));
     const metersToCopy = meters.filter(m => selectedMeterIds.includes(m.id));
+    const connectionsToCopy = connections.filter(c => selectedConnectionIds.includes(c.id));
     set({
       clipboard: JSON.parse(JSON.stringify(toCopy)),
-      clipboardMeters: JSON.parse(JSON.stringify(metersToCopy))
+      clipboardMeters: JSON.parse(JSON.stringify(metersToCopy)),
+      clipboardConnections: JSON.parse(JSON.stringify(connectionsToCopy))
     });
   },
 
+  // Offset by exactly one grid cell right and down - never atop the
+  // original, and always back on the grid (GRID_SIZE is itself the
+  // grid's own pitch, so a grid-aligned source stays grid-aligned).
   paste: () => {
-    const { clipboard, clipboardMeters } = get();
-    if (clipboard.length === 0 && clipboardMeters.length === 0) return;
+    const { clipboard, clipboardMeters, clipboardConnections } = get();
+    if (clipboard.length === 0 && clipboardMeters.length === 0 && clipboardConnections.length === 0) return;
 
-    const newIds: string[] = [];
-    const newObjects = clipboard.map(obj => {
-      const newId = uuidv4();
-      newIds.push(newId);
-      return { ...obj, id: newId, x: obj.x + 20, y: obj.y + 20 };
-    });
-
-    const newMeterIds: string[] = [];
-    const newMeters = clipboardMeters.map(m => {
-      const newId = uuidv4();
-      newMeterIds.push(newId);
-      return { ...m, id: newId, x: m.x + 20, y: m.y + 20 };
-    });
+    const cloned = cloneSelectionWithOffset(clipboard, clipboardMeters, clipboardConnections, GRID_SIZE, GRID_SIZE, uuidv4);
 
     set((state) => ({
-      objects: [...state.objects, ...newObjects],
-      meters: [...state.meters, ...newMeters],
-      selectedIds: newIds,
-      selectedConnectionIds: [],
-      selectedMeterIds: newMeterIds
+      objects: [...state.objects, ...cloned.objects],
+      meters: [...state.meters, ...cloned.meters],
+      connections: [...state.connections, ...cloned.connections],
+      selectedIds: cloned.objectIds,
+      selectedConnectionIds: cloned.connectionIds,
+      selectedMeterIds: cloned.meterIds
     }));
     get().saveHistory();
+  },
+
+  // Ctrl+D: duplicates the CURRENT selection directly, with the same
+  // one-grid-cell offset paste uses - one keystroke, the clipboard
+  // untouched (a subsequent Ctrl+V still pastes whatever was last
+  // explicitly copied, not this duplicate).
+  duplicateSelected: () => {
+    const { objects, selectedIds, meters, selectedMeterIds, connections, selectedConnectionIds } = get();
+    const toDuplicate = objects.filter(obj => selectedIds.includes(obj.id));
+    const metersToDuplicate = meters.filter(m => selectedMeterIds.includes(m.id));
+    const connectionsToDuplicate = connections.filter(c => selectedConnectionIds.includes(c.id));
+    if (toDuplicate.length === 0 && metersToDuplicate.length === 0 && connectionsToDuplicate.length === 0) return;
+
+    const cloned = cloneSelectionWithOffset(toDuplicate, metersToDuplicate, connectionsToDuplicate, GRID_SIZE, GRID_SIZE, uuidv4);
+
+    set((state) => ({
+      objects: [...state.objects, ...cloned.objects],
+      meters: [...state.meters, ...cloned.meters],
+      connections: [...state.connections, ...cloned.connections],
+      selectedIds: cloned.objectIds,
+      selectedConnectionIds: cloned.connectionIds,
+      selectedMeterIds: cloned.meterIds
+    }));
+    get().saveHistory();
+  },
+
+  duplicateObjectInPlace: (id) => {
+    const obj = get().objects.find(o => o.id === id);
+    if (!obj) return;
+    const clone = { ...JSON.parse(JSON.stringify(obj)), id: uuidv4() };
+    set((state) => ({ objects: [...state.objects, clone] }));
+  },
+
+  duplicateMeterInPlace: (id) => {
+    const meter = get().meters.find(m => m.id === id);
+    if (!meter) return;
+    const clone = { ...JSON.parse(JSON.stringify(meter)), id: uuidv4() };
+    set((state) => ({ meters: [...state.meters, clone] }));
   },
 
   undo: () => {

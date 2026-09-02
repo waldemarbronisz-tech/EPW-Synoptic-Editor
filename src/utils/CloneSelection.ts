@@ -1,0 +1,65 @@
+// feat/editing-and-signal-panel commit 2: copy/paste/duplicate, shared
+// by store.ts's copySelected+paste and duplicateSelected. Pure,
+// Konva-free (same convention as GridSnap.ts/Terminals.ts/
+// WireDrawing.ts) - takes plain arrays, returns plain arrays, no
+// Zustand involved, so it is testable without a store at all.
+//
+// A connection references nothing by id in the node-based wiring model
+// - it is a free polyline that happens to touch a terminal
+// geometrically (see NetResolver.ts). That is what makes cloning a
+// connected fragment trivial and correct with no relinking step at
+// all: shift a copied object's x/y and a copied connection's points by
+// the EXACT SAME offset, and the copy's own wire still touches the
+// copy's own terminals (translation does not change relative
+// geometry) - while the original is left exactly where it was, so the
+// copy touches nothing of the original's.
+
+import type { SynopticObject, SynopticConnection } from '../store';
+import type { MeterElement } from '../meter/MeterElement';
+
+export interface ClonedSelection {
+  objects: SynopticObject[];
+  meters: MeterElement[];
+  connections: SynopticConnection[];
+  objectIds: string[];
+  meterIds: string[];
+  connectionIds: string[];
+}
+
+/**
+ * Clones a selection (objects, meters, connections - any of the three
+ * may be empty) offset by (dx, dy), with fresh ids throughout. Deep-
+ * clones every source item first (JSON round-trip, the same technique
+ * the store's own clipboard already used) so the result shares no
+ * reference with its source - mutating a pasted object must never
+ * silently mutate the thing it was copied from.
+ */
+export function cloneSelectionWithOffset(
+  objects: SynopticObject[],
+  meters: MeterElement[],
+  connections: SynopticConnection[],
+  dx: number,
+  dy: number,
+  makeId: () => string
+): ClonedSelection {
+  const clonedObjects: SynopticObject[] = JSON.parse(JSON.stringify(objects));
+  const clonedMeters: MeterElement[] = JSON.parse(JSON.stringify(meters));
+  const clonedConnections: SynopticConnection[] = JSON.parse(JSON.stringify(connections));
+
+  const newObjects = clonedObjects.map(obj => ({ ...obj, id: makeId(), x: obj.x + dx, y: obj.y + dy }));
+  const newMeters = clonedMeters.map(m => ({ ...m, id: makeId(), x: m.x + dx, y: m.y + dy }));
+  const newConnections = clonedConnections.map(conn => ({
+    ...conn,
+    id: makeId(),
+    points: conn.points.map(p => ({ x: p.x + dx, y: p.y + dy }))
+  }));
+
+  return {
+    objects: newObjects,
+    meters: newMeters,
+    connections: newConnections,
+    objectIds: newObjects.map(o => o.id),
+    meterIds: newMeters.map(m => m.id),
+    connectionIds: newConnections.map(c => c.id)
+  };
+}

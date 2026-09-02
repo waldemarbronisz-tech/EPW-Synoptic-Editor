@@ -67,6 +67,17 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, gridSize }: {
         onTap={onSelect}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
+        onDragStart={() => {
+          // Alt+drag (commit 2): a copy is left behind at THIS exact
+          // spot the instant the drag starts, unselected and with no
+          // history entry of its own - the object actually under the
+          // cursor then keeps moving as an ordinary drag would, so the
+          // eventual onDragEnd's saveHistory() covers the new copy and
+          // the move together as one undo step.
+          if (isAltPressed) {
+            useStore.getState().duplicateObjectInPlace(obj.id);
+          }
+        }}
         onDragMove={(e) => {
           // Snap during drag for visual feedback (doesn't mutate store yet).
           // Held Alt bypasses this exactly as it bypasses the final snap
@@ -314,6 +325,20 @@ export const Canvas: React.FC = () => {
         useStore.getState().setDrawingMedium('WATER');
       } else if (e.key === '3') {
         useStore.getState().setDrawingMedium('VENTILATION');
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+        // Commit 2: copy the current selection (objects, connections
+        // and meters together, whatever is currently non-empty).
+        e.preventDefault();
+        useStore.getState().copySelected();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+        // Paste, offset by exactly one grid cell right and down.
+        e.preventDefault();
+        useStore.getState().paste();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+        // Duplicate the current selection in place, same offset as
+        // paste, without touching the clipboard.
+        e.preventDefault();
+        useStore.getState().duplicateSelected();
       }
     };
     const handleKeyUp = (e: KeyboardEvent) => { if (e.key === 'Alt') isAltPressed = false; };
@@ -703,6 +728,9 @@ export const Canvas: React.FC = () => {
               devices={devices}
               isSelected={selectedMeterIds.includes(meter.id)}
               onSelect={() => selectMeters([meter.id], false)}
+              onDragStart={() => {
+                if (isAltPressed) useStore.getState().duplicateMeterInPlace(meter.id);
+              }}
               onDragEnd={(x, y) => {
                 updateMeter(meter.id, { x: snapValue(x, gridSize, isAltPressed), y: snapValue(y, gridSize, isAltPressed) });
                 useStore.getState().saveHistory();

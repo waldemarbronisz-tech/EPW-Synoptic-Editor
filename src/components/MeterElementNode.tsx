@@ -37,6 +37,11 @@ export interface MeterElementNodeProps {
   isSelected: boolean;
   onSelect: () => void;
   onDragEnd: (x: number, y: number) => void;
+  // feat/editing-and-signal-panel commit 2: Alt+drag leaves a copy
+  // behind at this exact spot the instant the drag starts - optional
+  // so existing callers/tests that only care about selection/move stay
+  // unaffected.
+  onDragStart?: () => void;
 }
 
 // Preview values (the middle of a device's own range - not a live
@@ -53,7 +58,7 @@ function colorForRow(colorKind: 'NORMAL' | 'PREVIEW' | 'MISSING'): string {
   return COLOR_TEXT;
 }
 
-export const MeterElementNode: React.FC<MeterElementNodeProps> = ({ meter, devices, isSelected, onSelect, onDragEnd }) => {
+export const MeterElementNode: React.FC<MeterElementNodeProps> = ({ meter, devices, isSelected, onSelect, onDragEnd, onDragStart }) => {
   const fontSize = meter.fontSize || 12;
   const height = computeMeterHeight(meter);
   const hasTitle = !!meter.title;
@@ -89,6 +94,7 @@ export const MeterElementNode: React.FC<MeterElementNodeProps> = ({ meter, devic
       draggable
       onClick={onSelect}
       onTap={onSelect}
+      onDragStart={() => onDragStart?.()}
       onDragEnd={(e) => onDragEnd(e.target.x(), e.target.y())}
     >
       <Rect width={meter.width} height={height} fill={COLOR_PANEL} stroke={COLOR_OUTLINE} strokeWidth={PANEL_OUTLINE_WIDTH} />
