@@ -152,6 +152,15 @@ interface AppState {
   isDrawingConnection: boolean;
   setDrawingMode: (active: boolean) => void;
 
+  // feat/media-and-proportions part C: the medium/style a NEW wire is
+  // drawn with, chosen up front in the toolbar rather than after the
+  // fact in Properties - it still applies to every newly drawn wire
+  // until changed again, and can still be edited per-wire afterward.
+  drawingMedium: SynopticConnection['medium'];
+  drawingStyle: SynopticConnection['style'];
+  setDrawingMedium: (medium: SynopticConnection['medium']) => void;
+  setDrawingStyle: (style: SynopticConnection['style']) => void;
+
   // Grid snapping: a persistent toggle (View menu, default on) separate
   // from the momentary Alt-key bypass, which lives outside the store
   // entirely (Canvas.tsx tracks the live key state directly).
@@ -229,10 +238,15 @@ export const useStore = create<AppState>((set, get) => ({
   messages: [],
   isDrawingConnection: false,
   snapToGridEnabled: true,
+  drawingMedium: 'ELECTRICAL',
+  drawingStyle: 'NORMAL',
 
   setDrawingMode: (active) => set({
     isDrawingConnection: active
   }),
+
+  setDrawingMedium: (medium) => set({ drawingMedium: medium }),
+  setDrawingStyle: (style) => set({ drawingStyle: style }),
 
   toggleSnapToGrid: () => set((state) => ({ snapToGridEnabled: !state.snapToGridEnabled })),
 

@@ -1,18 +1,30 @@
 import React from 'react';
 import { useStore } from '../store';
+import type { SynopticConnection } from '../store';
 import {
   Undo, Redo, Copy, ClipboardPaste, Trash2,
   BringToFront, SendToBack, AlignLeft, AlignCenter, AlignRight,
   AlignVerticalSpaceAround, AlignHorizontalSpaceAround,
-  Lock, Unlock, RotateCcw, RotateCw, PenLine
+  Lock, Unlock, RotateCcw, RotateCw, PenLine, Zap, Droplet, Wind
 } from 'lucide-react';
+import { COLOR_ENERGIZED, COLOR_WATER, VENTILATION_ACTIVE, COLOR_WHITE, COLOR_RUN } from '../theme/ScadaTheme';
+
+// One icon/color pair per medium - reused by both the toolbar buttons
+// below and nothing else, so this stays local rather than joining
+// ScadaTheme.ts's own palette (which holds colors, not icon choices).
+const MEDIUM_OPTIONS: { value: SynopticConnection['medium']; label: string; icon: React.FC<{ size?: number }>; color: string }[] = [
+  { value: 'ELECTRICAL', label: 'Prad', icon: Zap, color: COLOR_ENERGIZED },
+  { value: 'WATER', label: 'Woda', icon: Droplet, color: COLOR_WATER },
+  { value: 'VENTILATION', label: 'Wentylacja', icon: Wind, color: VENTILATION_ACTIVE },
+];
 
 export const Toolbar: React.FC = () => {
   const {
     undo, redo, copySelected, paste, deleteObjects, selectedIds, selectedConnectionIds,
     bringToFront, sendToBack, alignSelected, distributeSelected,
     lockSelected, unlockSelected, rotateSelected,
-    isDrawingConnection, setDrawingMode
+    isDrawingConnection, setDrawingMode,
+    drawingMedium, setDrawingMedium, drawingStyle, setDrawingStyle
   } = useStore();
 
   return (
@@ -46,6 +58,45 @@ export const Toolbar: React.FC = () => {
           style={{ backgroundColor: isDrawingConnection ? '#3498db' : 'transparent' }}
         >
           <PenLine size={16} />
+        </button>
+      </div>
+
+      {/* Medium selector (part C): which of the three media a NEWLY
+          drawn wire gets, chosen up front instead of after the fact in
+          Properties - applies to every wire drawn until changed again.
+          Keyboard shortcuts 1/2/3 do the same (Canvas.tsx). */}
+      <div className="toolbar-group">
+        {MEDIUM_OPTIONS.map(({ value, label, icon: Icon, color }) => (
+          <button
+            key={value}
+            title={label}
+            onClick={() => setDrawingMedium(value)}
+            style={{
+              backgroundColor: drawingMedium === value ? color : 'transparent',
+              color: drawingMedium === value ? COLOR_WHITE : undefined
+            }}
+          >
+            <Icon size={16} />
+          </button>
+        ))}
+      </div>
+
+      {/* Style selector for newly drawn wires: NORMAL or BUS (a thicker
+          busbar/manifold, touchable anywhere along its length). */}
+      <div className="toolbar-group">
+        <button
+          title="Normal"
+          onClick={() => setDrawingStyle('NORMAL')}
+          style={{ backgroundColor: drawingStyle === 'NORMAL' ? COLOR_RUN : 'transparent', color: drawingStyle === 'NORMAL' ? COLOR_WHITE : undefined }}
+        >
+          N
+        </button>
+        <button
+          title="Bus (szyna / kolektor)"
+          onClick={() => setDrawingStyle('BUS')}
+          style={{ backgroundColor: drawingStyle === 'BUS' ? COLOR_RUN : 'transparent', color: drawingStyle === 'BUS' ? COLOR_WHITE : undefined }}
+        >
+          B
         </button>
       </div>
 
