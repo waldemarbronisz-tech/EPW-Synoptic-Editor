@@ -889,6 +889,7 @@ export const Canvas: React.FC = () => {
             <SignalPanelElementNode
               key={panel.id}
               panel={panel}
+              devices={devices}
               onSelect={(e: any) => selectSignalPanels([panel.id], !!e?.evt?.shiftKey)}
               onDragStart={() => {
                 if (isAltPressed) useStore.getState().duplicateSignalPanelInPlace(panel.id);
