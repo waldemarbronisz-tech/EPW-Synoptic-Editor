@@ -5,6 +5,7 @@ import { Toolbox } from './components/Toolbox';
 import { Canvas } from './components/Canvas';
 import { PropertyInspector } from './components/PropertyInspector';
 import { MessagesPanel } from './components/MessagesPanel';
+import { StatusBar } from './components/StatusBar';
 import { ScadaStylePreview } from './components/ScadaStylePreview';
 import { useStore } from './store';
 import { useEffect, useState } from 'react';
@@ -54,6 +55,8 @@ function App() {
           </Panel>
         </PanelGroup>
       </div>
+
+      <StatusBar />
     </div>
   );
 }

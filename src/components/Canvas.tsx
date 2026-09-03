@@ -18,6 +18,10 @@ import { describeObject } from '../utils/ObjectDisplay';
 import { WireNodeSymbol } from '../symbols/scada/WireNodeSymbol';
 import { MeterElementNode } from './MeterElementNode';
 import { computeMeterHeight } from '../meter/MeterElement';
+import { SignalPanelElementNode } from './SignalPanelElementNode';
+import { computeSignalPanelHeight } from '../elements/SignalPanelElement';
+import { isObjectFullyInBox, isMeterFullyInBox, isConnectionFullyInBox } from '../utils/SelectionBox';
+import { clampZoom, computeContentBounds, computeFitView, GRID_THIN_BELOW_ZOOM } from '../utils/CanvasView';
 
 // Momentary Alt-key bypass for grid snapping. Deliberately outside React
 // state: every ObjectNode's drag handlers need the CURRENT key state at
@@ -26,23 +30,37 @@ import { computeMeterHeight } from '../meter/MeterElement';
 // the whole canvas by itself.
 let isAltPressed = false;
 
-const ObjectNode = ({ obj, isSelected, onSelect, onChange, gridSize }: {
+// Same reasoning as isAltPressed above - held Space (commit 4) turns
+// the cursor into a hand and lets a left-button drag pan the canvas,
+// without waiting for a React re-render to notice the key state.
+let isSpacePressed = false;
+
+// isSelected is no longer a prop here (commit 5) - the Transformer that
+// used to read it moved out to its own top-level pass (
+// ObjectTransformerHandle below), and nothing else in this component's
+// own rendering depends on selection state.
+const ObjectNode = ({ obj, onSelect, onChange, gridSize, onShapeRef }: {
   gridSize: number,
   obj: SynopticObject,
-  isSelected: boolean,
-  onSelect: () => void,
+  // Receives the raw Konva event (onClick={onSelect} forwards it
+  // positionally) so the caller can read Shift for multi-select - see
+  // Canvas.tsx's own call site.
+  onSelect: (e?: any) => void,
   onChange: (newAttrs: Partial<SynopticObject>) => void,
+  // Layers (commit 5): the Transformer for a selected object is no
+  // longer rendered here - it moves to its own top-level pass
+  // (ObjectTransformerHandle below) so a selection's resize handles
+  // always draw ABOVE every symbol, never just above this one object's
+  // own. This reports the Group's own Konva node up to Canvas so that
+  // later pass can still attach a Transformer to it.
+  onShapeRef: (id: string, node: any) => void,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const shapeRef = useRef<any>(null);
-  const trRef = useRef<any>(null);
 
   useEffect(() => {
-    if (isSelected && trRef.current) {
-      trRef.current.nodes([shapeRef.current]);
-      trRef.current.getLayer().batchDraw();
-    }
-  }, [isSelected]);
+    onShapeRef(obj.id, shapeRef.current);
+  });
 
   // Node-based wiring model: a symbol has terminals now, not ports - see
   // utils/Terminals.ts. The old click-a-port-to-drag-a-wire interaction
@@ -53,7 +71,6 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, gridSize }: {
   const terminals = getObjectTerminals(obj);
 
   return (
-    <React.Fragment>
       <Group
         ref={shapeRef}
         x={obj.x}
@@ -67,6 +84,17 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, gridSize }: {
         onTap={onSelect}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
+        onDragStart={() => {
+          // Alt+drag (commit 2): a copy is left behind at THIS exact
+          // spot the instant the drag starts, unselected and with no
+          // history entry of its own - the object actually under the
+          // cursor then keeps moving as an ordinary drag would, so the
+          // eventual onDragEnd's saveHistory() covers the new copy and
+          // the move together as one undo step.
+          if (isAltPressed) {
+            useStore.getState().duplicateObjectInPlace(obj.id);
+          }
+        }}
         onDragMove={(e) => {
           // Snap during drag for visual feedback (doesn't mutate store yet).
           // Held Alt bypasses this exactly as it bypasses the final snap
@@ -99,8 +127,6 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, gridSize }: {
         }}
       >
         <SymbolRenderer obj={obj} />
-        {/* Render Designation/Name Label */}
-        <ObjectLabelRenderer obj={obj} onChange={onChange} />
 
         {/* Terminals highlight on hover only (usterka D3's precedent,
             carried forward) - radius 6, contrasting fill, black outline. */}
@@ -117,21 +143,43 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, gridSize }: {
           />
         ))}
       </Group>
-      {isSelected && !obj.locked && (
-        <Transformer
-          ref={trRef}
-          boundBoxFunc={(oldBox, newBox) => {
-            if (newBox.width < 10 || newBox.height < 10) {
-              return oldBox;
-            }
-            return newBox;
-          }}
-          borderStroke={COLOR_WHITE}
-          borderStrokeWidth={2}
-          borderDash={[6, 4]}
-        />
-      )}
-    </React.Fragment>
+  );
+};
+
+// Layer 7 (commit 5): the resize/rotate handles for one selected,
+// unlocked object - rendered in Canvas's own final "zaznaczenie i
+// uchwyty" pass so they always draw above every symbol, not just above
+// this one object's own (two overlapping objects, the later one drawn
+// after the selected one, used to be able to cover its handles - this
+// is what that bug looked like). Attaches to `node` (the target
+// object's own Konva Group, reported via ObjectNode's onShapeRef) -
+// resize/rotate itself is still handled by that Group's own existing
+// onTransformEnd, unchanged; this component only draws the handles.
+const ObjectTransformerHandle = ({ node }: { node: any }) => {
+  const trRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (node && trRef.current) {
+      trRef.current.nodes([node]);
+      trRef.current.getLayer()?.batchDraw();
+    }
+  });
+
+  if (!node) return null;
+
+  return (
+    <Transformer
+      ref={trRef}
+      boundBoxFunc={(oldBox, newBox) => {
+        if (newBox.width < 10 || newBox.height < 10) {
+          return oldBox;
+        }
+        return newBox;
+      }}
+      borderStroke={COLOR_WHITE}
+      borderStrokeWidth={2}
+      borderDash={[6, 4]}
+    />
   );
 };
 
@@ -144,7 +192,7 @@ const ObjectNode = ({ obj, isSelected, onSelect, onChange, gridSize }: {
 const ConnectionNode = ({ conn, isSelected, onSelect, gridSize, onAltClickSegment }: {
   conn: SynopticConnection,
   isSelected: boolean,
-  onSelect: () => void,
+  onSelect: (multi: boolean) => void,
   gridSize: number,
   onAltClickSegment: (conn: SynopticConnection, worldPoint: WirePoint) => void,
 }) => {
@@ -185,7 +233,7 @@ const ConnectionNode = ({ conn, isSelected, onSelect, gridSize, onAltClickSegmen
               onAltClickSegment(conn, snapPointToGrid((pos.x - panX) / zoom, (pos.y - panY) / zoom));
               return;
             }
-            onSelect();
+            onSelect(!!e?.evt?.shiftKey);
           }}
         />
       </Group>
@@ -217,11 +265,29 @@ const ConnectionNode = ({ conn, isSelected, onSelect, gridSize, onAltClickSegmen
 export const Canvas: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<any>(null);
+  // Layers (commit 5): every ObjectNode reports its own Konva Group node
+  // here (see ObjectNode's onShapeRef) so the separate, later-drawn
+  // selection/handles pass (ObjectTransformerHandle) can still attach a
+  // Transformer to the right node without owning a ref to it directly -
+  // a plain mutable Map, not React state: a Konva node reference itself
+  // never needs to trigger a re-render when it changes.
+  const objectShapeRefs = useRef<Map<string, any>>(new Map());
+  const registerObjectShapeRef = (id: string, node: any) => {
+    objectShapeRefs.current.set(id, node);
+  };
   const canvasConfig = useStore(state => state.canvasConfig);
   const gridSize = canvasConfig.gridSize;
   const { objects, selectedIds, selectObjects, clearSelection, addObject, updateObject, canvasState, setCanvasState } = useStore();
   const { meters, selectedMeterIds, selectMeters, updateMeter, devices } = useStore();
+  const { signalPanels, selectedSignalPanelIds, selectSignalPanels, updateSignalPanel } = useStore();
+  const { selectMixed } = useStore();
   const [size, setSize] = useState({ width: 800, height: 600 });
+  // Mirrors `size` for the keydown handler below (registered once,
+  // empty deps) - the same drawingPointsRef pattern already used
+  // elsewhere in this file so that closure always reads the CURRENT
+  // container size, not whatever it was when the effect first ran.
+  const sizeRef = useRef(size);
+  useEffect(() => { sizeRef.current = size; }, [size]);
 
   // Selection Rect
   const [selectionBox, setSelectionBox] = useState<{ x: number, y: number, width: number, height: number } | null>(null);
@@ -308,18 +374,91 @@ export const Canvas: React.FC = () => {
       } else if (e.key === 'Backspace' && drawingPointsRef.current) {
         e.preventDefault();
         setDrawingPoints(prev => (prev ? removeLastWirePoint(prev) : prev));
+      } else if (e.key === 'Escape') {
+        // Not mid-draw (the branch above already handled that case) -
+        // Escape just clears whatever is currently selected.
+        useStore.getState().clearSelection();
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        // Reads the CURRENT selection from the store rather than this
+        // render's destructured selectedIds/selectedConnectionIds/
+        // selectedMeterIds - this handler is registered once (empty
+        // deps below), so a value closed over from render-scope would
+        // go stale the moment the selection changes after mount, the
+        // same reasoning behind every other useStore.getState() call
+        // already in this effect.
+        e.preventDefault();
+        const s = useStore.getState();
+        s.deleteObjects(s.selectedIds, s.selectedConnectionIds, s.selectedMeterIds, s.selectedSignalPanelIds);
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+        // Select everything on the current screen - objects,
+        // connections and meters together.
+        e.preventDefault();
+        useStore.getState().selectAll();
+      } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        // One grid cell per press, ten with Shift held - one history
+        // entry per keypress (moveSelectionBy itself calls saveHistory
+        // exactly once), including on a held-key auto-repeat, where
+        // every repeat is its own keydown event and so its own press.
+        e.preventDefault();
+        const step = gridSize * (e.shiftKey ? 10 : 1);
+        const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
+        const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
+        useStore.getState().moveSelectionBy(dx, dy);
       } else if (e.key === '1') {
         useStore.getState().setDrawingMedium('ELECTRICAL');
       } else if (e.key === '2') {
         useStore.getState().setDrawingMedium('WATER');
       } else if (e.key === '3') {
         useStore.getState().setDrawingMedium('VENTILATION');
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+        // Commit 2: copy the current selection (objects, connections
+        // and meters together, whatever is currently non-empty).
+        e.preventDefault();
+        useStore.getState().copySelected();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+        // Paste, offset by exactly one grid cell right and down.
+        e.preventDefault();
+        useStore.getState().paste();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+        // Duplicate the current selection in place, same offset as
+        // paste, without touching the clipboard.
+        e.preventDefault();
+        useStore.getState().duplicateSelected();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+        // Restores the SCALE only - pan is left exactly where it is.
+        e.preventDefault();
+        useStore.getState().setCanvasState({ zoom: 1 });
+      } else if ((e.ctrlKey || e.metaKey) && e.key === '9') {
+        // Fit the whole project's content into the current viewport.
+        e.preventDefault();
+        const s = useStore.getState();
+        const bounds = computeContentBounds(s.objects, s.meters, s.connections);
+        const view = computeFitView(bounds, sizeRef.current.width, sizeRef.current.height);
+        s.setCanvasState(view);
+      } else if (e.key === ' ') {
+        // Held Space (commit 4): the cursor turns into a hand, and a
+        // left-button drag pans - guarded behind isTypingInField()
+        // (checked above, unlike Alt) since typing a space is common
+        // and must not put the canvas into pan mode.
+        isSpacePressed = true;
+        if (containerRef.current && !isPanningRef.current) containerRef.current.style.cursor = 'grab';
       }
     };
-    const handleKeyUp = (e: KeyboardEvent) => { if (e.key === 'Alt') isAltPressed = false; };
-    // Also cleared on window blur - Alt released outside the window (e.g.
-    // while alt-tabbing) would otherwise never fire its own keyup here.
-    const handleBlur = () => { isAltPressed = false; };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Alt') isAltPressed = false;
+      if (e.key === ' ') {
+        isSpacePressed = false;
+        if (containerRef.current && !isPanningRef.current) containerRef.current.style.cursor = 'default';
+      }
+    };
+    // Also cleared on window blur - Alt/Space released outside the
+    // window (e.g. while alt-tabbing) would otherwise never fire their
+    // own keyup here.
+    const handleBlur = () => {
+      isAltPressed = false;
+      isSpacePressed = false;
+      if (containerRef.current && !isPanningRef.current) containerRef.current.style.cursor = 'default';
+    };
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('blur', handleBlur);
@@ -361,10 +500,11 @@ export const Canvas: React.FC = () => {
       y: stage.getPointerPosition().y / oldScale - stage.y() / oldScale,
     };
 
-    const newScale = e.evt.deltaY < 0 ? oldScale * scaleBy : oldScale / scaleBy;
-
-    // limit zoom
-    if (newScale < 0.1 || newScale > 5) return;
+    // Clamped to [MIN_ZOOM, MAX_ZOOM] (25%-400%) rather than simply
+    // refused past the edge - so scrolling hard against the limit still
+    // lands exactly on 25% or 400%, not on whatever the previous step
+    // happened to stop at.
+    const newScale = clampZoom(e.evt.deltaY < 0 ? oldScale * scaleBy : oldScale / scaleBy);
 
     setCanvasState({
       zoom: newScale,
@@ -374,7 +514,9 @@ export const Canvas: React.FC = () => {
   };
 
   const handleMouseDown = (e: any) => {
-    if (e.evt.button === 1) {
+    // Middle-button pan (unchanged), or a left-button drag while Space
+    // is held (commit 4) - the same panning gesture either way.
+    if (e.evt.button === 1 || (isSpacePressed && e.evt.button === 0)) {
       isPanningRef.current = true;
       lastPanPosRef.current = { x: e.evt.clientX, y: e.evt.clientY };
       if (containerRef.current) containerRef.current.style.cursor = 'grabbing';
@@ -463,29 +605,35 @@ export const Canvas: React.FC = () => {
     }
 
     if (selectionStartRef.current && selectionBox) {
-      // Find objects inside selection rect
+      // Rubber-band selection (commit 3, extended in commit 6 to signal
+      // panels): everything lying ENTIRELY within the box - objects,
+      // connections, meters and signal panels together, not just
+      // whichever kind happens to be found first. Something poking out
+      // past the box's edge is left unselected. isMeterFullyInBox's own
+      // signature ({x,y,width} + a separately-computed height) is
+      // already generic enough to reuse as-is for a signal panel - no
+      // new isSignalPanelFullyInBox needed, just its own height math.
       const box = selectionBox;
-      const selected = objects.filter(obj => {
-        return (
-          obj.x >= box.x &&
-          obj.y >= box.y &&
-          obj.x + obj.width * (obj.scaleX || 1) <= box.x + box.width &&
-          obj.y + obj.height * (obj.scaleY || 1) <= box.y + box.height
-        );
-      });
-      // Meters aren't SynopticObjects (no width/height field - height is
-      // always computed), so they get their own marquee check using
-      // their own width and computeMeterHeight.
-      const selectedMeters = meters.filter(m => {
-        const h = computeMeterHeight(m);
-        return m.x >= box.x && m.y >= box.y && m.x + m.width <= box.x + box.width && m.y + h <= box.y + box.height;
-      });
+      const objectIds = objects.filter(obj => isObjectFullyInBox(obj, box)).map(o => o.id);
+      const meterIds = meters.filter(m => isMeterFullyInBox(m, computeMeterHeight(m), box)).map(m => m.id);
+      const signalPanelIds = signalPanels.filter(p => isMeterFullyInBox(p, computeSignalPanelHeight(p), box)).map(p => p.id);
+      const connectionIds = connections.filter(c => isConnectionFullyInBox(c, box)).map(c => c.id);
 
-      if (selected.length > 0) {
-        selectObjects(selected.map(s => s.id), e.evt.shiftKey);
-      } else if (selectedMeters.length > 0) {
-        selectMeters(selectedMeters.map(m => m.id), e.evt.shiftKey);
+      if (objectIds.length > 0 || meterIds.length > 0 || signalPanelIds.length > 0 || connectionIds.length > 0) {
+        if (e.evt.shiftKey) {
+          // Shift+drag adds to whatever was already selected, per kind.
+          selectMixed({
+            objectIds: [...new Set([...selectedIds, ...objectIds])],
+            connectionIds: [...new Set([...selectedConnectionIds, ...connectionIds])],
+            meterIds: [...new Set([...selectedMeterIds, ...meterIds])],
+            signalPanelIds: [...new Set([...selectedSignalPanelIds, ...signalPanelIds])]
+          });
+        } else {
+          selectMixed({ objectIds, connectionIds, meterIds, signalPanelIds });
+        }
       }
+      // An empty box selects nothing new - a non-shift click already
+      // cleared any previous selection back in handleMouseDown.
     }
 
     selectionStartRef.current = null;
@@ -585,9 +733,15 @@ export const Canvas: React.FC = () => {
     const height = useStore.getState().canvasConfig.height;
     const minorOpacity = 0.12;
     const majorOpacity = 0.32;
+    // Below GRID_THIN_BELOW_ZOOM (commit 4), only the major (every 4th)
+    // line draws at all - at that scale every minor line packed this
+    // close together on screen blurs into a solid gray plane instead of
+    // reading as a grid.
+    const onlyMajor = canvasState.zoom < GRID_THIN_BELOW_ZOOM;
 
     for (let i = 0; i * gridSize <= width; i++) {
       const isMajor = i % 4 === 0;
+      if (onlyMajor && !isMajor) continue;
       lines.push(
         <Rect
           key={`v${i}`}
@@ -603,6 +757,7 @@ export const Canvas: React.FC = () => {
     }
     for (let j = 0; j * gridSize <= height; j++) {
       const isMajor = j % 4 === 0;
+      if (onlyMajor && !isMajor) continue;
       lines.push(
         <Rect
           key={`h${j}`}
@@ -658,7 +813,7 @@ export const Canvas: React.FC = () => {
               key={conn.id}
               conn={conn}
               isSelected={selectedConnectionIds.includes(conn.id)}
-              onSelect={() => selectConnections([conn.id], false)}
+              onSelect={(multi: boolean) => selectConnections([conn.id], multi)}
               gridSize={gridSize}
               onAltClickSegment={handleAltClickSegment}
             />
@@ -688,39 +843,122 @@ export const Canvas: React.FC = () => {
             <ObjectNode
               key={obj.id}
               obj={obj}
-              isSelected={selectedIds.includes(obj.id)}
-              onSelect={() => selectObjects([obj.id], false)}
+              onSelect={(e: any) => selectObjects([obj.id], !!e?.evt?.shiftKey)}
               onChange={(newAttrs) => updateObject(obj.id, newAttrs)}
               gridSize={gridSize}
+              onShapeRef={registerObjectShapeRef}
             />
           ))}
+          {/* Topology junctions (layer 4 - deliberately ABOVE symbols,
+              not below as the task's own layer list literally orders
+              them): a wire node (from the SCADA library) wherever 3+
+              segments, or 2 segments and a terminal, meet at one grid
+              point - computed purely from geometry by NetResolver.
+              getJunctionPoints. A junction routinely lands exactly at a
+              terminal, which is often inside the object's own drawn
+              shape, and painting it underneath would leave it
+              invisible, hidden by the object itself - this deliberate
+              deviation preserves that earlier fix; see raport.md. */}
+          {junctionPoints.map((j, idx) => (
+            <Group key={`junc-${idx}`} x={j.x - 75} y={j.y - 75} listening={false}>
+              <WireNodeSymbol />
+            </Group>
+          ))}
           {/* The meter element (feat/meter-element): its own array, not
-              a symbol - see MeterElement.ts's own header comment. */}
+              a symbol - see MeterElement.ts's own header comment. Layer
+              5 - after every symbol and junction, before labels. */}
           {meters.map((meter) => (
             <MeterElementNode
               key={meter.id}
               meter={meter}
               devices={devices}
-              isSelected={selectedMeterIds.includes(meter.id)}
-              onSelect={() => selectMeters([meter.id], false)}
+              onSelect={(e: any) => selectMeters([meter.id], !!e?.evt?.shiftKey)}
+              onDragStart={() => {
+                if (isAltPressed) useStore.getState().duplicateMeterInPlace(meter.id);
+              }}
               onDragEnd={(x, y) => {
                 updateMeter(meter.id, { x: snapValue(x, gridSize, isAltPressed), y: snapValue(y, gridSize, isAltPressed) });
                 useStore.getState().saveHistory();
               }}
             />
           ))}
-          {/* Topology junctions: a wire node (from the SCADA library)
-              wherever 3+ segments, or 2 segments and a terminal, meet at
-              one grid point - computed purely from geometry by
-              NetResolver.getJunctionPoints. Rendered AFTER (on top of)
-              every object: a junction routinely lands exactly at a
-              terminal, which is often inside the object's own drawn
-              shape, and painting it underneath would leave it invisible,
-              hidden by the object itself. */}
-          {junctionPoints.map((j, idx) => (
-            <Group key={`junc-${idx}`} x={j.x - 75} y={j.y - 75} listening={false}>
-              <WireNodeSymbol />
+          {/* The signal panel element (commit 6): same mechanism as the
+              meter, its own array - see elements/SignalPanelElement.ts.
+              Same layer 5 as the meter. */}
+          {signalPanels.map((panel) => (
+            <SignalPanelElementNode
+              key={panel.id}
+              panel={panel}
+              devices={devices}
+              onSelect={(e: any) => selectSignalPanels([panel.id], !!e?.evt?.shiftKey)}
+              onDragStart={() => {
+                if (isAltPressed) useStore.getState().duplicateSignalPanelInPlace(panel.id);
+              }}
+              onDragEnd={(x, y) => {
+                updateSignalPanel(panel.id, { x: snapValue(x, gridSize, isAltPressed), y: snapValue(y, gridSize, isAltPressed) });
+                useStore.getState().saveHistory();
+              }}
+            />
+          ))}
+          {/* Layer 6, labels: a SEPARATE pass over every object, drawn
+              after every symbol/junction/meter so a label never falls
+              under another object's own shape - each wrapped in its own
+              Group carrying the exact same x/y/rotation/scale transform
+              ObjectNode's own Group already applies (ObjectLabelRenderer's
+              own local coordinates and rotation-cancelling math are
+              unchanged, only which Group they are nested inside). */}
+          {objects.map((obj) => (
+            <Group
+              key={`label-${obj.id}`}
+              x={obj.x}
+              y={obj.y}
+              rotation={obj.rotation || 0}
+              scaleX={obj.scaleX || 1}
+              scaleY={obj.scaleY || 1}
+              visible={obj.visible !== false}
+            >
+              <ObjectLabelRenderer obj={obj} onChange={(newAttrs) => updateObject(obj.id, newAttrs)} />
             </Group>
+          ))}
+          {/* Layer 7, selection and handles - always topmost. The
+              in-progress wire's own preview stays in layer 2 (przewody)
+              above, since it is a wire, not a selection. */}
+          {selectedIds.filter(id => {
+            const obj = objects.find(o => o.id === id);
+            return obj && !obj.locked;
+          }).map((id) => (
+            <ObjectTransformerHandle
+              key={`tr-${id}`}
+              node={objectShapeRefs.current.get(id)}
+            />
+          ))}
+          {meters.filter(m => selectedMeterIds.includes(m.id)).map((meter) => (
+            <Rect
+              key={`meter-sel-${meter.id}`}
+              x={meter.x}
+              y={meter.y}
+              width={meter.width}
+              height={computeMeterHeight(meter)}
+              stroke={COLOR_WHITE}
+              strokeWidth={2}
+              dash={[6, 4]}
+              fill="transparent"
+              listening={false}
+            />
+          ))}
+          {signalPanels.filter(p => selectedSignalPanelIds.includes(p.id)).map((panel) => (
+            <Rect
+              key={`panel-sel-${panel.id}`}
+              x={panel.x}
+              y={panel.y}
+              width={panel.width}
+              height={computeSignalPanelHeight(panel)}
+              stroke={COLOR_WHITE}
+              strokeWidth={2}
+              dash={[6, 4]}
+              fill="transparent"
+              listening={false}
+            />
           ))}
           {selectionBox && (
             <Rect

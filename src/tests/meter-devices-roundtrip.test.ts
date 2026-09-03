@@ -23,7 +23,7 @@ describe('Device list round-trip through ProjectManager', () => {
     useStore.setState({
       objects: [], connections: [], meters: [], devices: [],
       selectedIds: [], selectedConnectionIds: [], selectedMeterIds: [],
-      history: [{ objects: [], connections: [], meters: [] }],
+      history: [{ objects: [], connections: [], meters: [], signalPanels: [] }],
       historyIndex: 0
     });
   });

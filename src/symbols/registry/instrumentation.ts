@@ -19,27 +19,27 @@ export const instrumentationSymbols: Record<string, SymbolDefinition> = {
     defaultHeight: 64,
     allowedStates: ['NORMAL', 'FAULT'],
     defaultState: 'NORMAL',
-    terminals: [{ id: 'IN', x: 16, y: 0, medium: 'ELECTRICAL' }]
+    terminals: [{ id: 'IN', side: 'TOP', medium: 'ELECTRICAL' }]
   },
   'instrumentation.pressure_sensor': {
     type: 'instrumentation.pressure_sensor',
     label: 'Pressure Sensor',
     category: 'Instrumentation',
-    defaultWidth: 48,
-    defaultHeight: 48,
+    defaultWidth: 64,
+    defaultHeight: 64,
     allowedStates: ['NORMAL', 'FAULT'],
     defaultState: 'NORMAL',
-    terminals: [{ id: 'IN', x: 32, y: 0, medium: 'ELECTRICAL' }]
+    terminals: [{ id: 'IN', side: 'TOP', medium: 'ELECTRICAL' }]
   },
   'instrumentation.level_sensor': {
     type: 'instrumentation.level_sensor',
     label: 'Level Sensor',
     category: 'Instrumentation',
-    defaultWidth: 48,
-    defaultHeight: 48,
+    defaultWidth: 64,
+    defaultHeight: 64,
     allowedStates: ['NORMAL', 'FAULT'],
     defaultState: 'NORMAL',
-    terminals: [{ id: 'IN', x: 32, y: 0, medium: 'ELECTRICAL' }]
+    terminals: [{ id: 'IN', side: 'TOP', medium: 'ELECTRICAL' }]
   },
   'instrumentation.humidity_sensor': {
     type: 'instrumentation.humidity_sensor',
@@ -49,17 +49,17 @@ export const instrumentationSymbols: Record<string, SymbolDefinition> = {
     defaultHeight: 64,
     allowedStates: ['NORMAL', 'FAULT'],
     defaultState: 'NORMAL',
-    terminals: [{ id: 'IN', x: 16, y: 0, medium: 'ELECTRICAL' }]
+    terminals: [{ id: 'IN', side: 'TOP', medium: 'ELECTRICAL' }]
   },
   'instrumentation.leak_sensor': {
     type: 'instrumentation.leak_sensor',
     label: 'Leak Sensor',
     category: 'Instrumentation',
-    defaultWidth: 48,
-    defaultHeight: 16,
+    defaultWidth: 64,
+    defaultHeight: 32,
     allowedStates: ['NORMAL', 'ACTIVE', 'FAULT'],
     defaultState: 'NORMAL',
-    terminals: [{ id: 'IN', x: 32, y: 0, medium: 'ELECTRICAL' }]
+    terminals: [{ id: 'IN', side: 'TOP', medium: 'ELECTRICAL' }]
   },
 
   // Automation

@@ -15,6 +15,12 @@
 import type { Device, MeasuredDevice } from '../project/DeviceSchema';
 import type { MeterElement, MeterElementRow } from './MeterElement';
 import { formatManualRowValue } from './MeterElement';
+import { findDeviceById, filterDevicesByBehavior } from '../project/DeviceLookup';
+
+// findDeviceById is re-exported here (not just imported for internal
+// use) so existing callers of this module keep working unchanged - see
+// project/DeviceLookup.ts's own header comment for why it moved there.
+export { findDeviceById };
 
 /**
  * Every MEASURED device in a project's device list. THE canonical path
@@ -24,12 +30,7 @@ import { formatManualRowValue } from './MeterElement';
  * this rather than filtering `behavior === 'MEASURED'` themselves.
  */
 export function getMeasuredDevices(devices: Device[]): MeasuredDevice[] {
-  return devices.filter((d): d is MeasuredDevice => d.behavior === 'MEASURED');
-}
-
-/** A device by id, or undefined - devices are not assumed sorted or indexed. */
-export function findDeviceById(devices: Device[], id: string): Device | undefined {
-  return devices.find(d => d.id === id);
+  return filterDevicesByBehavior(devices, ['MEASURED'] as const);
 }
 
 /**

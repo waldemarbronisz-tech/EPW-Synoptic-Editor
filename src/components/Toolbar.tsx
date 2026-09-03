@@ -5,7 +5,7 @@ import {
   Undo, Redo, Copy, ClipboardPaste, Trash2,
   BringToFront, SendToBack, AlignLeft, AlignCenter, AlignRight,
   AlignVerticalSpaceAround, AlignHorizontalSpaceAround,
-  Lock, Unlock, RotateCcw, RotateCw, PenLine, Zap, Droplet, Wind, Gauge
+  Lock, Unlock, RotateCcw, RotateCw, PenLine, Zap, Droplet, Wind, Gauge, CircleDot
 } from 'lucide-react';
 import { COLOR_ENERGIZED, COLOR_WATER, VENTILATION_ACTIVE, COLOR_WHITE, COLOR_RUN } from '../theme/ScadaTheme';
 
@@ -25,7 +25,8 @@ export const Toolbar: React.FC = () => {
     lockSelected, unlockSelected, rotateSelected,
     isDrawingConnection, setDrawingMode,
     drawingMedium, setDrawingMedium, drawingStyle, setDrawingStyle,
-    addMeter, selectedMeterIds, selectMeters
+    addMeter, selectedMeterIds, selectMeters,
+    addSignalPanel, selectedSignalPanelIds, selectSignalPanels
   } = useStore();
 
   return (
@@ -47,7 +48,7 @@ export const Toolbar: React.FC = () => {
       <div className="toolbar-group">
         <button title="Copy" onClick={copySelected}><Copy size={16} /></button>
         <button title="Paste" onClick={paste}><ClipboardPaste size={16} /></button>
-        <button title="Delete" onClick={() => deleteObjects(selectedIds, selectedConnectionIds, selectedMeterIds)}><Trash2 size={16} /></button>
+        <button title="Delete" onClick={() => deleteObjects(selectedIds, selectedConnectionIds, selectedMeterIds, selectedSignalPanelIds)}><Trash2 size={16} /></button>
       </div>
 
       <div className="toolbar-divider" />
@@ -66,6 +67,21 @@ export const Toolbar: React.FC = () => {
           }}
         >
           <Gauge size={16} />
+        </button>
+      </div>
+
+      {/* The signal panel element (commit 6): the same mechanism, the
+          same reasoning for having a toolbar button at all. */}
+      <div className="toolbar-group">
+        <button
+          title="Dodaj Panel Sygnalizacyjny"
+          onClick={() => {
+            addSignalPanel({ x: 160, y: 160, width: 160, fontSize: 12, rows: [] });
+            const newest = useStore.getState().signalPanels[useStore.getState().signalPanels.length - 1];
+            if (newest) selectSignalPanels([newest.id], false);
+          }}
+        >
+          <CircleDot size={16} />
         </button>
       </div>
 

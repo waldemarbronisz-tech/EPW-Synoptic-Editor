@@ -16,11 +16,27 @@ export interface ConnectionPoint {
 // terminal sits at a fixed LOCAL point (from the symbol's own top-left,
 // same origin obj.x/obj.y always means), which MUST be a multiple of
 // GRID_SIZE - a wire ending exactly on that world point is connected,
-// no id-matching involved (see NetResolver.ts).
+// no id-matching involved (see NetResolver.ts). Resolved shape - what
+// getObjectTerminals (utils/Terminals.ts) hands back, x/y already
+// computed. A symbol's own registry entry never declares one of these
+// directly - see TerminalSpec below.
 export interface Terminal {
   id: string;
   x: number; // local px from top-left, multiple of GRID_SIZE
   y: number; // local px from top-left, multiple of GRID_SIZE
+  medium: 'ELECTRICAL' | 'WATER' | 'VENTILATION';
+}
+
+// feat/editing-and-signal-panel commit 1: a terminal lies ALWAYS on the
+// middle of a symbol's edge - so a symbol's own registry entry only
+// ever needs to say WHICH edge, never a raw x/y. utils/Terminals.ts's
+// getObjectTerminals turns a TerminalSpec into a real Terminal (x/y
+// resolved from the object's own current width/height) at read time.
+export type TerminalSide = 'TOP' | 'BOTTOM' | 'LEFT' | 'RIGHT';
+
+export interface TerminalSpec {
+  id: string;
+  side: TerminalSide;
   medium: 'ELECTRICAL' | 'WATER' | 'VENTILATION';
 }
 
@@ -33,7 +49,7 @@ export interface SymbolDefinition {
   allowedStates: string[];
   defaultState: string;
   connectionPoints?: ConnectionPoint[];
-  terminals?: Terminal[];
+  terminals?: TerminalSpec[];
   isLine?: boolean;
   designationPrefix?: string;
   supportsDynamicPorts?: boolean;

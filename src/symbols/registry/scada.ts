@@ -62,21 +62,24 @@ export const scadaSymbols: Record<string, SymbolDefinition> = {
     type: 'scada.label_frame',
     label: 'Label Frame',
     category: 'SCADA',
-    // feat/media-and-proportions part A2: 150 -> 144 (nearest GRID_SIZE
-    // multiple). Purely a registry-hygiene change - LabelFrameSymbol's
-    // own rendered width/height are computed straight from the title/
-    // description text (getLabelFrameSize), never read obj.width/
-    // obj.height at all, so this has no visible effect on the symbol
-    // itself, only on its initial placement bounding box.
-    defaultWidth: 144,
-    defaultHeight: 144,
+    // feat/media-and-proportions part A2, then feat/editing-and-signal-
+    // panel commit 1: 150 -> 144 -> 160 (nearest EVEN GRID_SIZE
+    // multiple, since a terminal now always sits at exactly w/2 - see
+    // Terminals.ts's getTerminalOffsetForSide). Purely a registry-
+    // hygiene change either way - LabelFrameSymbol's own rendered
+    // width/height are computed straight from the title/description
+    // text (getLabelFrameSize), never read obj.width/obj.height at
+    // all, so this has no visible effect on the symbol itself, only on
+    // its initial placement bounding box.
+    defaultWidth: 160,
+    defaultHeight: 160,
     allowedStates: [],
     defaultState: '',
     connectionPoints: [{ id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive' }],
-    // EKRAN: "Opis tekstowy". 144x144 -> center 72, an exact tie between
-    // 64 and 80 - kept at 80 (unchanged from the 150-wide default; same
-    // round-up-on-tie convention, so no functional change here either).
-    terminals: [{ id: 'IN', x: 80, y: 0, medium: 'ELECTRICAL' }]
+    // EKRAN: "Opis tekstowy". No raw x/y any more - side: 'TOP' resolves
+    // to w/2 = 80 for the 160-wide default above, the same value this
+    // already had.
+    terminals: [{ id: 'IN', side: 'TOP', medium: 'ELECTRICAL' }]
   },
   'scada.motor': {
     type: 'scada.motor',
@@ -118,17 +121,19 @@ export const scadaSymbols: Record<string, SymbolDefinition> = {
     type: 'scada.indicator_diode',
     label: 'Indicator Diode',
     category: 'SCADA',
-    // feat/media-and-proportions part A2: 150 -> 144. Also purely
-    // registry hygiene - IndicatorDiodeSymbol draws its dot at a fixed
-    // local (75,75) regardless of obj.width/obj.height, so the visible
-    // dot does not move; only the bounding box shrinks slightly.
-    defaultWidth: 144,
-    defaultHeight: 144,
+    // feat/media-and-proportions part A2, then feat/editing-and-signal-
+    // panel commit 1: 150 -> 144 -> 160, same EVEN-multiple reasoning
+    // as label_frame above. Also purely registry hygiene here too -
+    // IndicatorDiodeSymbol draws its dot at a fixed local (75,75)
+    // regardless of obj.width/obj.height, so the visible dot does not
+    // move; only the bounding box changes.
+    defaultWidth: 160,
+    defaultHeight: 160,
     allowedStates: ['ON', 'OFF', 'QUALITY'],
     defaultState: 'OFF',
-    // EKRAN: "Dioda sygnalizacyjna". Same tie-at-72 case as label_frame
-    // above - kept at 80, unchanged.
-    terminals: [{ id: 'IN', x: 80, y: 0, medium: 'ELECTRICAL' }]
+    // EKRAN: "Dioda sygnalizacyjna". side: 'TOP' -> w/2 = 80, same value
+    // as before.
+    terminals: [{ id: 'IN', side: 'TOP', medium: 'ELECTRICAL' }]
   },
   'scada.meter': {
     type: 'scada.meter',
@@ -144,9 +149,10 @@ export const scadaSymbols: Record<string, SymbolDefinition> = {
     defaultHeight: 96,
     allowedStates: [],
     defaultState: '',
-    // EKRAN: "Miernik". 160x96 -> (80,0), still an exact grid multiple
-    // (unaffected by the height change - it sits on the top edge, y=0).
-    terminals: [{ id: 'IN', x: 80, y: 0, medium: 'ELECTRICAL' }]
+    // EKRAN: "Miernik". Both dims are already even GRID_SIZE multiples
+    // (160 = 32x5, 96 = 32x3) - no change needed here for commit 1.
+    // side: 'TOP' -> w/2 = 80, the same value this already had.
+    terminals: [{ id: 'IN', side: 'TOP', medium: 'ELECTRICAL' }]
   },
   'scada.boundary_point': {
     type: 'scada.boundary_point',
@@ -160,13 +166,17 @@ export const scadaSymbols: Record<string, SymbolDefinition> = {
     // dynamically (utils/Terminals.ts's getObjectTerminals) rather than
     // listed statically, the same way the old port model special-cased
     // it in GeometryUtils.resolveConnectionPoint.
-    // feat/media-and-proportions part A2: 150 -> 144, 60 -> 64. Registry
-    // hygiene only, same as label_frame/indicator_diode above - these
-    // two fields are never read for boundary_point's actual rendered
-    // size or its terminal (both come from getBoundaryPointWidth/
+    // feat/media-and-proportions part A2, then feat/editing-and-signal-
+    // panel commit 1: 150 -> 144 -> 160, 60 -> 64. Registry hygiene
+    // only, same as label_frame/indicator_diode above - these two
+    // fields are never read for boundary_point's actual rendered size
+    // or its terminal (both come from getBoundaryPointWidth/
     // getLabelFrameSize, driven by the label text, not obj.width/
     // obj.height), so nothing here changes visually or terminal-wise.
-    defaultWidth: 144,
+    // Kept an even GRID_SIZE multiple anyway, same as every other
+    // visible symbol now, even though this one has no static
+    // `terminals` entry for commit 1's centering test to check at all.
+    defaultWidth: 160,
     defaultHeight: 64,
     allowedStates: [],
     defaultState: ''

@@ -4,6 +4,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '../store';
+import { GRID_SIZE } from '../theme/ScadaTheme';
 
 describe('Meter element - place/select/move/copy/delete', () => {
   beforeEach(() => {
@@ -11,7 +12,7 @@ describe('Meter element - place/select/move/copy/delete', () => {
       objects: [], connections: [], meters: [],
       selectedIds: [], selectedConnectionIds: [], selectedMeterIds: [],
       clipboard: [], clipboardMeters: [],
-      history: [{ objects: [], connections: [], meters: [] }],
+      history: [{ objects: [], connections: [], meters: [], signalPanels: [] }],
       historyIndex: 0
     });
   });
@@ -59,8 +60,14 @@ describe('Meter element - place/select/move/copy/delete', () => {
     expect(meters.length).toBe(2);
     const pasted = meters.find(m => m.id !== id)!;
     expect(pasted).toBeTruthy();
-    expect(pasted.x).toBe(70);
-    expect(pasted.y).toBe(80);
+    // feat/editing-and-signal-panel commit 2: paste now offsets by
+    // exactly one grid cell (GRID_SIZE) for every pasteable element,
+    // meters included - this replaces the earlier, meter-element-task
+    // era hardcoded +20px offset (a generic store.ts clipboard detail,
+    // not part of the meter element's own behavior, so updating this
+    // expectation does not run afoul of "do not change meter behavior").
+    expect(pasted.x).toBe(50 + GRID_SIZE);
+    expect(pasted.y).toBe(60 + GRID_SIZE);
     expect(pasted.title).toBe('M1');
     expect(useStore.getState().selectedMeterIds).toEqual([pasted.id]);
   });

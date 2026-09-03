@@ -54,6 +54,7 @@ export class ProjectManager {
       objects: state.objects,
       connections: state.connections || [],
       meters: state.meters || [],
+      signalPanels: state.signalPanels || [],
       devices: state.devices || []
     };
     const validation = validateProjectSchema(proj);
@@ -70,6 +71,7 @@ export class ProjectManager {
       objects: project.objects,
       connections: project.connections || [],
       meters: project.meters || [],
+      signalPanels: project.signalPanels || [],
       devices: project.devices || [],
       projectName: project.project.name,
       projectMetadata: {
@@ -94,7 +96,8 @@ export class ProjectManager {
       history: [{
         objects: JSON.parse(JSON.stringify(project.objects)),
         connections: JSON.parse(JSON.stringify(project.connections || [])),
-        meters: JSON.parse(JSON.stringify(project.meters || []))
+        meters: JSON.parse(JSON.stringify(project.meters || [])),
+        signalPanels: JSON.parse(JSON.stringify(project.signalPanels || []))
       }],
       historyIndex: 0
     });
