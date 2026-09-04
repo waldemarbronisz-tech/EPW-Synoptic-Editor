@@ -1,0 +1,113 @@
+{
+  "tileWidth": 128,
+  "tileHeight": 64,
+  "metersPerTile": 8,
+  "sprites": [
+    {
+      "id": "building.house",
+      "description": "Dom jednorodzinny",
+      "footprint": {
+        "x": 2,
+        "y": 2
+      },
+      "states": {
+        "DEFAULT": {
+          "file": "building_house.png",
+          "width": 224,
+          "height": 129,
+          "anchorX": 112,
+          "anchorY": 129
+        }
+      }
+    },
+    {
+      "id": "building.warehouse",
+      "description": "Hala magazynowa",
+      "footprint": {
+        "x": 3,
+        "y": 2
+      },
+      "states": {
+        "DEFAULT": {
+          "file": "building_warehouse.png",
+          "width": 288,
+          "height": 196,
+          "anchorX": 144,
+          "anchorY": 196
+        }
+      }
+    },
+    {
+      "id": "water.septic_tank",
+      "description": "Oczyszczalnia przydomowa",
+      "footprint": {
+        "x": 1,
+        "y": 1
+      },
+      "states": {
+        "DEFAULT": {
+          "file": "water_septic_tank.png",
+          "width": 56,
+          "height": 53,
+          "anchorX": 28,
+          "anchorY": 53
+        }
+      }
+    },
+    {
+      "id": "light.pole_double",
+      "description": "Slup oswietleniowy, dwie oprawy",
+      "footprint": {
+        "x": 1,
+        "y": 1
+      },
+      "states": {
+        "OFF": {
+          "file": "light_pole_double_OFF.png",
+          "width": 72,
+          "height": 103,
+          "anchorX": 36,
+          "anchorY": 103
+        },
+        "ON": {
+          "file": "light_pole_double_ON.png",
+          "width": 72,
+          "height": 80,
+          "anchorX": 36,
+          "anchorY": 80
+        }
+      }
+    },
+    {
+      "id": "gate.sliding",
+      "description": "Brama przesuwna",
+      "footprint": {
+        "x": 2,
+        "y": 1
+      },
+      "states": {
+        "CLOSED": {
+          "file": "gate_sliding_CLOSED.png",
+          "width": 96,
+          "height": 62,
+          "anchorX": 48,
+          "anchorY": 62
+        },
+        "MOVING": {
+          "file": "gate_sliding_MOVING.png",
+          "width": 96,
+          "height": 64,
+          "anchorX": 48,
+          "anchorY": 64
+        },
+        "OPEN": {
+          "file": "gate_sliding_OPEN.png",
+          "width": 105,
+          "height": 57,
+          "anchorX": 52,
+          "anchorY": 57
+        }
+      }
+    }
+  ]
+}
