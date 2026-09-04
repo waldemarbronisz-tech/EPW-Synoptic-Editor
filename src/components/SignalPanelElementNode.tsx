@@ -48,6 +48,10 @@ export interface SignalPanelElementNodeProps {
   // Alt+drag leaves a copy behind at this exact spot the instant the
   // drag starts - same mechanism as the meter element's own.
   onDragStart?: () => void;
+  // feat/appearance-selection-frames commit 2c: same group-move wiring
+  // as MeterElementNode.tsx's own - see that file's comment.
+  onDragMove?: (x: number, y: number) => void;
+  onShapeRef?: (node: any) => void;
 }
 // No isSelected prop, no selection outline drawn here at all (unlike
 // the meter element's own commit-1 version, which drew one and had it
@@ -56,12 +60,16 @@ export interface SignalPanelElementNodeProps {
 // in Canvas.tsx, so there was nothing to build here that needed
 // removing later.
 
-export const SignalPanelElementNode: React.FC<SignalPanelElementNodeProps> = ({ panel, devices, onSelect, onDragEnd, onDragStart }) => {
+export const SignalPanelElementNode: React.FC<SignalPanelElementNodeProps> = ({ panel, devices, onSelect, onDragEnd, onDragStart, onDragMove, onShapeRef }) => {
   const fontSize = panel.fontSize || FONT_SIZE_BASE;
   const height = computeSignalPanelHeight(panel);
   const hasTitle = !!panel.title;
   const { rowHeight, titleBlockHeight } = getPanelRowLayout(fontSize, hasTitle);
   const diodeX = panel.width - PANEL_PADDING_X - DIODE_RADIUS;
+  const groupRef = useRef<any>(null);
+  useEffect(() => {
+    onShapeRef?.(groupRef.current);
+  });
 
   // A dangling row is not a hard error - the panel still draws - but the
   // user should hear about it once, not on every re-render. Same
@@ -82,12 +90,14 @@ export const SignalPanelElementNode: React.FC<SignalPanelElementNodeProps> = ({ 
 
   return (
     <Group
+      ref={groupRef}
       x={panel.x}
       y={panel.y}
       draggable
       onClick={onSelect}
       onTap={onSelect}
       onDragStart={() => onDragStart?.()}
+      onDragMove={(e) => onDragMove?.(e.target.x(), e.target.y())}
       onDragEnd={(e) => onDragEnd(e.target.x(), e.target.y())}
     >
       <PanelChrome width={panel.width} height={height} title={panel.title} fontSize={fontSize}>

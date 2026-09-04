@@ -44,6 +44,14 @@ export interface MeterElementNodeProps {
   // so existing callers/tests that only care about selection/move stay
   // unaffected.
   onDragStart?: () => void;
+  // feat/appearance-selection-frames commit 2c: raw Konva positions
+  // forwarded up so Canvas.tsx can drive a group move (drag any
+  // selected element, everything selected follows) without this file
+  // knowing anything about selection or other element kinds - it only
+  // ever reports its own Group's position, same spirit as onDragStart
+  // above. Optional for the same reason.
+  onDragMove?: (x: number, y: number) => void;
+  onShapeRef?: (node: any) => void;
 }
 // commit 5 (drawing layers): isSelected/the dashed selection outline
 // used to live here, drawn as the last child of this meter's own
@@ -69,13 +77,17 @@ function colorForRow(colorKind: 'NORMAL' | 'PREVIEW' | 'MISSING'): string {
   return COLOR_TEXT;
 }
 
-export const MeterElementNode: React.FC<MeterElementNodeProps> = ({ meter, devices, onSelect, onDragEnd, onDragStart }) => {
+export const MeterElementNode: React.FC<MeterElementNodeProps> = ({ meter, devices, onSelect, onDragEnd, onDragStart, onDragMove, onShapeRef }) => {
   const fontSize = meter.fontSize || FONT_SIZE_BASE;
   const height = computeMeterHeight(meter);
   const hasTitle = !!meter.title;
   const { rowHeight, titleBlockHeight } = getPanelRowLayout(fontSize, hasTitle);
   const valueFieldWidth = meter.width * VALUE_FIELD_WIDTH_FRACTION;
   const valueFieldX = meter.width - PANEL_PADDING_X - valueFieldWidth;
+  const groupRef = useRef<any>(null);
+  useEffect(() => {
+    onShapeRef?.(groupRef.current);
+  });
 
   // A dangling row is not a hard error - the meter still draws - but
   // the user should hear about it once, not on every re-render. Fired
@@ -99,12 +111,14 @@ export const MeterElementNode: React.FC<MeterElementNodeProps> = ({ meter, devic
 
   return (
     <Group
+      ref={groupRef}
       x={meter.x}
       y={meter.y}
       draggable
       onClick={onSelect}
       onTap={onSelect}
       onDragStart={() => onDragStart?.()}
+      onDragMove={(e) => onDragMove?.(e.target.x(), e.target.y())}
       onDragEnd={(e) => onDragEnd(e.target.x(), e.target.y())}
     >
       <PanelChrome width={meter.width} height={height} title={meter.title} fontSize={fontSize}>
