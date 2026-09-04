@@ -9,16 +9,18 @@
 import React, { useEffect, useRef } from 'react';
 import { Group, Circle, Text } from 'react-konva';
 import type { SignalPanelElement } from '../elements/SignalPanelElement';
-import { computeSignalPanelHeight } from '../elements/SignalPanelElement';
+import { computeSignalPanelHeight, SIGNAL_PANEL_MIN_WIDTH, SIGNAL_PANEL_MAX_WIDTH } from '../elements/SignalPanelElement';
 import { resolveSignalPanelRow, getSignalPanelDanglingRows } from '../elements/SignalPanelResolver';
 import type { Device } from '../project/DeviceSchema';
 import { useStore } from '../store';
 import { PanelChrome, getPanelRowLayout } from './PanelChrome';
 import { PANEL_PADDING_X, PANEL_PADDING_Y } from '../elements/PanelLayout';
-import { getIndicatorDiodeFillColor, getIndicatorDiodeRadius, DIODE_OUTLINE_WIDTH } from '../symbols/scada/IndicatorDiodeSymbol';
-import { COLOR_OUTLINE, COLOR_TEXT, FONT_UI, FONT_SIZE_BASE } from '../theme/ScadaTheme';
+import { getIndicatorDiodeFillColor, getIndicatorDiodeCoreColor, getIndicatorDiodeCoreGeometry, getIndicatorDiodeRadius, DIODE_OUTLINE_WIDTH } from '../symbols/scada/IndicatorDiodeSymbol';
+import { computeWidthResizeFromAnchor, getActiveResizeAnchor, setActiveResizeAnchor } from '../utils/ResizeHandles';
+import { COLOR_OUTLINE, COLOR_TEXT, FONT_UI, FONT_SIZE_BASE, GRID_SIZE } from '../theme/ScadaTheme';
 
 const DIODE_RADIUS = getIndicatorDiodeRadius('large'); // 12, per this element's own spec - reusing the Indicator Diode symbol's own radius helper rather than a coincidentally-equal literal
+const diodeCore = getIndicatorDiodeCoreGeometry(DIODE_RADIUS); // fix/handles-insert-mode-diodes commit 3b: same lit-core geometry as IndicatorDiodeSymbol.tsx's own
 
 // A device-linked row's diode always previews ON (SignalPanelResolver.ts
 // has no live data to draw from, same as the meter's own preview value) -
@@ -52,6 +54,9 @@ export interface SignalPanelElementNodeProps {
   // as MeterElementNode.tsx's own - see that file's comment.
   onDragMove?: (x: number, y: number) => void;
   onShapeRef?: (node: any) => void;
+  // fix/handles-insert-mode-diodes commit 1: width-only resize, same
+  // mechanism and reasoning as MeterElementNode.tsx's own.
+  onResize?: (x: number, width: number) => void;
 }
 // No isSelected prop, no selection outline drawn here at all (unlike
 // the meter element's own commit-1 version, which drew one and had it
@@ -60,7 +65,7 @@ export interface SignalPanelElementNodeProps {
 // in Canvas.tsx, so there was nothing to build here that needed
 // removing later.
 
-export const SignalPanelElementNode: React.FC<SignalPanelElementNodeProps> = ({ panel, devices, onSelect, onDragEnd, onDragStart, onDragMove, onShapeRef }) => {
+export const SignalPanelElementNode: React.FC<SignalPanelElementNodeProps> = ({ panel, devices, onSelect, onDragEnd, onDragStart, onDragMove, onShapeRef, onResize }) => {
   const fontSize = panel.fontSize || FONT_SIZE_BASE;
   const height = computeSignalPanelHeight(panel);
   const hasTitle = !!panel.title;
@@ -99,6 +104,29 @@ export const SignalPanelElementNode: React.FC<SignalPanelElementNodeProps> = ({ 
       onDragStart={() => onDragStart?.()}
       onDragMove={(e) => onDragMove?.(e.target.x(), e.target.y())}
       onDragEnd={(e) => onDragEnd(e.target.x(), e.target.y())}
+      onTransformEnd={() => {
+        const node = groupRef.current;
+        if (!node || !onResize) return;
+        const anchor = getActiveResizeAnchor();
+        setActiveResizeAnchor(null);
+        // The ORIGINAL x comes from the panel prop (the store's own
+        // last-committed value), never from node.x() - see
+        // MeterElementNode.tsx's own onTransformEnd for why.
+        const rawWidth = panel.width * node.scaleX();
+        const resized = anchor && anchor !== 'rotater'
+          ? computeWidthResizeFromAnchor(anchor, { x: panel.x, width: panel.width }, rawWidth, GRID_SIZE, SIGNAL_PANEL_MIN_WIDTH, SIGNAL_PANEL_MAX_WIDTH)
+          : { x: panel.x, width: Math.min(SIGNAL_PANEL_MAX_WIDTH, Math.max(SIGNAL_PANEL_MIN_WIDTH, rawWidth)) };
+        // Reset Konva's own live node state to match the committed
+        // value explicitly - React's props-diffing would otherwise
+        // skip re-applying x when it equals the pre-resize value (the
+        // fixed-edge case), leaving Konva's live-drag drift on screen.
+        // See MeterElementNode.tsx's own onTransformEnd for the full
+        // explanation (same bug, same fix).
+        node.x(resized.x);
+        node.scaleX(1);
+        node.scaleY(1);
+        onResize(resized.x, resized.width);
+      }}
     >
       <PanelChrome width={panel.width} height={height} title={panel.title} fontSize={fontSize}>
         {panel.rows.map((row, i) => {
@@ -128,6 +156,23 @@ export const SignalPanelElementNode: React.FC<SignalPanelElementNodeProps> = ({ 
                 stroke={COLOR_OUTLINE}
                 strokeWidth={DIODE_OUTLINE_WIDTH}
               />
+              {/* fix/handles-insert-mode-diodes commit 3b/3c: the same
+                  brighter, smaller, up-and-left offset inner circle as
+                  IndicatorDiodeSymbol.tsx's own ON/QUALITY rendering -
+                  same geometry helper, so a panel's diode row always
+                  matches that symbol's own look exactly, never a
+                  separately hand-tuned duplicate of it. OFF renders no
+                  core at all, same reasoning as that symbol's own. */}
+              {getIndicatorDiodeCoreColor(display.state) && (
+                <Circle
+                  x={diodeX - diodeCore.offset}
+                  y={rowCenterY - diodeCore.offset}
+                  radius={diodeCore.radius}
+                  fill={getIndicatorDiodeCoreColor(display.state)!}
+                  opacity={display.colorKind === 'PREVIEW' ? PREVIEW_DIODE_OPACITY : 1}
+                  listening={false}
+                />
+              )}
             </Group>
           );
         })}

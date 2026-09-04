@@ -8,13 +8,14 @@
 import React, { useEffect, useRef } from 'react';
 import { Group, Rect, Text } from 'react-konva';
 import type { MeterElement } from '../meter/MeterElement';
-import { computeMeterHeight } from '../meter/MeterElement';
+import { computeMeterHeight, METER_MIN_WIDTH, METER_MAX_WIDTH } from '../meter/MeterElement';
+import { computeWidthResizeFromAnchor, getActiveResizeAnchor, setActiveResizeAnchor } from '../utils/ResizeHandles';
 import { resolveMeterRow, getMeterDanglingRows } from '../meter/MeterResolver';
 import type { Device } from '../project/DeviceSchema';
 import { useStore } from '../store';
 import { PanelChrome, getPanelRowLayout } from './PanelChrome';
 import { PANEL_PADDING_X, PANEL_PADDING_Y } from '../elements/PanelLayout';
-import { COLOR_OUTLINE, COLOR_VALUE_FIELD, COLOR_TEXT, COLOR_DE_ENERGIZED, COLOR_ALARM, FONT_UI, FONT_VALUE, FONT_SIZE_BASE } from '../theme/ScadaTheme';
+import { COLOR_OUTLINE, COLOR_VALUE_FIELD, COLOR_TEXT, COLOR_DE_ENERGIZED, COLOR_ALARM, FONT_UI, FONT_VALUE, FONT_SIZE_BASE, GRID_SIZE } from '../theme/ScadaTheme';
 
 // Dimension literals local to this element, same convention every other
 // scada/ symbol already follows (ScadaTheme.ts holds colors and the
@@ -52,6 +53,12 @@ export interface MeterElementNodeProps {
   // above. Optional for the same reason.
   onDragMove?: (x: number, y: number) => void;
   onShapeRef?: (node: any) => void;
+  // fix/handles-insert-mode-diodes commit 1: width-only resize via the
+  // two vertical-edge handles (WidthOnlyTransformerHandle in
+  // Canvas.tsx) - height stays exactly what computeMeterHeight says it
+  // is, never settable by hand (1's own note). Mirrors
+  // FrameElementNode.tsx's onResize in spirit, one dimension narrower.
+  onResize?: (x: number, width: number) => void;
 }
 // commit 5 (drawing layers): isSelected/the dashed selection outline
 // used to live here, drawn as the last child of this meter's own
@@ -77,7 +84,7 @@ function colorForRow(colorKind: 'NORMAL' | 'PREVIEW' | 'MISSING'): string {
   return COLOR_TEXT;
 }
 
-export const MeterElementNode: React.FC<MeterElementNodeProps> = ({ meter, devices, onSelect, onDragEnd, onDragStart, onDragMove, onShapeRef }) => {
+export const MeterElementNode: React.FC<MeterElementNodeProps> = ({ meter, devices, onSelect, onDragEnd, onDragStart, onDragMove, onShapeRef, onResize }) => {
   const fontSize = meter.fontSize || FONT_SIZE_BASE;
   const height = computeMeterHeight(meter);
   const hasTitle = !!meter.title;
@@ -120,6 +127,40 @@ export const MeterElementNode: React.FC<MeterElementNodeProps> = ({ meter, devic
       onDragStart={() => onDragStart?.()}
       onDragMove={(e) => onDragMove?.(e.target.x(), e.target.y())}
       onDragEnd={(e) => onDragEnd(e.target.x(), e.target.y())}
+      onTransformEnd={() => {
+        const node = groupRef.current;
+        if (!node || !onResize) return;
+        const anchor = getActiveResizeAnchor();
+        setActiveResizeAnchor(null);
+        // The ORIGINAL x comes from the meter prop (the store's own
+        // last-committed value), never from node.x() - that reflects
+        // wherever Konva's Transformer left it mid-drag, not a clean
+        // baseline to compute a fixed edge from (same reasoning
+        // FrameElementNode's own onTransformEnd now uses).
+        const rawWidth = meter.width * node.scaleX();
+        const resized = anchor && anchor !== 'rotater'
+          ? computeWidthResizeFromAnchor(anchor, { x: meter.x, width: meter.width }, rawWidth, GRID_SIZE, METER_MIN_WIDTH, METER_MAX_WIDTH)
+          : { x: meter.x, width: Math.min(METER_MAX_WIDTH, Math.max(METER_MIN_WIDTH, rawWidth)) };
+        // Konva's own Transformer mutates this node's x/scaleX directly
+        // while the drag is live - when the committed x equals what it
+        // already was (the fixed edge case), React sees no prop change
+        // and never re-applies it, leaving Konva's own live-drag value
+        // on screen instead of what was just committed (the same bug
+        // ObjectNode's own onTransformEnd was found to have live).
+        // Reset explicitly, every time, so the node's on-screen state
+        // can never drift from the store's. Width is baked directly
+        // into the store field (meter.width IS its own geometry, same
+        // reasoning FrameElementNode's own reset already states) -
+        // scale must go back to 1 or the next resize would compound on
+        // a lingering factor. scaleY specifically: the width-only
+        // handles never touch it, but Konva Transformer still reports
+        // whatever scaleY the LAST full transform left (typically 1
+        // already) - reset defensively regardless.
+        node.x(resized.x);
+        node.scaleX(1);
+        node.scaleY(1);
+        onResize(resized.x, resized.width);
+      }}
     >
       <PanelChrome width={meter.width} height={height} title={meter.title} fontSize={fontSize}>
         {meter.rows.map((row, i) => {
