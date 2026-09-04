@@ -22,6 +22,8 @@ import { SignalPanelElementNode } from './SignalPanelElementNode';
 import { computeSignalPanelHeight } from '../elements/SignalPanelElement';
 import { isObjectFullyInBox, isMeterFullyInBox, isConnectionFullyInBox, mergeSelectionAdditive } from '../utils/SelectionBox';
 import { clampZoom, computeContentBounds, computeFitView, GRID_THIN_BELOW_ZOOM } from '../utils/CanvasView';
+import { FrameElementNode } from './FrameElementNode';
+import { computeFrameRectFromDrag } from '../elements/FrameElement';
 
 // Momentary Alt-key bypass for grid snapping. Deliberately outside React
 // state: every ObjectNode's drag handlers need the CURRENT key state at
@@ -239,6 +241,44 @@ const ObjectTransformerHandle = ({ node }: { node: any }) => {
   );
 };
 
+// The same Transformer-relocation pattern as ObjectTransformerHandle
+// above, for a frame's own resize handles (3f) - rotation disabled
+// (frames do not rotate, per this element's own 3a spec, which lists
+// only x/y/width/height/title/titlePosition/variant), and no live
+// boundBoxFunc floor beyond a small pixel minimum: the REAL 2-grid-
+// cell minimum (3g) is enforced where it actually matters, in
+// FrameElementNode's own onTransformEnd (clampFrameSize), which runs
+// regardless of zoom level - a boundBoxFunc here only sees on-screen
+// pixels, not the frame's own local units.
+const FrameTransformerHandle = ({ node }: { node: any }) => {
+  const trRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (node && trRef.current) {
+      trRef.current.nodes([node]);
+      trRef.current.getLayer()?.batchDraw();
+    }
+  });
+
+  if (!node) return null;
+
+  return (
+    <Transformer
+      ref={trRef}
+      rotateEnabled={false}
+      boundBoxFunc={(oldBox, newBox) => {
+        if (newBox.width < 10 || newBox.height < 10) {
+          return oldBox;
+        }
+        return newBox;
+      }}
+      borderStroke={COLOR_WHITE}
+      borderStrokeWidth={2}
+      borderDash={[6, 4]}
+    />
+  );
+};
+
 // A finished wire: draws itself (ConnectionLine), can be dragged whole
 // (translating every point, grid-snapped), and - while selected - shows
 // a draggable handle at each of its own points so a bend can be grabbed
@@ -350,11 +390,19 @@ export const Canvas: React.FC = () => {
   const registerObjectShapeRef = (id: string, node: any) => {
     objectShapeRefs.current.set(id, node);
   };
+  // Same reasoning, for a frame's own resize handles (commit 3: 3f
+  // requires a frame to be resizable via corner/edge handles, same
+  // mechanism as a symbol's own Transformer).
+  const frameShapeRefs = useRef<Map<string, any>>(new Map());
+  const registerFrameShapeRef = (id: string, node: any) => {
+    frameShapeRefs.current.set(id, node);
+  };
   const canvasConfig = useStore(state => state.canvasConfig);
   const gridSize = canvasConfig.gridSize;
   const { objects, selectedIds, selectObjects, clearSelection, addObject, updateObject, canvasState, setCanvasState } = useStore();
   const { meters, selectedMeterIds, selectMeters, updateMeter, devices } = useStore();
   const { signalPanels, selectedSignalPanelIds, selectSignalPanels, updateSignalPanel } = useStore();
+  const { frames, selectedFrameIds, selectFrames, addFrame, updateFrame, isDrawingFrame, drawingFrameVariant } = useStore();
   const { selectMixed } = useStore();
   const [size, setSize] = useState({ width: 800, height: 600 });
   // Mirrors `size` for the keydown handler below (registered once,
@@ -404,6 +452,7 @@ export const Canvas: React.FC = () => {
     ...selectedIds.map(id => `obj:${id}`),
     ...selectedMeterIds.map(id => `meter:${id}`),
     ...selectedSignalPanelIds.map(id => `panel:${id}`),
+    ...selectedFrameIds.map(id => `frame:${id}`),
     ...selectedConnectionIds.map(id => `conn:${id}`)
   ];
 
@@ -434,7 +483,8 @@ export const Canvas: React.FC = () => {
         const id = key.slice(key.indexOf(':') + 1);
         const source = key.startsWith('obj:') ? objects.find(o => o.id === id)
           : key.startsWith('meter:') ? meters.find(m => m.id === id)
-          : signalPanels.find(p => p.id === id);
+          : key.startsWith('panel:') ? signalPanels.find(p => p.id === id)
+          : frames.find(f => f.id === id);
         if (!source) return;
         node.x(source.x + dx);
         node.y(source.y + dy);
@@ -531,7 +581,7 @@ export const Canvas: React.FC = () => {
         // already in this effect.
         e.preventDefault();
         const s = useStore.getState();
-        s.deleteObjects(s.selectedIds, s.selectedConnectionIds, s.selectedMeterIds, s.selectedSignalPanelIds);
+        s.deleteObjects(s.selectedIds, s.selectedConnectionIds, s.selectedMeterIds, s.selectedSignalPanelIds, s.selectedFrameIds);
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
         // Select everything on the current screen - objects,
         // connections and meters together.
@@ -677,6 +727,23 @@ export const Canvas: React.FC = () => {
       return;
     }
 
+    if (isDrawingFrame) {
+      // A frame is dragged out like a rectangle tool, on any point -
+      // same "doesn't matter what's underneath" reasoning as the wire
+      // tool above. Reuses the same start/box tracking the rubber-band
+      // selection itself uses (selectionStartRef/selectionBox) - the
+      // two gestures are geometrically identical (drag a corner to a
+      // corner), only what happens on release differs (see
+      // handleMouseUp), so there is no need for a second, parallel set
+      // of refs just to tell them apart.
+      const pos = e.target.getStage().getPointerPosition();
+      if (!pos) return;
+      const { x: startX, y: startY } = toCanvasPoint(pos);
+      selectionStartRef.current = { x: startX, y: startY };
+      setSelectionBox({ x: startX, y: startY, width: 0, height: 0 });
+      return;
+    }
+
     // Check if clicking on empty stage
     const clickedOnEmpty = e.target === e.target.getStage() || e.target.name() === 'grid';
     if (clickedOnEmpty) {
@@ -747,30 +814,57 @@ export const Canvas: React.FC = () => {
       return;
     }
 
+    if (isDrawingFrame) {
+      // Finalize the dragged rectangle into a real frame - 3g's own
+      // minimum-size clamp lives in computeFrameRectFromDrag itself, so
+      // a drag too small to register (a stray click, essentially) still
+      // creates a real, minimum-size frame, never a zero-size one.
+      if (selectionBox) {
+        // selectionBox is already the normalized (min-x/min-y, width,
+        // height) rectangle handleMouseMove built from the two drag
+        // corners - its own two opposite corners are exactly the two
+        // points computeFrameRectFromDrag needs, however the drag
+        // itself was oriented.
+        const rect = computeFrameRectFromDrag(selectionBox.x, selectionBox.y, selectionBox.x + selectionBox.width, selectionBox.y + selectionBox.height);
+        addFrame({ ...rect, titlePosition: 'TOP_LEFT', variant: drawingFrameVariant });
+        const newest = useStore.getState().frames[useStore.getState().frames.length - 1];
+        if (newest) selectFrames([newest.id], false);
+      }
+      selectionStartRef.current = null;
+      setSelectionBox(null);
+      return;
+    }
+
     if (selectionStartRef.current && selectionBox) {
       // Rubber-band selection (commit 3, extended in commit 6 to signal
-      // panels): everything lying ENTIRELY within the box - objects,
-      // connections, meters and signal panels together, not just
-      // whichever kind happens to be found first. Something poking out
-      // past the box's edge is left unselected. isMeterFullyInBox's own
-      // signature ({x,y,width} + a separately-computed height) is
-      // already generic enough to reuse as-is for a signal panel - no
-      // new isSignalPanelFullyInBox needed, just its own height math.
+      // panels, and in commit 2/feat-appearance-selection-frames to
+      // frames): everything lying ENTIRELY within the box - objects,
+      // connections, meters, signal panels and frames together, not
+      // just whichever kind happens to be found first. Something
+      // poking out past the box's edge is left unselected.
+      // isMeterFullyInBox's own signature ({x,y,width} + a separately-
+      // computed height) is already generic enough to reuse as-is for
+      // a signal panel - no new isSignalPanelFullyInBox needed, just
+      // its own height math. A frame has x/y/width/height directly, so
+      // isObjectFullyInBox (built for a SynopticObject, but only ever
+      // reads those four fields plus optional scale) is reusable for
+      // it exactly as it stands - no new isFrameFullyInBox either.
       const box = selectionBox;
       const objectIds = objects.filter(obj => isObjectFullyInBox(obj, box)).map(o => o.id);
       const meterIds = meters.filter(m => isMeterFullyInBox(m, computeMeterHeight(m), box)).map(m => m.id);
       const signalPanelIds = signalPanels.filter(p => isMeterFullyInBox(p, computeSignalPanelHeight(p), box)).map(p => p.id);
+      const frameIds = frames.filter(f => isObjectFullyInBox(f, box)).map(f => f.id);
       const connectionIds = connections.filter(c => isConnectionFullyInBox(c, box)).map(c => c.id);
 
-      if (objectIds.length > 0 || meterIds.length > 0 || signalPanelIds.length > 0 || connectionIds.length > 0) {
+      if (objectIds.length > 0 || meterIds.length > 0 || signalPanelIds.length > 0 || frameIds.length > 0 || connectionIds.length > 0) {
         if (e.evt.shiftKey) {
           // Shift+drag adds to whatever was already selected, per kind.
           selectMixed(mergeSelectionAdditive(
-            { objectIds: selectedIds, connectionIds: selectedConnectionIds, meterIds: selectedMeterIds, signalPanelIds: selectedSignalPanelIds },
-            { objectIds, connectionIds, meterIds, signalPanelIds }
+            { objectIds: selectedIds, connectionIds: selectedConnectionIds, meterIds: selectedMeterIds, signalPanelIds: selectedSignalPanelIds, frameIds: selectedFrameIds },
+            { objectIds, connectionIds, meterIds, signalPanelIds, frameIds }
           ));
         } else {
-          selectMixed({ objectIds, connectionIds, meterIds, signalPanelIds });
+          selectMixed({ objectIds, connectionIds, meterIds, signalPanelIds, frameIds });
         }
       }
       // An empty box selects nothing new - a non-shift click already
@@ -925,7 +1019,7 @@ export const Canvas: React.FC = () => {
   // (an axis-aligned box, not each object's own rotated bounds) - the
   // same simplification isObjectFullyInBox already makes for the
   // rubber-band box itself.
-  const selectedTotalCount = selectedIds.length + selectedMeterIds.length + selectedSignalPanelIds.length + selectedConnectionIds.length;
+  const selectedTotalCount = selectedIds.length + selectedMeterIds.length + selectedSignalPanelIds.length + selectedFrameIds.length + selectedConnectionIds.length;
   const selectionGroupBounds = (() => {
     if (selectedTotalCount <= 1) return null;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -938,6 +1032,7 @@ export const Canvas: React.FC = () => {
     objects.filter(o => selectedIds.includes(o.id)).forEach(o => extend(o.x, o.y, o.x + o.width, o.y + o.height));
     meters.filter(m => selectedMeterIds.includes(m.id)).forEach(m => extend(m.x, m.y, m.x + m.width, m.y + computeMeterHeight(m)));
     signalPanels.filter(p => selectedSignalPanelIds.includes(p.id)).forEach(p => extend(p.x, p.y, p.x + p.width, p.y + computeSignalPanelHeight(p)));
+    frames.filter(f => selectedFrameIds.includes(f.id)).forEach(f => extend(f.x, f.y, f.x + f.width, f.y + f.height));
     connections.filter(c => selectedConnectionIds.includes(c.id)).forEach(c => c.points.forEach(pt => extend(pt.x, pt.y, pt.x, pt.y)));
     if (!Number.isFinite(minX)) return null;
     const padding = 8;
@@ -985,6 +1080,47 @@ export const Canvas: React.FC = () => {
           {drawGrid()}
         </Layer>
         <Layer>
+          {/* The frame element (commit 3): pure background graphic, no
+              terminals, no state - drawn first in this Layer so it sits
+              BELOW every wire and symbol that follows (3e: "warstwa
+              podkladu"), while still being above the grid/canvas
+              background Layer above. A symbol placed inside a frame's
+              own bounds draws later in this same Layer, so it is
+              visible above the frame, per that same requirement. */}
+          {frames.map((frame) => (
+            <FrameElementNode
+              key={frame.id}
+              frame={frame}
+              onSelect={(e: any) => selectFrames([frame.id], !!e?.evt?.shiftKey)}
+              onShapeRef={(node) => { groupDrag.registerNode(`frame:${frame.id}`, node); registerFrameShapeRef(frame.id, node); }}
+              onDragStart={() => {
+                if (isAltPressed) useStore.getState().duplicateFrameInPlace(frame.id);
+                groupDrag.start(`frame:${frame.id}`);
+              }}
+              onDragMove={(x, y) => {
+                if (groupDrag.isActive()) groupDrag.follow(x - frame.x, y - frame.y);
+              }}
+              onDragEnd={(x, y) => {
+                const finalX = snapValue(x, gridSize, isAltPressed);
+                const finalY = snapValue(y, gridSize, isAltPressed);
+                if (groupDrag.isActive()) {
+                  groupDrag.commit(finalX - frame.x, finalY - frame.y);
+                } else {
+                  updateFrame(frame.id, { x: finalX, y: finalY });
+                  useStore.getState().saveHistory();
+                }
+              }}
+              onResize={(x, y, width, height) => {
+                updateFrame(frame.id, {
+                  x: snapValue(x, gridSize, isAltPressed),
+                  y: snapValue(y, gridSize, isAltPressed),
+                  width: snapValue(width, gridSize, isAltPressed),
+                  height: snapValue(height, gridSize, isAltPressed)
+                });
+                useStore.getState().saveHistory();
+              }}
+            />
+          ))}
           {/* Node-based wiring model: a connection draws itself straight
               through its own points array now - no from/to object lookup
               needed here at all (that whole indirection is gone). A
@@ -1164,6 +1300,12 @@ export const Canvas: React.FC = () => {
               dash={[6, 4]}
               fill="transparent"
               listening={false}
+            />
+          ))}
+          {selectedFrameIds.map((id) => (
+            <FrameTransformerHandle
+              key={`frame-tr-${id}`}
+              node={frameShapeRefs.current.get(id)}
             />
           ))}
           {selectionGroupBounds && (

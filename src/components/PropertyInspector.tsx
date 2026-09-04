@@ -21,6 +21,7 @@ export const PropertyInspector: React.FC = () => {
   const { objects, connections, selectedIds, selectedConnectionIds, updateObject, updateConnection } = useStore();
   const { meters, selectedMeterIds, updateMeter, devices } = useStore();
   const { signalPanels, selectedSignalPanelIds, updateSignalPanel } = useStore();
+  const { frames, selectedFrameIds, updateFrame } = useStore();
   // Hooks must run unconditionally on every render (this component is
   // otherwise a chain of early returns depending on what is selected),
   // so this lives up here rather than inside the selectedMeter/
@@ -29,7 +30,7 @@ export const PropertyInspector: React.FC = () => {
   const [showMeterWizard, setShowMeterWizard] = useState(false);
   const [showSignalPanelWizard, setShowSignalPanelWizard] = useState(false);
 
-  if (selectedIds.length === 0 && selectedConnectionIds.length === 0 && selectedMeterIds.length === 0 && selectedSignalPanelIds.length === 0) {
+  if (selectedIds.length === 0 && selectedConnectionIds.length === 0 && selectedMeterIds.length === 0 && selectedSignalPanelIds.length === 0 && selectedFrameIds.length === 0) {
     return (
       <div className="property-inspector">
         <div className="inspector-header">Properties</div>
@@ -38,8 +39,8 @@ export const PropertyInspector: React.FC = () => {
     );
   }
 
-  const selectionKindCount = (selectedIds.length > 0 ? 1 : 0) + (selectedConnectionIds.length > 0 ? 1 : 0) + (selectedMeterIds.length > 0 ? 1 : 0) + (selectedSignalPanelIds.length > 0 ? 1 : 0);
-  if (selectedIds.length > 1 || selectedConnectionIds.length > 1 || selectedMeterIds.length > 1 || selectedSignalPanelIds.length > 1 || selectionKindCount > 1) {
+  const selectionKindCount = (selectedIds.length > 0 ? 1 : 0) + (selectedConnectionIds.length > 0 ? 1 : 0) + (selectedMeterIds.length > 0 ? 1 : 0) + (selectedSignalPanelIds.length > 0 ? 1 : 0) + (selectedFrameIds.length > 0 ? 1 : 0);
+  if (selectedIds.length > 1 || selectedConnectionIds.length > 1 || selectedMeterIds.length > 1 || selectedSignalPanelIds.length > 1 || selectedFrameIds.length > 1 || selectionKindCount > 1) {
     return (
       <div className="property-inspector">
         <div className="inspector-header">Properties</div>
@@ -51,12 +52,14 @@ export const PropertyInspector: React.FC = () => {
   const isConnectionSelected = selectedConnectionIds.length === 1;
   const isMeterSelected = selectedMeterIds.length === 1;
   const isSignalPanelSelected = selectedSignalPanelIds.length === 1;
-  const selectedObj = isConnectionSelected || isMeterSelected || isSignalPanelSelected ? null : objects.find(o => o.id === selectedIds[0]);
+  const isFrameSelected = selectedFrameIds.length === 1;
+  const selectedObj = isConnectionSelected || isMeterSelected || isSignalPanelSelected || isFrameSelected ? null : objects.find(o => o.id === selectedIds[0]);
   const selectedConn = isConnectionSelected ? connections.find(c => c.id === selectedConnectionIds[0]) : null;
   const selectedMeter = isMeterSelected ? meters.find(m => m.id === selectedMeterIds[0]) : null;
   const selectedSignalPanel = isSignalPanelSelected ? signalPanels.find(p => p.id === selectedSignalPanelIds[0]) : null;
+  const selectedFrame = isFrameSelected ? frames.find(f => f.id === selectedFrameIds[0]) : null;
 
-  if (!selectedObj && !selectedConn && !selectedMeter && !selectedSignalPanel) return null;
+  if (!selectedObj && !selectedConn && !selectedMeter && !selectedSignalPanel && !selectedFrame) return null;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -437,6 +440,57 @@ export const PropertyInspector: React.FC = () => {
         />
       )}
       </>
+    );
+  }
+
+  if (selectedFrame) {
+    // commit 3: a frame is pure graphics - no rows, no width/height
+    // fields (3a/3f: those are set by dragging it out and resized via
+    // its own corner/edge handles, not typed in here). Only title and
+    // where it sits in the top edge are editable in Properties; variant
+    // (PLAIN/BUILDING) is fixed at creation by which toolbar button
+    // drew it, the same way a symbol's own type cannot be changed
+    // after the fact from Properties either.
+    return (
+      <div className="property-inspector">
+        <div className="inspector-header">Frame Properties</div>
+        <div className="inspector-content">
+          <div className="property-group">
+            <div className="property-group-title">Frame</div>
+            <div className="property-row">
+              <label>Variant</label>
+              <input type="text" value={selectedFrame.variant} disabled />
+            </div>
+            <div className="property-row">
+              <label>Title</label>
+              <input
+                type="text"
+                value={selectedFrame.title || ''}
+                onChange={(e) => updateFrame(selectedFrame.id, { title: e.target.value })}
+                onBlur={() => useStore.getState().saveHistory()}
+              />
+            </div>
+            <div className="property-row">
+              <label>Title Position</label>
+              <select
+                value={selectedFrame.titlePosition}
+                onChange={(e) => { updateFrame(selectedFrame.id, { titlePosition: e.target.value as typeof selectedFrame.titlePosition }); useStore.getState().saveHistory(); }}
+              >
+                <option value="TOP_LEFT">Top Left</option>
+                <option value="TOP_CENTER">Top Center</option>
+              </select>
+            </div>
+            <div className="property-row">
+              <label>Width</label>
+              <input type="number" value={Math.round(selectedFrame.width)} disabled />
+            </div>
+            <div className="property-row">
+              <label>Height</label>
+              <input type="number" value={Math.round(selectedFrame.height)} disabled />
+            </div>
+          </div>
+        </div>
+      </div>
     );
   }
 

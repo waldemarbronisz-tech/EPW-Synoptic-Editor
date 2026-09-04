@@ -17,33 +17,38 @@
 import type { SynopticObject, SynopticConnection } from '../store';
 import type { MeterElement } from '../meter/MeterElement';
 import type { SignalPanelElement } from '../elements/SignalPanelElement';
+import type { FrameElement } from '../elements/FrameElement';
 
 export interface ClonedSelection {
   objects: SynopticObject[];
   meters: MeterElement[];
   signalPanels: SignalPanelElement[];
+  frames: FrameElement[];
   connections: SynopticConnection[];
   objectIds: string[];
   meterIds: string[];
   signalPanelIds: string[];
+  frameIds: string[];
   connectionIds: string[];
 }
 
 /**
- * Clones a selection (objects, meters, signal panels, connections - any
- * may be empty) offset by (dx, dy), with fresh ids throughout. Deep-
- * clones every source item first (JSON round-trip, the same technique
- * the store's own clipboard already used) so the result shares no
- * reference with its source - mutating a pasted object must never
- * silently mutate the thing it was copied from. A signal panel clones
- * exactly like a meter (id + x/y offset, nothing else to touch) - both
- * are "point elements" with no internal geometry of their own to shift,
- * unlike a connection's points array.
+ * Clones a selection (objects, meters, signal panels, frames,
+ * connections - any may be empty) offset by (dx, dy), with fresh ids
+ * throughout. Deep-clones every source item first (JSON round-trip,
+ * the same technique the store's own clipboard already used) so the
+ * result shares no reference with its source - mutating a pasted
+ * object must never silently mutate the thing it was copied from. A
+ * signal panel or a frame clones exactly like a meter (id + x/y
+ * offset, nothing else to touch) - all three are "point elements" with
+ * no internal geometry of their own to shift, unlike a connection's
+ * points array.
  */
 export function cloneSelectionWithOffset(
   objects: SynopticObject[],
   meters: MeterElement[],
   signalPanels: SignalPanelElement[],
+  frames: FrameElement[],
   connections: SynopticConnection[],
   dx: number,
   dy: number,
@@ -52,11 +57,13 @@ export function cloneSelectionWithOffset(
   const clonedObjects: SynopticObject[] = JSON.parse(JSON.stringify(objects));
   const clonedMeters: MeterElement[] = JSON.parse(JSON.stringify(meters));
   const clonedSignalPanels: SignalPanelElement[] = JSON.parse(JSON.stringify(signalPanels));
+  const clonedFrames: FrameElement[] = JSON.parse(JSON.stringify(frames));
   const clonedConnections: SynopticConnection[] = JSON.parse(JSON.stringify(connections));
 
   const newObjects = clonedObjects.map(obj => ({ ...obj, id: makeId(), x: obj.x + dx, y: obj.y + dy }));
   const newMeters = clonedMeters.map(m => ({ ...m, id: makeId(), x: m.x + dx, y: m.y + dy }));
   const newSignalPanels = clonedSignalPanels.map(p => ({ ...p, id: makeId(), x: p.x + dx, y: p.y + dy }));
+  const newFrames = clonedFrames.map(f => ({ ...f, id: makeId(), x: f.x + dx, y: f.y + dy }));
   const newConnections = clonedConnections.map(conn => ({
     ...conn,
     id: makeId(),
@@ -67,10 +74,12 @@ export function cloneSelectionWithOffset(
     objects: newObjects,
     meters: newMeters,
     signalPanels: newSignalPanels,
+    frames: newFrames,
     connections: newConnections,
     objectIds: newObjects.map(o => o.id),
     meterIds: newMeters.map(m => m.id),
     signalPanelIds: newSignalPanels.map(p => p.id),
+    frameIds: newFrames.map(f => f.id),
     connectionIds: newConnections.map(c => c.id)
   };
 }

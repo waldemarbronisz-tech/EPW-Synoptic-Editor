@@ -28,7 +28,7 @@ function resetStore() {
     objects: [], connections: [], meters: [],
     selectedIds: [], selectedConnectionIds: [], selectedMeterIds: [],
     clipboard: [], clipboardMeters: [], clipboardConnections: [],
-    history: [{ objects: [], connections: [], meters: [], signalPanels: [] }],
+    history: [{ objects: [], connections: [], meters: [], signalPanels: [], frames: [] }],
     historyIndex: 0
   });
 }

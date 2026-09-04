@@ -41,7 +41,7 @@ function resetStore() {
   useStore.setState({
     objects: [], connections: [], meters: [], signalPanels: [],
     selectedIds: [], selectedConnectionIds: [], selectedMeterIds: [], selectedSignalPanelIds: [],
-    history: [{ objects: [], connections: [], meters: [], signalPanels: [] }],
+    history: [{ objects: [], connections: [], meters: [], signalPanels: [], frames: [] }],
     historyIndex: 0
   });
 }
@@ -88,7 +88,7 @@ describe('Group move preserves relative distances (moveSelectionBy)', () => {
 // 10. Shift+drag adds to the existing selection instead of replacing it
 describe('mergeSelectionAdditive (Shift+drag rubber-band)', () => {
   it('adds newly-found ids to an existing selection, per kind, without dropping what was already selected', () => {
-    const existing = { objectIds: ['A'], connectionIds: ['W1'], meterIds: [], signalPanelIds: ['P1'] };
+    const existing = { objectIds: ['A'], connectionIds: ['W1'], meterIds: [], signalPanelIds: ['P1'], frameIds: [] };
     const found = { objectIds: ['B', 'C'], connectionIds: [], meterIds: ['M1'], signalPanelIds: [] };
 
     const merged = mergeSelectionAdditive(existing, found);
@@ -100,7 +100,7 @@ describe('mergeSelectionAdditive (Shift+drag rubber-band)', () => {
   });
 
   it('never duplicates an id already in both the existing selection and the newly-found set', () => {
-    const existing = { objectIds: ['A', 'B'], connectionIds: [], meterIds: [], signalPanelIds: [] };
+    const existing = { objectIds: ['A', 'B'], connectionIds: [], meterIds: [], signalPanelIds: [], frameIds: [] };
     const found = { objectIds: ['B', 'C'], connectionIds: [], meterIds: [], signalPanelIds: [] };
 
     const merged = mergeSelectionAdditive(existing, found);
@@ -109,7 +109,7 @@ describe('mergeSelectionAdditive (Shift+drag rubber-band)', () => {
   });
 
   it('an empty found set (the box enclosed nothing new) leaves the existing selection exactly as it was', () => {
-    const existing = { objectIds: ['A'], connectionIds: ['W1'], meterIds: ['M1'], signalPanelIds: ['P1'] };
+    const existing = { objectIds: ['A'], connectionIds: ['W1'], meterIds: ['M1'], signalPanelIds: ['P1'], frameIds: ['F1'] };
 
     const merged = mergeSelectionAdditive(existing, {});
 
@@ -120,12 +120,12 @@ describe('mergeSelectionAdditive (Shift+drag rubber-band)', () => {
     useStore.setState({
       objects: [], connections: [], meters: [], signalPanels: [],
       selectedIds: ['A'], selectedConnectionIds: [], selectedMeterIds: [], selectedSignalPanelIds: [],
-      history: [{ objects: [], connections: [], meters: [], signalPanels: [] }],
+      history: [{ objects: [], connections: [], meters: [], signalPanels: [], frames: [] }],
       historyIndex: 0
     });
 
     const merged = mergeSelectionAdditive(
-      { objectIds: useStore.getState().selectedIds, connectionIds: useStore.getState().selectedConnectionIds, meterIds: useStore.getState().selectedMeterIds, signalPanelIds: useStore.getState().selectedSignalPanelIds },
+      { objectIds: useStore.getState().selectedIds, connectionIds: useStore.getState().selectedConnectionIds, meterIds: useStore.getState().selectedMeterIds, signalPanelIds: useStore.getState().selectedSignalPanelIds, frameIds: [] },
       { objectIds: ['B'] }
     );
     useStore.getState().selectMixed(merged);

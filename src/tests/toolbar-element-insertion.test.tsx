@@ -29,7 +29,7 @@ function resetStore() {
     objects: [], connections: [], meters: [], signalPanels: [],
     selectedIds: [], selectedConnectionIds: [], selectedMeterIds: [], selectedSignalPanelIds: [],
     clipboard: [], clipboardMeters: [], clipboardSignalPanels: [], clipboardConnections: [],
-    history: [{ objects: [], connections: [], meters: [], signalPanels: [] }],
+    history: [{ objects: [], connections: [], meters: [], signalPanels: [], frames: [] }],
     historyIndex: 0
   });
 }
