@@ -9,14 +9,15 @@
 import React, { useEffect, useRef } from 'react';
 import { Group, Circle, Text } from 'react-konva';
 import type { SignalPanelElement } from '../elements/SignalPanelElement';
-import { computeSignalPanelHeight } from '../elements/SignalPanelElement';
+import { computeSignalPanelHeight, SIGNAL_PANEL_MIN_WIDTH, SIGNAL_PANEL_MAX_WIDTH } from '../elements/SignalPanelElement';
 import { resolveSignalPanelRow, getSignalPanelDanglingRows } from '../elements/SignalPanelResolver';
 import type { Device } from '../project/DeviceSchema';
 import { useStore } from '../store';
 import { PanelChrome, getPanelRowLayout } from './PanelChrome';
 import { PANEL_PADDING_X, PANEL_PADDING_Y } from '../elements/PanelLayout';
 import { getIndicatorDiodeFillColor, getIndicatorDiodeRadius, DIODE_OUTLINE_WIDTH } from '../symbols/scada/IndicatorDiodeSymbol';
-import { COLOR_OUTLINE, COLOR_TEXT, FONT_UI, FONT_SIZE_BASE } from '../theme/ScadaTheme';
+import { computeWidthResizeFromAnchor, getActiveResizeAnchor, setActiveResizeAnchor } from '../utils/ResizeHandles';
+import { COLOR_OUTLINE, COLOR_TEXT, FONT_UI, FONT_SIZE_BASE, GRID_SIZE } from '../theme/ScadaTheme';
 
 const DIODE_RADIUS = getIndicatorDiodeRadius('large'); // 12, per this element's own spec - reusing the Indicator Diode symbol's own radius helper rather than a coincidentally-equal literal
 
@@ -52,6 +53,9 @@ export interface SignalPanelElementNodeProps {
   // as MeterElementNode.tsx's own - see that file's comment.
   onDragMove?: (x: number, y: number) => void;
   onShapeRef?: (node: any) => void;
+  // fix/handles-insert-mode-diodes commit 1: width-only resize, same
+  // mechanism and reasoning as MeterElementNode.tsx's own.
+  onResize?: (x: number, width: number) => void;
 }
 // No isSelected prop, no selection outline drawn here at all (unlike
 // the meter element's own commit-1 version, which drew one and had it
@@ -60,7 +64,7 @@ export interface SignalPanelElementNodeProps {
 // in Canvas.tsx, so there was nothing to build here that needed
 // removing later.
 
-export const SignalPanelElementNode: React.FC<SignalPanelElementNodeProps> = ({ panel, devices, onSelect, onDragEnd, onDragStart, onDragMove, onShapeRef }) => {
+export const SignalPanelElementNode: React.FC<SignalPanelElementNodeProps> = ({ panel, devices, onSelect, onDragEnd, onDragStart, onDragMove, onShapeRef, onResize }) => {
   const fontSize = panel.fontSize || FONT_SIZE_BASE;
   const height = computeSignalPanelHeight(panel);
   const hasTitle = !!panel.title;
@@ -99,6 +103,29 @@ export const SignalPanelElementNode: React.FC<SignalPanelElementNodeProps> = ({ 
       onDragStart={() => onDragStart?.()}
       onDragMove={(e) => onDragMove?.(e.target.x(), e.target.y())}
       onDragEnd={(e) => onDragEnd(e.target.x(), e.target.y())}
+      onTransformEnd={() => {
+        const node = groupRef.current;
+        if (!node || !onResize) return;
+        const anchor = getActiveResizeAnchor();
+        setActiveResizeAnchor(null);
+        // The ORIGINAL x comes from the panel prop (the store's own
+        // last-committed value), never from node.x() - see
+        // MeterElementNode.tsx's own onTransformEnd for why.
+        const rawWidth = panel.width * node.scaleX();
+        const resized = anchor && anchor !== 'rotater'
+          ? computeWidthResizeFromAnchor(anchor, { x: panel.x, width: panel.width }, rawWidth, GRID_SIZE, SIGNAL_PANEL_MIN_WIDTH, SIGNAL_PANEL_MAX_WIDTH)
+          : { x: panel.x, width: Math.min(SIGNAL_PANEL_MAX_WIDTH, Math.max(SIGNAL_PANEL_MIN_WIDTH, rawWidth)) };
+        // Reset Konva's own live node state to match the committed
+        // value explicitly - React's props-diffing would otherwise
+        // skip re-applying x when it equals the pre-resize value (the
+        // fixed-edge case), leaving Konva's live-drag drift on screen.
+        // See MeterElementNode.tsx's own onTransformEnd for the full
+        // explanation (same bug, same fix).
+        node.x(resized.x);
+        node.scaleX(1);
+        node.scaleY(1);
+        onResize(resized.x, resized.width);
+      }}
     >
       <PanelChrome width={panel.width} height={height} title={panel.title} fontSize={fontSize}>
         {panel.rows.map((row, i) => {

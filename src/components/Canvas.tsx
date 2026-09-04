@@ -24,6 +24,7 @@ import { isObjectFullyInBox, isMeterFullyInBox, isConnectionFullyInBox, mergeSel
 import { clampZoom, computeContentBounds, computeFitView, GRID_THIN_BELOW_ZOOM } from '../utils/CanvasView';
 import { FrameElementNode } from './FrameElementNode';
 import { computeFrameRectFromDrag } from '../elements/FrameElement';
+import { computeResizeFromAnchor, setActiveResizeAnchor, getActiveResizeAnchor } from '../utils/ResizeHandles';
 
 // Momentary Alt-key bypass for grid snapping. Deliberately outside React
 // state: every ObjectNode's drag handlers need the CURRENT key state at
@@ -31,6 +32,14 @@ import { computeFrameRectFromDrag } from '../elements/FrameElement';
 // re-rendered prop, and a keypress should never trigger a re-render of
 // the whole canvas by itself.
 let isAltPressed = false;
+
+// fix/handles-insert-mode-diodes commit 1: which Transformer anchor
+// started the CURRENT resize gesture - tracked in utils/ResizeHandles.ts
+// itself (setActiveResizeAnchor/getActiveResizeAnchor), not here,
+// because FrameElementNode.tsx/MeterElementNode.tsx/
+// SignalPanelElementNode.tsx each need to read it from their own
+// onTransformEnd too, in files separate from this one. See that
+// module's own comment for the full reasoning.
 
 // Same reasoning as isAltPressed above - held Space (commit 4) turns
 // the cursor into a hand and lets a left-button drag pan the canvas,
@@ -171,6 +180,53 @@ const ObjectNode = ({ obj, onSelect, onChange, gridSize, onShapeRef, groupDrag }
         }}
         onTransformEnd={() => {
           const node = shapeRef.current;
+          const anchor = getActiveResizeAnchor();
+          setActiveResizeAnchor(null);
+
+          // fix/handles-insert-mode-diodes commit 1: a genuine resize
+          // (one of the 8 corner/edge anchors, not the rotate handle)
+          // goes through computeResizeFromAnchor - grid-snapped,
+          // minimum-clamped (GRID_SIZE, the closest this app has to a
+          // universal "a symbol's own minimum" - no dedicated constant
+          // exists for symbols the way FRAME_MIN_SIZE/METER_MIN_WIDTH
+          // do), and guaranteed to keep the OPPOSITE corner/edge fixed
+          // by construction. Only handled for an unrotated object - see
+          // this file's own note above computeResizeFromAnchor's import
+          // for why a rotated resize falls back to the older,
+          // independently-snapped x/y instead.
+          if (anchor && anchor !== 'rotater' && !(obj.rotation || 0)) {
+            const rawWidth = obj.width * node.scaleX();
+            const rawHeight = obj.height * node.scaleY();
+            const resized = computeResizeFromAnchor(
+              anchor,
+              { x: obj.x, y: obj.y, width: obj.width, height: obj.height },
+              rawWidth, rawHeight, gridSize, gridSize, gridSize, !isAltPressed
+            );
+            // Konva's own Transformer mutates this node's x/y/scaleX/
+            // scaleY directly and imperatively while the drag is live -
+            // when the committed value happens to equal what it already
+            // was (the fixed corner, by design, usually does), React
+            // sees no prop change and never re-applies it, leaving
+            // Konva's own live-drag value on screen instead of the
+            // value just committed to the store. Set explicitly so the
+            // node's on-screen state can never drift from the store's.
+            const newScaleX = resized.width / obj.width;
+            const newScaleY = resized.height / obj.height;
+            node.x(resized.x);
+            node.y(resized.y);
+            node.scaleX(newScaleX);
+            node.scaleY(newScaleY);
+            onChange({
+              x: resized.x,
+              y: resized.y,
+              rotation: 0,
+              scaleX: newScaleX,
+              scaleY: newScaleY,
+            });
+            useStore.getState().saveHistory();
+            return;
+          }
+
           const scaleX = node.scaleX();
           const scaleY = node.scaleY();
 
@@ -212,7 +268,17 @@ const ObjectNode = ({ obj, onSelect, onChange, gridSize, onShapeRef, groupDrag }
 // is what that bug looked like). Attaches to `node` (the target
 // object's own Konva Group, reported via ObjectNode's onShapeRef) -
 // resize/rotate itself is still handled by that Group's own existing
-// onTransformEnd, unchanged; this component only draws the handles.
+// onTransformEnd, unchanged; this component only draws the handles and
+// (fix/handles-insert-mode-diodes commit 1) records which anchor
+// started the gesture via setActiveResizeAnchor (ResizeHandles.ts), for
+// that onTransformEnd to read back.
+//
+// keepRatio is Konva's own Transformer default - true unless told
+// otherwise - which locks width/height together on every corner drag.
+// That default is exactly usterka 1's own symptom ("chwycenie uchwytu
+// w rogu... nie pozwala zmieniac szerokosci i wysokosci niezaleznie");
+// explicitly false here (and on every other Transformer in this file)
+// is the one-line fix underneath everything else this commit adds.
 const ObjectTransformerHandle = ({ node }: { node: any }) => {
   const trRef = useRef<any>(null);
 
@@ -228,6 +294,10 @@ const ObjectTransformerHandle = ({ node }: { node: any }) => {
   return (
     <Transformer
       ref={trRef}
+      keepRatio={false}
+      onTransformStart={() => {
+        setActiveResizeAnchor((trRef.current?.getActiveAnchor() || null) as any);
+      }}
       boundBoxFunc={(oldBox, newBox) => {
         if (newBox.width < 10 || newBox.height < 10) {
           return oldBox;
@@ -244,12 +314,14 @@ const ObjectTransformerHandle = ({ node }: { node: any }) => {
 // The same Transformer-relocation pattern as ObjectTransformerHandle
 // above, for a frame's own resize handles (3f) - rotation disabled
 // (frames do not rotate, per this element's own 3a spec, which lists
-// only x/y/width/height/title/titlePosition/variant), and no live
+// only x/y/width/height/title/titlePosition/variant). keepRatio false
+// for the same reason as ObjectTransformerHandle above. No live
 // boundBoxFunc floor beyond a small pixel minimum: the REAL 2-grid-
 // cell minimum (3g) is enforced where it actually matters, in
-// FrameElementNode's own onTransformEnd (clampFrameSize), which runs
-// regardless of zoom level - a boundBoxFunc here only sees on-screen
-// pixels, not the frame's own local units.
+// FrameElementNode's own onTransformEnd (computeResizeFromAnchor's own
+// minWidth/minHeight), which runs regardless of zoom level - a
+// boundBoxFunc here only sees on-screen pixels, not the frame's own
+// local units.
 const FrameTransformerHandle = ({ node }: { node: any }) => {
   const trRef = useRef<any>(null);
 
@@ -266,10 +338,53 @@ const FrameTransformerHandle = ({ node }: { node: any }) => {
     <Transformer
       ref={trRef}
       rotateEnabled={false}
+      keepRatio={false}
+      onTransformStart={() => {
+        setActiveResizeAnchor((trRef.current?.getActiveAnchor() || null) as any);
+      }}
       boundBoxFunc={(oldBox, newBox) => {
         if (newBox.width < 10 || newBox.height < 10) {
           return oldBox;
         }
+        return newBox;
+      }}
+      borderStroke={COLOR_WHITE}
+      borderStrokeWidth={2}
+      borderDash={[6, 4]}
+    />
+  );
+};
+
+// fix/handles-insert-mode-diodes commit 1: the meter and signal panel
+// elements resize ONLY their own width by hand - height is always
+// computed from row count (1's own note). Only the two vertical-edge
+// anchors are enabled at all; every corner and the two horizontal
+// (top/bottom) anchors are left out of enabledAnchors entirely, so
+// they are not merely inactive but genuinely absent from the handle -
+// there is nothing there to grab that could touch height.
+const WidthOnlyTransformerHandle = ({ node }: { node: any }) => {
+  const trRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (node && trRef.current) {
+      trRef.current.nodes([node]);
+      trRef.current.getLayer()?.batchDraw();
+    }
+  });
+
+  if (!node) return null;
+
+  return (
+    <Transformer
+      ref={trRef}
+      rotateEnabled={false}
+      keepRatio={false}
+      enabledAnchors={['middle-left', 'middle-right']}
+      onTransformStart={() => {
+        setActiveResizeAnchor((trRef.current?.getActiveAnchor() || null) as any);
+      }}
+      boundBoxFunc={(oldBox, newBox) => {
+        if (newBox.width < 10) return oldBox;
         return newBox;
       }}
       borderStroke={COLOR_WHITE}
@@ -1111,12 +1226,15 @@ export const Canvas: React.FC = () => {
                 }
               }}
               onResize={(x, y, width, height) => {
-                updateFrame(frame.id, {
-                  x: snapValue(x, gridSize, isAltPressed),
-                  y: snapValue(y, gridSize, isAltPressed),
-                  width: snapValue(width, gridSize, isAltPressed),
-                  height: snapValue(height, gridSize, isAltPressed)
-                });
+                // fix/handles-insert-mode-diodes commit 1: x/y/width/
+                // height arrive already grid-snapped and fixed-corner-
+                // correct (FrameElementNode's own onTransformEnd calls
+                // computeResizeFromAnchor) - re-snapping x/y and width/
+                // height independently here, the way this used to work,
+                // would risk shifting the corner that resize is
+                // supposed to hold exactly still. Passed straight
+                // through.
+                updateFrame(frame.id, { x, y, width, height });
                 useStore.getState().saveHistory();
               }}
             />
@@ -1211,6 +1329,14 @@ export const Canvas: React.FC = () => {
                   useStore.getState().saveHistory();
                 }
               }}
+              onResize={(x, width) => {
+                // x/width already grid-snapped and clamped
+                // (MeterElementNode's own onTransformEnd) - passed
+                // straight through, same reasoning as the frame's own
+                // onResize above.
+                updateMeter(meter.id, { x, width });
+                useStore.getState().saveHistory();
+              }}
             />
           ))}
           {/* The signal panel element (commit 6): same mechanism as the
@@ -1239,6 +1365,10 @@ export const Canvas: React.FC = () => {
                   updateSignalPanel(panel.id, { x: finalX, y: finalY });
                   useStore.getState().saveHistory();
                 }
+              }}
+              onResize={(x, width) => {
+                updateSignalPanel(panel.id, { x, width });
+                useStore.getState().saveHistory();
               }}
             />
           ))}
@@ -1274,32 +1404,25 @@ export const Canvas: React.FC = () => {
               node={objectShapeRefs.current.get(id)}
             />
           ))}
-          {meters.filter(m => selectedMeterIds.includes(m.id)).map((meter) => (
-            <Rect
-              key={`meter-sel-${meter.id}`}
-              x={meter.x}
-              y={meter.y}
-              width={meter.width}
-              height={computeMeterHeight(meter)}
-              stroke={COLOR_WHITE}
-              strokeWidth={2}
-              dash={[6, 4]}
-              fill="transparent"
-              listening={false}
+          {/* fix/handles-insert-mode-diodes commit 1: a plain dashed
+              Rect used to be the whole selection indicator for a meter
+              or signal panel - now WidthOnlyTransformerHandle (its own
+              Transformer already draws that same dashed border) so
+              there is something to actually grab and resize width
+              with. Reuses dragNodeRefs (the SAME map groupDrag's own
+              registerNode already populates via each element's own
+              onShapeRef below) rather than a second, parallel ref map
+              just for this. */}
+          {selectedMeterIds.map((id) => (
+            <WidthOnlyTransformerHandle
+              key={`meter-tr-${id}`}
+              node={dragNodeRefs.current.get(`meter:${id}`)}
             />
           ))}
-          {signalPanels.filter(p => selectedSignalPanelIds.includes(p.id)).map((panel) => (
-            <Rect
-              key={`panel-sel-${panel.id}`}
-              x={panel.x}
-              y={panel.y}
-              width={panel.width}
-              height={computeSignalPanelHeight(panel)}
-              stroke={COLOR_WHITE}
-              strokeWidth={2}
-              dash={[6, 4]}
-              fill="transparent"
-              listening={false}
+          {selectedSignalPanelIds.map((id) => (
+            <WidthOnlyTransformerHandle
+              key={`panel-tr-${id}`}
+              node={dragNodeRefs.current.get(`panel:${id}`)}
             />
           ))}
           {selectedFrameIds.map((id) => (

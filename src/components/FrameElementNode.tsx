@@ -13,8 +13,9 @@
 import React, { useEffect, useRef } from 'react';
 import { Group, Line, Text } from 'react-konva';
 import type { FrameElement } from '../elements/FrameElement';
-import { clampFrameSize } from '../elements/FrameElement';
-import { COLOR_OUTLINE, OUTLINE_WIDTH, FONT_UI, FONT_SIZE_TITLE } from '../theme/ScadaTheme';
+import { FRAME_MIN_SIZE } from '../elements/FrameElement';
+import { computeResizeFromAnchor, getActiveResizeAnchor, setActiveResizeAnchor } from '../utils/ResizeHandles';
+import { COLOR_OUTLINE, OUTLINE_WIDTH, FONT_UI, FONT_SIZE_TITLE, GRID_SIZE } from '../theme/ScadaTheme';
 
 const TITLE_PADDING_X = 6; // gap between the title text and where the border line resumes on either side
 const TITLE_INSET = 12;    // TOP_LEFT's own left margin before the gap starts
@@ -91,17 +92,44 @@ export const FrameElementNode: React.FC<FrameElementNodeProps> = ({ frame, onSel
       onTransformEnd={() => {
         const node = groupRef.current;
         if (!node || !onResize) return;
-        const newWidth = clampFrameSize(width * node.scaleX());
-        const newHeight = clampFrameSize(height * node.scaleY());
-        // Bake the scale into width/height and reset the node's own
-        // scale back to 1 - otherwise the NEXT resize would compound
-        // on top of a lingering scale factor instead of starting from
-        // a clean 1:1, the same reset ObjectNode's onTransformEnd
-        // would do too if it did not intentionally keep scale separate
-        // for a symbol's own native artwork.
+        const anchor = getActiveResizeAnchor();
+        setActiveResizeAnchor(null);
+
+        // fix/handles-insert-mode-diodes commit 1: computeResizeFromAnchor
+        // keeps the corner/edge OPPOSITE the one dragged exactly fixed
+        // (by construction, not by coincidence) and enforces
+        // FRAME_MIN_SIZE - the same shared math ObjectNode's own resize
+        // uses, so a frame's corner/edge handles behave identically to
+        // every other resizable element's own. The ORIGINAL rect comes
+        // from the frame prop (the store's own last-committed values),
+        // never from node.x()/node.y() - those reflect whatever Konva's
+        // Transformer left them at mid-drag, not a clean baseline to
+        // compute a fixed corner from. Falls back to the plain scale-
+        // based read (frame's own pre-fix behavior) only if somehow no
+        // anchor was recorded - should not happen in practice (frames
+        // have no rotate handle to confuse this with), kept purely as
+        // a safety net.
+        const rawWidth = width * node.scaleX();
+        const rawHeight = height * node.scaleY();
+        const resized = anchor && anchor !== 'rotater'
+          ? computeResizeFromAnchor(anchor, { x: frame.x, y: frame.y, width, height }, rawWidth, rawHeight, GRID_SIZE, FRAME_MIN_SIZE)
+          : { x: frame.x, y: frame.y, width: Math.max(FRAME_MIN_SIZE, rawWidth), height: Math.max(FRAME_MIN_SIZE, rawHeight) };
+
+        // Konva's own Transformer mutates this node's x/y/scaleX/scaleY
+        // directly while the drag is live - when the committed value
+        // equals what it already was (the fixed corner, usually),
+        // React sees no prop change and never re-applies it, leaving
+        // Konva's own live-drag value on screen instead of what was
+        // just committed. Reset explicitly, every time, so the node's
+        // on-screen state can never drift from the store's - this also
+        // is what resets scale back to a clean 1:1 for the next resize,
+        // now that width/height are baked into the store fields
+        // instead (a frame has no native artwork of its own to scale).
+        node.x(resized.x);
+        node.y(resized.y);
         node.scaleX(1);
         node.scaleY(1);
-        onResize(node.x(), node.y(), newWidth, newHeight);
+        onResize(resized.x, resized.y, resized.width, resized.height);
       }}
     >
       {variant === 'BUILDING' && (
