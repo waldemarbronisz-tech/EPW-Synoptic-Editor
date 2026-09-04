@@ -4,11 +4,17 @@ import { getSymbolsByCategory } from '../symbols/SymbolRegistry';
 export const Toolbox: React.FC = () => {
   const library = useMemo(() => getSymbolsByCategory(), []);
 
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({
-    Electrical: true,
-    Water: true,
-    SCADA: true
-  });
+  // feat/appearance-selection-frames commit 4a: this used to be a
+  // literal three-category object (Electrical/Water/SCADA) written
+  // before HVAC and Instrumentation existed - both silently defaulted
+  // to collapsed ever since, hiding seven symbols until a user
+  // happened to click their folders. Every category the registry
+  // actually returns now starts expanded, derived directly from
+  // `library` itself so a future category can never repeat this same
+  // bug by omission.
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(
+    () => Object.fromEntries(Object.keys(library).map(category => [category, true]))
+  );
 
   const toggleFolder = (folder: string) => {
     setExpanded(prev => ({ ...prev, [folder]: !prev[folder] }));

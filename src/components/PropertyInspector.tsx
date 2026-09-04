@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
+import { symbolUsesTextField } from '../symbols/SymbolRenderer';
 import { clampMeterWidth, METER_MIN_WIDTH, METER_MAX_WIDTH, METER_DEFAULT_FONT_SIZE } from '../meter/MeterElement';
 import type { MeterElementRow } from '../meter/MeterElement';
 import { MeterWizardDialog } from './MeterWizardDialog';
@@ -8,11 +9,20 @@ import { clampSignalPanelWidth, SIGNAL_PANEL_MIN_WIDTH, SIGNAL_PANEL_MAX_WIDTH, 
 import type { SignalPanelRow } from '../elements/SignalPanelElement';
 import { INDICATOR_DIODE_STATES } from '../symbols/scada/IndicatorDiodeSymbol';
 import { SignalPanelWizardDialog } from './SignalPanelWizardDialog';
+import { FONT_SIZE_BASE, FONT_SIZE_SMALL } from '../theme/ScadaTheme';
+
+// feat/appearance-selection-frames commit 1e: every small utility-
+// button/annotation size in this file used to be its own literal
+// ('10px', '11px', '12px', all slightly different for no reason) -
+// now the theme's own FONT_SIZE_SMALL, formatted once here rather
+// than re-stringified at each call site.
+const UI_SMALL = `${FONT_SIZE_SMALL}px`;
 
 export const PropertyInspector: React.FC = () => {
   const { objects, connections, selectedIds, selectedConnectionIds, updateObject, updateConnection } = useStore();
   const { meters, selectedMeterIds, updateMeter, devices } = useStore();
   const { signalPanels, selectedSignalPanelIds, updateSignalPanel } = useStore();
+  const { frames, selectedFrameIds, updateFrame } = useStore();
   // Hooks must run unconditionally on every render (this component is
   // otherwise a chain of early returns depending on what is selected),
   // so this lives up here rather than inside the selectedMeter/
@@ -21,7 +31,7 @@ export const PropertyInspector: React.FC = () => {
   const [showMeterWizard, setShowMeterWizard] = useState(false);
   const [showSignalPanelWizard, setShowSignalPanelWizard] = useState(false);
 
-  if (selectedIds.length === 0 && selectedConnectionIds.length === 0 && selectedMeterIds.length === 0 && selectedSignalPanelIds.length === 0) {
+  if (selectedIds.length === 0 && selectedConnectionIds.length === 0 && selectedMeterIds.length === 0 && selectedSignalPanelIds.length === 0 && selectedFrameIds.length === 0) {
     return (
       <div className="property-inspector">
         <div className="inspector-header">Properties</div>
@@ -30,8 +40,8 @@ export const PropertyInspector: React.FC = () => {
     );
   }
 
-  const selectionKindCount = (selectedIds.length > 0 ? 1 : 0) + (selectedConnectionIds.length > 0 ? 1 : 0) + (selectedMeterIds.length > 0 ? 1 : 0) + (selectedSignalPanelIds.length > 0 ? 1 : 0);
-  if (selectedIds.length > 1 || selectedConnectionIds.length > 1 || selectedMeterIds.length > 1 || selectedSignalPanelIds.length > 1 || selectionKindCount > 1) {
+  const selectionKindCount = (selectedIds.length > 0 ? 1 : 0) + (selectedConnectionIds.length > 0 ? 1 : 0) + (selectedMeterIds.length > 0 ? 1 : 0) + (selectedSignalPanelIds.length > 0 ? 1 : 0) + (selectedFrameIds.length > 0 ? 1 : 0);
+  if (selectedIds.length > 1 || selectedConnectionIds.length > 1 || selectedMeterIds.length > 1 || selectedSignalPanelIds.length > 1 || selectedFrameIds.length > 1 || selectionKindCount > 1) {
     return (
       <div className="property-inspector">
         <div className="inspector-header">Properties</div>
@@ -43,12 +53,14 @@ export const PropertyInspector: React.FC = () => {
   const isConnectionSelected = selectedConnectionIds.length === 1;
   const isMeterSelected = selectedMeterIds.length === 1;
   const isSignalPanelSelected = selectedSignalPanelIds.length === 1;
-  const selectedObj = isConnectionSelected || isMeterSelected || isSignalPanelSelected ? null : objects.find(o => o.id === selectedIds[0]);
+  const isFrameSelected = selectedFrameIds.length === 1;
+  const selectedObj = isConnectionSelected || isMeterSelected || isSignalPanelSelected || isFrameSelected ? null : objects.find(o => o.id === selectedIds[0]);
   const selectedConn = isConnectionSelected ? connections.find(c => c.id === selectedConnectionIds[0]) : null;
   const selectedMeter = isMeterSelected ? meters.find(m => m.id === selectedMeterIds[0]) : null;
   const selectedSignalPanel = isSignalPanelSelected ? signalPanels.find(p => p.id === selectedSignalPanelIds[0]) : null;
+  const selectedFrame = isFrameSelected ? frames.find(f => f.id === selectedFrameIds[0]) : null;
 
-  if (!selectedObj && !selectedConn && !selectedMeter && !selectedSignalPanel) return null;
+  if (!selectedObj && !selectedConn && !selectedMeter && !selectedSignalPanel && !selectedFrame) return null;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -246,13 +258,13 @@ export const PropertyInspector: React.FC = () => {
           <div className="property-group">
             <div className="property-group-title">
               Rows
-              <button onClick={() => setShowMeterWizard(true)} style={{ marginLeft: 'auto', fontSize: '10px' }}>Kreator...</button>
-              <button onClick={addManualRow} style={{ fontSize: '10px' }}>+ Manual row</button>
+              <button onClick={() => setShowMeterWizard(true)} style={{ marginLeft: 'auto', fontSize: UI_SMALL }}>Kreator...</button>
+              <button onClick={addManualRow} style={{ fontSize: UI_SMALL }}>+ Manual row</button>
             </div>
             {selectedMeter.rows.map((row, idx) => (
               <div className="property-row" key={idx} style={{ gap: '2px', alignItems: 'center' }}>
-                <button onClick={() => moveRow(idx, -1)} disabled={idx === 0} style={{ fontSize: '10px' }}>up</button>
-                <button onClick={() => moveRow(idx, 1)} disabled={idx === selectedMeter.rows.length - 1} style={{ fontSize: '10px' }}>down</button>
+                <button onClick={() => moveRow(idx, -1)} disabled={idx === 0} style={{ fontSize: UI_SMALL }}>up</button>
+                <button onClick={() => moveRow(idx, 1)} disabled={idx === selectedMeter.rows.length - 1} style={{ fontSize: UI_SMALL }}>down</button>
                 <input
                   type="text"
                   placeholder="Label"
@@ -281,8 +293,8 @@ export const PropertyInspector: React.FC = () => {
                     />
                   </>
                 )}
-                {row.device && <span style={{ flex: 2, fontSize: '10px' }}><em>device: {row.device}</em></span>}
-                <button onClick={() => removeRow(idx)} style={{ fontSize: '10px' }}>x</button>
+                {row.device && <span style={{ flex: 2, fontSize: UI_SMALL }}><em>device: {row.device}</em></span>}
+                <button onClick={() => removeRow(idx)} style={{ fontSize: UI_SMALL }}>x</button>
               </div>
             ))}
             {selectedMeter.rows.length === 0 && (
@@ -383,13 +395,13 @@ export const PropertyInspector: React.FC = () => {
           <div className="property-group">
             <div className="property-group-title">
               Rows
-              <button onClick={() => setShowSignalPanelWizard(true)} style={{ marginLeft: 'auto', fontSize: '10px' }}>Kreator...</button>
-              <button onClick={addManualRow} style={{ fontSize: '10px' }}>+ Manual row</button>
+              <button onClick={() => setShowSignalPanelWizard(true)} style={{ marginLeft: 'auto', fontSize: UI_SMALL }}>Kreator...</button>
+              <button onClick={addManualRow} style={{ fontSize: UI_SMALL }}>+ Manual row</button>
             </div>
             {selectedSignalPanel.rows.map((row, idx) => (
               <div className="property-row" key={idx} style={{ gap: '2px', alignItems: 'center' }}>
-                <button onClick={() => moveRow(idx, -1)} disabled={idx === 0} style={{ fontSize: '10px' }}>up</button>
-                <button onClick={() => moveRow(idx, 1)} disabled={idx === selectedSignalPanel.rows.length - 1} style={{ fontSize: '10px' }}>down</button>
+                <button onClick={() => moveRow(idx, -1)} disabled={idx === 0} style={{ fontSize: UI_SMALL }}>up</button>
+                <button onClick={() => moveRow(idx, 1)} disabled={idx === selectedSignalPanel.rows.length - 1} style={{ fontSize: UI_SMALL }}>down</button>
                 <input
                   type="text"
                   placeholder="Label"
@@ -407,8 +419,8 @@ export const PropertyInspector: React.FC = () => {
                     {INDICATOR_DIODE_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 )}
-                {row.device && <span style={{ flex: 1, fontSize: '10px' }}><em>device: {row.device}</em></span>}
-                <button onClick={() => removeRow(idx)} style={{ fontSize: '10px' }}>x</button>
+                {row.device && <span style={{ flex: 1, fontSize: UI_SMALL }}><em>device: {row.device}</em></span>}
+                <button onClick={() => removeRow(idx)} style={{ fontSize: UI_SMALL }}>x</button>
               </div>
             ))}
             {selectedSignalPanel.rows.length === 0 && (
@@ -429,6 +441,57 @@ export const PropertyInspector: React.FC = () => {
         />
       )}
       </>
+    );
+  }
+
+  if (selectedFrame) {
+    // commit 3: a frame is pure graphics - no rows, no width/height
+    // fields (3a/3f: those are set by dragging it out and resized via
+    // its own corner/edge handles, not typed in here). Only title and
+    // where it sits in the top edge are editable in Properties; variant
+    // (PLAIN/BUILDING) is fixed at creation by which toolbar button
+    // drew it, the same way a symbol's own type cannot be changed
+    // after the fact from Properties either.
+    return (
+      <div className="property-inspector">
+        <div className="inspector-header">Frame Properties</div>
+        <div className="inspector-content">
+          <div className="property-group">
+            <div className="property-group-title">Frame</div>
+            <div className="property-row">
+              <label>Variant</label>
+              <input type="text" value={selectedFrame.variant} disabled />
+            </div>
+            <div className="property-row">
+              <label>Title</label>
+              <input
+                type="text"
+                value={selectedFrame.title || ''}
+                onChange={(e) => updateFrame(selectedFrame.id, { title: e.target.value })}
+                onBlur={() => useStore.getState().saveHistory()}
+              />
+            </div>
+            <div className="property-row">
+              <label>Title Position</label>
+              <select
+                value={selectedFrame.titlePosition}
+                onChange={(e) => { updateFrame(selectedFrame.id, { titlePosition: e.target.value as typeof selectedFrame.titlePosition }); useStore.getState().saveHistory(); }}
+              >
+                <option value="TOP_LEFT">Top Left</option>
+                <option value="TOP_CENTER">Top Center</option>
+              </select>
+            </div>
+            <div className="property-row">
+              <label>Width</label>
+              <input type="number" value={Math.round(selectedFrame.width)} disabled />
+            </div>
+            <div className="property-row">
+              <label>Height</label>
+              <input type="number" value={Math.round(selectedFrame.height)} disabled />
+            </div>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -518,18 +581,30 @@ export const PropertyInspector: React.FC = () => {
               onBlur={() => useStore.getState().saveHistory()}
             />
           </div>
-          <div className="property-row">
-            <label>Height</label>
-            <input
-              type="number"
-              value={Math.round(selectedObj.height)}
-              onChange={(e) => {
-                const newHeight = parseFloat(e.target.value);
-                if (!isNaN(newHeight)) updateObject(selectedObj.id, { height: newHeight });
-              }}
-              onBlur={() => useStore.getState().saveHistory()}
-            />
-          </div>
+          {/* feat/appearance-selection-frames commit 4b: for the static
+              scada.meter symbol, obj.height is never actually read -
+              ScadaMeterAdapter passes only obj.width into MeterSymbol,
+              which computes its own height from row count
+              (getMeterHeight), exactly like the dynamic meter/signal
+              panel elements do. Editing this field DID silently
+              overwrite the stored obj.height value - it just never had
+              any visible effect, since nothing ever read it back. Only
+              hidden for this one type; every other object's own Height
+              field is real and stays. */}
+          {selectedObj.type !== 'scada.meter' && (
+            <div className="property-row">
+              <label>Height</label>
+              <input
+                type="number"
+                value={Math.round(selectedObj.height)}
+                onChange={(e) => {
+                  const newHeight = parseFloat(e.target.value);
+                  if (!isNaN(newHeight)) updateObject(selectedObj.id, { height: newHeight });
+                }}
+                onBlur={() => useStore.getState().saveHistory()}
+              />
+            </div>
+          )}
           <div className="property-row">
             <label>X</label>
             <input type="number" name="x" value={Math.round(selectedObj.x)} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
@@ -562,17 +637,19 @@ export const PropertyInspector: React.FC = () => {
             <label>Border</label>
             <input type="color" name="border" value={selectedObj.border || '#000000'} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
-          <div className="property-row">
-            <label>Text</label>
-            <input type="text" name="text" value={selectedObj.text || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
-          </div>
+          {symbolUsesTextField(selectedObj.type) && (
+            <div className="property-row">
+              <label>Text</label>
+              <input type="text" name="text" value={selectedObj.text || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
+            </div>
+          )}
           <div className="property-row">
             <label>Font</label>
             <input type="text" name="font" value={selectedObj.font || 'Arial'} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
           <div className="property-row">
             <label>Font Size</label>
-            <input type="number" name="fontSize" value={selectedObj.fontSize || 12} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
+            <input type="number" name="fontSize" value={selectedObj.fontSize || FONT_SIZE_BASE} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
           <div className="property-row">
             <label>Tooltip</label>
@@ -609,31 +686,42 @@ export const PropertyInspector: React.FC = () => {
           ) : null}
         </div>
 
-        <div className="property-group">
-          <div className="property-group-title">Bindings</div>
-          <div className="property-row">
-            <label>State</label>
-            <input type="text" name="bindings.state.tag" value={selectedObj.bindings?.state?.tag || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
+        {/* feat/appearance-selection-frames commit 4d: the static
+            scada.meter symbol takes its data through its own rows
+            (obj.meterRows), not through a tag binding - ScadaMeterAdapter
+            never reads obj.bindings at all, so this section did nothing
+            for it but invite a user to fill in tags that would never be
+            read. The dynamic meter/signal panel elements (their own
+            selectedMeter/selectedSignalPanel branches above) never had a
+            Bindings section to begin with - same reasoning, same fix,
+            nothing further to remove there. */}
+        {selectedObj.type !== 'scada.meter' && (
+          <div className="property-group">
+            <div className="property-group-title">Bindings</div>
+            <div className="property-row">
+              <label>State</label>
+              <input type="text" name="bindings.state.tag" value={selectedObj.bindings?.state?.tag || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
+            </div>
+            <div className="property-row">
+              <label>Value</label>
+              <input type="text" name="bindings.value.tag" value={selectedObj.bindings?.value?.tag || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
+            </div>
+            <div className="property-row">
+              <label>Alarm</label>
+              <input type="text" name="bindings.alarm.tag" value={selectedObj.bindings?.alarm?.tag || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
+            </div>
+            <div className="property-row">
+              <label>Command</label>
+              <input type="text" name="bindings.command.tag" value={selectedObj.bindings?.command?.tag || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
+            </div>
           </div>
-          <div className="property-row">
-            <label>Value</label>
-            <input type="text" name="bindings.value.tag" value={selectedObj.bindings?.value?.tag || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
-          </div>
-          <div className="property-row">
-            <label>Alarm</label>
-            <input type="text" name="bindings.alarm.tag" value={selectedObj.bindings?.alarm?.tag || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
-          </div>
-          <div className="property-row">
-            <label>Command</label>
-            <input type="text" name="bindings.command.tag" value={selectedObj.bindings?.command?.tag || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
-          </div>
-        </div>
+        )}
 
         {selectedObj.type === 'scada.meter' && (
           <div className="property-group">
             <div className="property-group-title">
               Meter Rows
-              <button onClick={addMeterRow} style={{marginLeft: 'auto', fontSize: '10px'}}>+ Row</button>
+              <button onClick={addMeterRow} style={{marginLeft: 'auto', fontSize: UI_SMALL}}>+ Row</button>
             </div>
             {(selectedObj.meterRows || []).map((row, index) => (
               <div className="property-row" key={index} style={{ gap: '2px' }}>
@@ -661,7 +749,7 @@ export const PropertyInspector: React.FC = () => {
                   onBlur={() => useStore.getState().saveHistory()}
                   style={{ flex: 1 }}
                 />
-                <button onClick={() => removeMeterRow(index)} style={{ fontSize: '10px' }}>x</button>
+                <button onClick={() => removeMeterRow(index)} style={{ fontSize: UI_SMALL }}>x</button>
               </div>
             ))}
             {(selectedObj.meterRows || []).length === 0 && (
@@ -704,7 +792,7 @@ export const PropertyInspector: React.FC = () => {
         <div className="property-group">
           <div className="property-group-title">
             Custom Properties
-            <button onClick={addCustomProperty} style={{marginLeft: 'auto', fontSize: '10px'}}>+</button>
+            <button onClick={addCustomProperty} style={{marginLeft: 'auto', fontSize: UI_SMALL}}>+</button>
           </div>
           {Object.entries(selectedObj.customProperties || {}).map(([key, value]) => (
             <div className="property-row" key={key}>

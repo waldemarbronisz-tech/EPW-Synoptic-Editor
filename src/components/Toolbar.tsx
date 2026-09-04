@@ -5,9 +5,12 @@ import {
   Undo, Redo, Copy, ClipboardPaste, Trash2,
   BringToFront, SendToBack, AlignLeft, AlignCenter, AlignRight,
   AlignVerticalSpaceAround, AlignHorizontalSpaceAround,
-  Lock, Unlock, RotateCcw, RotateCw, PenLine, Zap, Droplet, Wind, Gauge, CircleDot
+  Lock, Unlock, RotateCcw, RotateCw, PenLine, Zap, Droplet, Wind, Gauge, CircleDot,
+  Square, Home
 } from 'lucide-react';
 import { COLOR_ENERGIZED, COLOR_WATER, VENTILATION_ACTIVE, COLOR_WHITE, COLOR_RUN } from '../theme/ScadaTheme';
+import { METER_DEFAULT_FONT_SIZE } from '../meter/MeterElement';
+import { SIGNAL_PANEL_DEFAULT_FONT_SIZE } from '../elements/SignalPanelElement';
 
 // One icon/color pair per medium - reused by both the toolbar buttons
 // below and nothing else, so this stays local rather than joining
@@ -26,7 +29,8 @@ export const Toolbar: React.FC = () => {
     isDrawingConnection, setDrawingMode,
     drawingMedium, setDrawingMedium, drawingStyle, setDrawingStyle,
     addMeter, selectedMeterIds, selectMeters,
-    addSignalPanel, selectedSignalPanelIds, selectSignalPanels
+    addSignalPanel, selectedSignalPanelIds, selectSignalPanels,
+    selectedFrameIds, isDrawingFrame, drawingFrameVariant, setDrawingFrameMode
   } = useStore();
 
   return (
@@ -48,7 +52,7 @@ export const Toolbar: React.FC = () => {
       <div className="toolbar-group">
         <button title="Copy" onClick={copySelected}><Copy size={16} /></button>
         <button title="Paste" onClick={paste}><ClipboardPaste size={16} /></button>
-        <button title="Delete" onClick={() => deleteObjects(selectedIds, selectedConnectionIds, selectedMeterIds, selectedSignalPanelIds)}><Trash2 size={16} /></button>
+        <button title="Delete" onClick={() => deleteObjects(selectedIds, selectedConnectionIds, selectedMeterIds, selectedSignalPanelIds, selectedFrameIds)}><Trash2 size={16} /></button>
       </div>
 
       <div className="toolbar-divider" />
@@ -61,7 +65,7 @@ export const Toolbar: React.FC = () => {
         <button
           title="Dodaj Miernik"
           onClick={() => {
-            addMeter({ x: 160, y: 160, width: 200, fontSize: 12, rows: [] });
+            addMeter({ x: 160, y: 160, width: 200, fontSize: METER_DEFAULT_FONT_SIZE, rows: [] });
             const newest = useStore.getState().meters[useStore.getState().meters.length - 1];
             if (newest) selectMeters([newest.id], false);
           }}
@@ -76,7 +80,7 @@ export const Toolbar: React.FC = () => {
         <button
           title="Dodaj Panel Sygnalizacyjny"
           onClick={() => {
-            addSignalPanel({ x: 160, y: 160, width: 160, fontSize: 12, rows: [] });
+            addSignalPanel({ x: 160, y: 160, width: 160, fontSize: SIGNAL_PANEL_DEFAULT_FONT_SIZE, rows: [] });
             const newest = useStore.getState().signalPanels[useStore.getState().signalPanels.length - 1];
             if (newest) selectSignalPanels([newest.id], false);
           }}
@@ -94,6 +98,33 @@ export const Toolbar: React.FC = () => {
           style={{ backgroundColor: isDrawingConnection ? '#3498db' : 'transparent' }}
         >
           <PenLine size={16} />
+        </button>
+      </div>
+
+      <div className="toolbar-divider" />
+
+      {/* The frame element (commit 3): drawn by dragging a rectangle on
+          the canvas, like graphics.rectangle already is - two separate
+          buttons for the two variants rather than one button plus a
+          selector, matching this toolbar's own convention of dedicated
+          single-purpose buttons. Toggles the same way the wire tool
+          above does: stays active across multiple drags until clicked
+          again (or the other one is clicked, which switches variant
+          without needing to turn the tool off first). */}
+      <div className="toolbar-group">
+        <button
+          title="Rysuj ramkę"
+          onClick={() => setDrawingFrameMode(!(isDrawingFrame && drawingFrameVariant === 'PLAIN'), 'PLAIN')}
+          style={{ backgroundColor: isDrawingFrame && drawingFrameVariant === 'PLAIN' ? COLOR_RUN : 'transparent', color: isDrawingFrame && drawingFrameVariant === 'PLAIN' ? COLOR_WHITE : undefined }}
+        >
+          <Square size={16} />
+        </button>
+        <button
+          title="Rysuj budynek"
+          onClick={() => setDrawingFrameMode(!(isDrawingFrame && drawingFrameVariant === 'BUILDING'), 'BUILDING')}
+          style={{ backgroundColor: isDrawingFrame && drawingFrameVariant === 'BUILDING' ? COLOR_RUN : 'transparent', color: isDrawingFrame && drawingFrameVariant === 'BUILDING' ? COLOR_WHITE : undefined }}
+        >
+          <Home size={16} />
         </button>
       </div>
 

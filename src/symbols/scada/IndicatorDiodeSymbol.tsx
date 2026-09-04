@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { Circle } from 'react-konva';
-import { COLOR_DE_ENERGIZED, COLOR_LAMP_LIT, COLOR_OUTLINE, COLOR_RUN } from '../../theme/ScadaTheme';
+import { COLOR_DE_ENERGIZED, COLOR_LAMP_LIT, COLOR_OUTLINE, COLOR_RUN, DIODE_RADIUS_SMALL, DIODE_RADIUS_LARGE } from '../../theme/ScadaTheme';
 
 export type IndicatorDiodeState = 'ON' | 'OFF' | 'QUALITY';
 // oxlint-disable-next-line react/only-export-components -- one file per symbol is required; this state list belongs beside its component.
@@ -11,9 +11,14 @@ export const INDICATOR_DIODE_STATES: IndicatorDiodeState[] = ['ON', 'OFF', 'QUAL
 
 export type IndicatorDiodeSize = 'small' | 'large';
 
+// feat/appearance-selection-frames commit 1: the two radii used to be
+// literal numbers (8/12) local to this file - now ScadaTheme.ts's own
+// DIODE_RADIUS_SMALL/DIODE_RADIUS_LARGE, so a signal panel's diode
+// (which reuses this same helper, see SignalPanelElementNode.tsx) and
+// this symbol always shrink or grow together, from one source.
 // oxlint-disable-next-line react/only-export-components -- one file per symbol is required; this helper belongs beside its component.
 export function getIndicatorDiodeRadius(size: IndicatorDiodeSize): number {
-  return size === 'small' ? 8 : 12;
+  return size === 'small' ? DIODE_RADIUS_SMALL : DIODE_RADIUS_LARGE;
 }
 
 // oxlint-disable-next-line react/only-export-components -- one file per symbol is required; this helper belongs beside its component.

@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { Group, Line, Rect, Text } from 'react-konva';
-import { COLOR_OUTLINE, COLOR_PANEL, COLOR_VALUE_FIELD } from '../../theme/ScadaTheme';
+import { COLOR_OUTLINE, COLOR_PANEL, COLOR_VALUE_FIELD, FONT_UI, FONT_VALUE, FONT_SIZE_BASE, FONT_SIZE_TITLE } from '../../theme/ScadaTheme';
 
 // No discrete state machine (rows are arbitrary data), same as the wire
 // node and label frame symbols - an empty list documents that fact.
@@ -50,7 +50,7 @@ export const MeterSymbol: React.FC<MeterSymbolProps> = ({ width, title, rows }) 
 
       {hasTitle && (
         <>
-          <Text x={METER_PADDING} y={METER_PADDING} width={width - METER_PADDING * 2} text={title} fontSize={14} fontStyle="bold" align="center" fill={COLOR_OUTLINE} />
+          <Text x={METER_PADDING} y={METER_PADDING} width={width - METER_PADDING * 2} text={title} fontSize={FONT_SIZE_TITLE} fontFamily={FONT_UI} fontStyle="bold" align="center" fill={COLOR_OUTLINE} />
           <Line points={[0, METER_PADDING + METER_TITLE_HEIGHT - 6, width, METER_PADDING + METER_TITLE_HEIGHT - 6]} stroke={COLOR_OUTLINE} strokeWidth={1} />
         </>
       )}
@@ -59,15 +59,15 @@ export const MeterSymbol: React.FC<MeterSymbolProps> = ({ width, title, rows }) 
         const rowY = METER_PADDING + (hasTitle ? METER_TITLE_HEIGHT : 0) + i * METER_ROW_HEIGHT;
         return (
           <Group key={`${row.label}-${i}`}>
-            <Text x={METER_PADDING} y={rowY + 4} text={row.label} fontSize={13} fontStyle="bold" fill={COLOR_OUTLINE} />
+            <Text x={METER_PADDING} y={rowY + 4} text={row.label} fontSize={FONT_SIZE_BASE} fontFamily={FONT_UI} fontStyle="bold" fill={COLOR_OUTLINE} />
             <Rect x={valueFieldX} y={rowY} width={valueFieldWidth} height={METER_ROW_HEIGHT - 6} fill={COLOR_VALUE_FIELD} stroke={COLOR_OUTLINE} strokeWidth={VALUE_FIELD_OUTLINE_WIDTH} />
             <Text
               x={valueFieldX}
               y={rowY + 4}
               width={valueFieldWidth - 6}
               text={`${row.value} ${row.unit}`}
-              fontSize={12}
-              fontFamily="Courier New, monospace"
+              fontSize={FONT_SIZE_BASE}
+              fontFamily={FONT_VALUE}
               align="right"
               fill={COLOR_OUTLINE}
             />

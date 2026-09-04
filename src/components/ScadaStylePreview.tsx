@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { Group, Layer, Line, Rect, Stage, Text } from 'react-konva';
-import { COLOR_CANVAS_BACKGROUND, COLOR_OUTLINE, COLOR_WHITE, GRID_SIZE } from '../theme/ScadaTheme';
+import { COLOR_CANVAS_BACKGROUND, COLOR_OUTLINE, COLOR_WHITE, GRID_SIZE, FONT_UI, FONT_SIZE_SMALL } from '../theme/ScadaTheme';
 import { LoadSwitchSymbol, LOAD_SWITCH_STATES } from '../symbols/scada/LoadSwitchSymbol';
 import { BusbarSymbol, BUSBAR_STATES } from '../symbols/scada/BusbarSymbol';
 import { WireNodeSymbol } from '../symbols/scada/WireNodeSymbol';
@@ -138,7 +138,7 @@ export const ScadaStylePreview: React.FC<ScadaStylePreviewProps> = ({ onClose })
                   <Group x={symbolX} y={cellY + SYMBOL_TOP}>
                     {cell.render()}
                   </Group>
-                  <Text x={cellX} y={cellY + LABEL_Y} width={CELL_WIDTH} text={cell.title} fontSize={11} align="center" fill={COLOR_OUTLINE} />
+                  <Text x={cellX} y={cellY + LABEL_Y} width={CELL_WIDTH} text={cell.title} fontSize={FONT_SIZE_SMALL} fontFamily={FONT_UI} align="center" fill={COLOR_OUTLINE} />
                 </Group>
               );
             })}

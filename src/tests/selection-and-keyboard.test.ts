@@ -25,7 +25,7 @@ function resetStore() {
   useStore.setState({
     objects: [], connections: [], meters: [],
     selectedIds: [], selectedConnectionIds: [], selectedMeterIds: [],
-    history: [{ objects: [], connections: [], meters: [], signalPanels: [] }],
+    history: [{ objects: [], connections: [], meters: [], signalPanels: [], frames: [] }],
     historyIndex: 0
   });
 }

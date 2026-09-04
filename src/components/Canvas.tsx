@@ -6,7 +6,7 @@ import { SymbolRenderer } from '../symbols/SymbolRenderer';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 import { ConnectionLine, pathFromPoints, getConductorCoreColor } from './ConnectionLine';
 import { ObjectLabelRenderer } from './ObjectLabelRenderer';
-import { COLOR_CANVAS_BACKGROUND, COLOR_OUTLINE, COLOR_WATER, COLOR_WHITE, CONDUCTOR_WIDTH } from '../theme/ScadaTheme';
+import { COLOR_CANVAS_BACKGROUND, COLOR_OUTLINE, COLOR_WATER, COLOR_WHITE, CONDUCTOR_WIDTH, FONT_SIZE_BASE, FONT_UI } from '../theme/ScadaTheme';
 import { snapValue } from '../utils/GridSnap';
 import { getObjectTerminals } from '../utils/Terminals';
 import {
@@ -20,8 +20,10 @@ import { MeterElementNode } from './MeterElementNode';
 import { computeMeterHeight } from '../meter/MeterElement';
 import { SignalPanelElementNode } from './SignalPanelElementNode';
 import { computeSignalPanelHeight } from '../elements/SignalPanelElement';
-import { isObjectFullyInBox, isMeterFullyInBox, isConnectionFullyInBox } from '../utils/SelectionBox';
+import { isObjectFullyInBox, isMeterFullyInBox, isConnectionFullyInBox, mergeSelectionAdditive } from '../utils/SelectionBox';
 import { clampZoom, computeContentBounds, computeFitView, GRID_THIN_BELOW_ZOOM } from '../utils/CanvasView';
+import { FrameElementNode } from './FrameElementNode';
+import { computeFrameRectFromDrag } from '../elements/FrameElement';
 
 // Momentary Alt-key bypass for grid snapping. Deliberately outside React
 // state: every ObjectNode's drag handlers need the CURRENT key state at
@@ -35,11 +37,52 @@ let isAltPressed = false;
 // without waiting for a React re-render to notice the key state.
 let isSpacePressed = false;
 
+// feat/appearance-selection-frames commit 2c: group move. Dragging ANY
+// selected element, when more than one thing is selected, moves the
+// WHOLE selection together, keeping relative positions, as one history
+// entry - "like a graphics program", per this commit's own spec. The
+// store already has exactly the right primitive for this
+// (moveSelectionBy, built for arrow-key movement: skips locked
+// objects, touches all four kinds atomically, one saveHistory() call);
+// this just drives it from a mouse drag too, with a live visual follow
+// for every OTHER selected element while the drag is in progress.
+//
+// A connection's own move-Group (ConnectionNode below) has no absolute
+// x/y of its own - its x/y IS a pending delta from its last committed
+// points, reset to (0,0) after every drag - so a connection's own
+// "position" for this purpose is always (0,0), never its points' own
+// coordinates. Every other kind (object/meter/signal panel) is
+// absolute, matching its own x/y field directly.
+type DragKey = string; // "obj:<id>" | "meter:<id>" | "panel:<id>" | "conn:<id>"
+interface GroupDragApi {
+  // Reports one element's own Konva node so ANOTHER element's leader
+  // drag can reposition it live as a follower. Passing null
+  // unregisters it (unmount).
+  registerNode: (key: DragKey, node: any) => void;
+  // Called from an element's own onDragStart. Starts a group drag only
+  // when that element is part of a selection of MORE than one item;
+  // otherwise clears any previous group-drag state so a lone drag
+  // falls through to that element's own existing solo behavior.
+  start: (key: DragKey) => void;
+  isActive: () => boolean;
+  // Called from the leader's own onDragMove with how far ITS OWN Konva
+  // node has moved from where the drag started (raw, unsnapped - final
+  // snapping happens once, together, at commit). Repositions every
+  // OTHER selected element's Konva node by the same amount, display
+  // only - nothing is written to the store until commit.
+  follow: (dx: number, dy: number) => void;
+  // Called from the leader's own onDragEnd with the final, already
+  // grid-snapped delta. Writes the whole group to the store in one
+  // moveSelectionBy call, resets every follower connection's move-
+  // Group back to its neutral (0,0), and clears the group-drag state.
+  commit: (dx: number, dy: number) => void;
+}
+
 // isSelected is no longer a prop here (commit 5) - the Transformer that
 // used to read it moved out to its own top-level pass (
 // ObjectTransformerHandle below), and nothing else in this component's
 // own rendering depends on selection state.
-const ObjectNode = ({ obj, onSelect, onChange, gridSize, onShapeRef }: {
+const ObjectNode = ({ obj, onSelect, onChange, gridSize, onShapeRef, groupDrag }: {
   gridSize: number,
   obj: SynopticObject,
   // Receives the raw Konva event (onClick={onSelect} forwards it
@@ -54,12 +97,15 @@ const ObjectNode = ({ obj, onSelect, onChange, gridSize, onShapeRef }: {
   // own. This reports the Group's own Konva node up to Canvas so that
   // later pass can still attach a Transformer to it.
   onShapeRef: (id: string, node: any) => void,
+  groupDrag: GroupDragApi,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const shapeRef = useRef<any>(null);
+  const dragKey: DragKey = `obj:${obj.id}`;
 
   useEffect(() => {
     onShapeRef(obj.id, shapeRef.current);
+    groupDrag.registerNode(dragKey, shapeRef.current);
   });
 
   // Node-based wiring model: a symbol has terminals now, not ports - see
@@ -94,22 +140,34 @@ const ObjectNode = ({ obj, onSelect, onChange, gridSize, onShapeRef }: {
           if (isAltPressed) {
             useStore.getState().duplicateObjectInPlace(obj.id);
           }
+          groupDrag.start(dragKey);
         }}
         onDragMove={(e) => {
           // Snap during drag for visual feedback (doesn't mutate store yet).
           // Held Alt bypasses this exactly as it bypasses the final snap
           // on release, so the preview matches where the object will land.
-          e.target.x(snapValue(e.target.x(), gridSize, isAltPressed));
-          e.target.y(snapValue(e.target.y(), gridSize, isAltPressed));
+          const snappedX = snapValue(e.target.x(), gridSize, isAltPressed);
+          const snappedY = snapValue(e.target.y(), gridSize, isAltPressed);
+          e.target.x(snappedX);
+          e.target.y(snappedY);
+          if (groupDrag.isActive()) {
+            groupDrag.follow(snappedX - obj.x, snappedY - obj.y);
+          }
         }}
         onDragEnd={(e) => {
-          // Push final position, then commit exactly one history entry for
-          // the whole drag (updateObject itself no longer touches history).
-          onChange({
-            x: snapValue(e.target.x(), gridSize, isAltPressed),
-            y: snapValue(e.target.y(), gridSize, isAltPressed),
-          });
-          useStore.getState().saveHistory();
+          const finalX = snapValue(e.target.x(), gridSize, isAltPressed);
+          const finalY = snapValue(e.target.y(), gridSize, isAltPressed);
+          if (groupDrag.isActive()) {
+            // The whole selection moves together, one history entry
+            // (moveSelectionBy's own) - not this object's own onChange.
+            groupDrag.commit(finalX - obj.x, finalY - obj.y);
+          } else {
+            // Push final position, then commit exactly one history entry
+            // for the whole drag (updateObject itself no longer touches
+            // history).
+            onChange({ x: finalX, y: finalY });
+            useStore.getState().saveHistory();
+          }
         }}
         onTransformEnd={() => {
           const node = shapeRef.current;
@@ -183,34 +241,91 @@ const ObjectTransformerHandle = ({ node }: { node: any }) => {
   );
 };
 
+// The same Transformer-relocation pattern as ObjectTransformerHandle
+// above, for a frame's own resize handles (3f) - rotation disabled
+// (frames do not rotate, per this element's own 3a spec, which lists
+// only x/y/width/height/title/titlePosition/variant), and no live
+// boundBoxFunc floor beyond a small pixel minimum: the REAL 2-grid-
+// cell minimum (3g) is enforced where it actually matters, in
+// FrameElementNode's own onTransformEnd (clampFrameSize), which runs
+// regardless of zoom level - a boundBoxFunc here only sees on-screen
+// pixels, not the frame's own local units.
+const FrameTransformerHandle = ({ node }: { node: any }) => {
+  const trRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (node && trRef.current) {
+      trRef.current.nodes([node]);
+      trRef.current.getLayer()?.batchDraw();
+    }
+  });
+
+  if (!node) return null;
+
+  return (
+    <Transformer
+      ref={trRef}
+      rotateEnabled={false}
+      boundBoxFunc={(oldBox, newBox) => {
+        if (newBox.width < 10 || newBox.height < 10) {
+          return oldBox;
+        }
+        return newBox;
+      }}
+      borderStroke={COLOR_WHITE}
+      borderStrokeWidth={2}
+      borderDash={[6, 4]}
+    />
+  );
+};
+
 // A finished wire: draws itself (ConnectionLine), can be dragged whole
 // (translating every point, grid-snapped), and - while selected - shows
 // a draggable handle at each of its own points so a bend can be grabbed
 // and moved without breaking orthogonality (WireDrawing.
 // reorthogonalizeAfterMove fixes up its two neighboring segments).
 // Alt+click on a segment (not a handle) inserts a brand new bend there.
-const ConnectionNode = ({ conn, isSelected, onSelect, gridSize, onAltClickSegment }: {
+const ConnectionNode = ({ conn, isSelected, onSelect, gridSize, onAltClickSegment, groupDrag }: {
   conn: SynopticConnection,
   isSelected: boolean,
   onSelect: (multi: boolean) => void,
   gridSize: number,
   onAltClickSegment: (conn: SynopticConnection, worldPoint: WirePoint) => void,
+  groupDrag: GroupDragApi,
 }) => {
   const moveGroupRef = useRef<any>(null);
+  const dragKey: DragKey = `conn:${conn.id}`;
+
+  useEffect(() => {
+    groupDrag.registerNode(dragKey, moveGroupRef.current);
+  });
 
   return (
     <React.Fragment>
       <Group
         ref={moveGroupRef}
         draggable={isSelected}
+        onDragStart={() => {
+          groupDrag.start(dragKey);
+        }}
         onDragMove={(e) => {
-          e.target.x(snapValue(e.target.x(), gridSize, isAltPressed));
-          e.target.y(snapValue(e.target.y(), gridSize, isAltPressed));
+          const snappedX = snapValue(e.target.x(), gridSize, isAltPressed);
+          const snappedY = snapValue(e.target.y(), gridSize, isAltPressed);
+          e.target.x(snappedX);
+          e.target.y(snappedY);
+          // This move-Group's own x/y already IS a delta from (0,0) -
+          // no baseline subtraction needed, unlike an object/meter/
+          // panel's absolute position (see GroupDragApi's own comment).
+          if (groupDrag.isActive()) {
+            groupDrag.follow(snappedX, snappedY);
+          }
         }}
         onDragEnd={(e) => {
-          const dx = e.target.x();
-          const dy = e.target.y();
-          if (dx !== 0 || dy !== 0) {
+          const dx = snapValue(e.target.x(), gridSize, isAltPressed);
+          const dy = snapValue(e.target.y(), gridSize, isAltPressed);
+          if (groupDrag.isActive()) {
+            groupDrag.commit(dx, dy);
+          } else if (dx !== 0 || dy !== 0) {
             useStore.getState().updateConnection(conn.id, {
               points: conn.points.map(p => ({ x: p.x + dx, y: p.y + dy }))
             });
@@ -275,11 +390,19 @@ export const Canvas: React.FC = () => {
   const registerObjectShapeRef = (id: string, node: any) => {
     objectShapeRefs.current.set(id, node);
   };
+  // Same reasoning, for a frame's own resize handles (commit 3: 3f
+  // requires a frame to be resizable via corner/edge handles, same
+  // mechanism as a symbol's own Transformer).
+  const frameShapeRefs = useRef<Map<string, any>>(new Map());
+  const registerFrameShapeRef = (id: string, node: any) => {
+    frameShapeRefs.current.set(id, node);
+  };
   const canvasConfig = useStore(state => state.canvasConfig);
   const gridSize = canvasConfig.gridSize;
   const { objects, selectedIds, selectObjects, clearSelection, addObject, updateObject, canvasState, setCanvasState } = useStore();
   const { meters, selectedMeterIds, selectMeters, updateMeter, devices } = useStore();
   const { signalPanels, selectedSignalPanelIds, selectSignalPanels, updateSignalPanel } = useStore();
+  const { frames, selectedFrameIds, selectFrames, addFrame, updateFrame, isDrawingFrame, drawingFrameVariant } = useStore();
   const { selectMixed } = useStore();
   const [size, setSize] = useState({ width: 800, height: 600 });
   // Mirrors `size` for the keydown handler below (registered once,
@@ -313,6 +436,76 @@ export const Canvas: React.FC = () => {
   // drawingStyle (part C) are the toolbar's medium/style selector -
   // every new wire is drawn with whichever is currently chosen.
   const { connections, selectedConnectionIds, selectConnections, isDrawingConnection, drawingMedium } = useStore();
+
+  // Group move (commit 2c) - see GroupDragApi's own comment above for
+  // the full reasoning. dragNodeRefs is a plain mutable Map, not React
+  // state, for the same reason objectShapeRefs above is one: a Konva
+  // node reference never needs to trigger a re-render when it changes.
+  // groupDragRef tracks the in-progress drag itself (which element
+  // started it, and every key that must follow it) - also not React
+  // state, since it only ever needs to be read/written from Konva
+  // event handlers mid-gesture, never from a render.
+  const dragNodeRefs = useRef<Map<DragKey, any>>(new Map());
+  const groupDragRef = useRef<{ leaderKey: DragKey; keys: DragKey[] } | null>(null);
+
+  const getSelectionKeys = (): DragKey[] => [
+    ...selectedIds.map(id => `obj:${id}`),
+    ...selectedMeterIds.map(id => `meter:${id}`),
+    ...selectedSignalPanelIds.map(id => `panel:${id}`),
+    ...selectedFrameIds.map(id => `frame:${id}`),
+    ...selectedConnectionIds.map(id => `conn:${id}`)
+  ];
+
+  const groupDrag: GroupDragApi = {
+    registerNode: (key, node) => {
+      if (node) dragNodeRefs.current.set(key, node);
+      else dragNodeRefs.current.delete(key);
+    },
+    start: (key) => {
+      const keys = getSelectionKeys();
+      groupDragRef.current = (keys.length > 1 && keys.includes(key)) ? { leaderKey: key, keys } : null;
+    },
+    isActive: () => !!groupDragRef.current,
+    follow: (dx, dy) => {
+      const g = groupDragRef.current;
+      if (!g) return;
+      g.keys.forEach(key => {
+        if (key === g.leaderKey) return;
+        const node = dragNodeRefs.current.get(key);
+        if (!node) return;
+        if (key.startsWith('conn:')) {
+          // A connection's move-Group IS the delta - see this type's
+          // own comment.
+          node.x(dx);
+          node.y(dy);
+          return;
+        }
+        const id = key.slice(key.indexOf(':') + 1);
+        const source = key.startsWith('obj:') ? objects.find(o => o.id === id)
+          : key.startsWith('meter:') ? meters.find(m => m.id === id)
+          : key.startsWith('panel:') ? signalPanels.find(p => p.id === id)
+          : frames.find(f => f.id === id);
+        if (!source) return;
+        node.x(source.x + dx);
+        node.y(source.y + dy);
+      });
+    },
+    commit: (dx, dy) => {
+      const g = groupDragRef.current;
+      if (!g) return;
+      useStore.getState().moveSelectionBy(dx, dy);
+      // A follower connection's move-Group has no store-driven x/y at
+      // all (see ConnectionNode) - the store update alone will not put
+      // it back to neutral, so it must be reset by hand, the same way
+      // its own solo drag already resets itself after every commit.
+      g.keys.forEach(key => {
+        if (!key.startsWith('conn:')) return;
+        const node = dragNodeRefs.current.get(key);
+        if (node) { node.x(0); node.y(0); }
+      });
+      groupDragRef.current = null;
+    }
+  };
 
   const toCanvasPoint = (stagePos: { x: number; y: number }): WirePoint => {
     const scale = canvasState.zoom;
@@ -388,7 +581,7 @@ export const Canvas: React.FC = () => {
         // already in this effect.
         e.preventDefault();
         const s = useStore.getState();
-        s.deleteObjects(s.selectedIds, s.selectedConnectionIds, s.selectedMeterIds, s.selectedSignalPanelIds);
+        s.deleteObjects(s.selectedIds, s.selectedConnectionIds, s.selectedMeterIds, s.selectedSignalPanelIds, s.selectedFrameIds);
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
         // Select everything on the current screen - objects,
         // connections and meters together.
@@ -534,6 +727,23 @@ export const Canvas: React.FC = () => {
       return;
     }
 
+    if (isDrawingFrame) {
+      // A frame is dragged out like a rectangle tool, on any point -
+      // same "doesn't matter what's underneath" reasoning as the wire
+      // tool above. Reuses the same start/box tracking the rubber-band
+      // selection itself uses (selectionStartRef/selectionBox) - the
+      // two gestures are geometrically identical (drag a corner to a
+      // corner), only what happens on release differs (see
+      // handleMouseUp), so there is no need for a second, parallel set
+      // of refs just to tell them apart.
+      const pos = e.target.getStage().getPointerPosition();
+      if (!pos) return;
+      const { x: startX, y: startY } = toCanvasPoint(pos);
+      selectionStartRef.current = { x: startX, y: startY };
+      setSelectionBox({ x: startX, y: startY, width: 0, height: 0 });
+      return;
+    }
+
     // Check if clicking on empty stage
     const clickedOnEmpty = e.target === e.target.getStage() || e.target.name() === 'grid';
     if (clickedOnEmpty) {
@@ -604,32 +814,57 @@ export const Canvas: React.FC = () => {
       return;
     }
 
+    if (isDrawingFrame) {
+      // Finalize the dragged rectangle into a real frame - 3g's own
+      // minimum-size clamp lives in computeFrameRectFromDrag itself, so
+      // a drag too small to register (a stray click, essentially) still
+      // creates a real, minimum-size frame, never a zero-size one.
+      if (selectionBox) {
+        // selectionBox is already the normalized (min-x/min-y, width,
+        // height) rectangle handleMouseMove built from the two drag
+        // corners - its own two opposite corners are exactly the two
+        // points computeFrameRectFromDrag needs, however the drag
+        // itself was oriented.
+        const rect = computeFrameRectFromDrag(selectionBox.x, selectionBox.y, selectionBox.x + selectionBox.width, selectionBox.y + selectionBox.height);
+        addFrame({ ...rect, titlePosition: 'TOP_LEFT', variant: drawingFrameVariant });
+        const newest = useStore.getState().frames[useStore.getState().frames.length - 1];
+        if (newest) selectFrames([newest.id], false);
+      }
+      selectionStartRef.current = null;
+      setSelectionBox(null);
+      return;
+    }
+
     if (selectionStartRef.current && selectionBox) {
       // Rubber-band selection (commit 3, extended in commit 6 to signal
-      // panels): everything lying ENTIRELY within the box - objects,
-      // connections, meters and signal panels together, not just
-      // whichever kind happens to be found first. Something poking out
-      // past the box's edge is left unselected. isMeterFullyInBox's own
-      // signature ({x,y,width} + a separately-computed height) is
-      // already generic enough to reuse as-is for a signal panel - no
-      // new isSignalPanelFullyInBox needed, just its own height math.
+      // panels, and in commit 2/feat-appearance-selection-frames to
+      // frames): everything lying ENTIRELY within the box - objects,
+      // connections, meters, signal panels and frames together, not
+      // just whichever kind happens to be found first. Something
+      // poking out past the box's edge is left unselected.
+      // isMeterFullyInBox's own signature ({x,y,width} + a separately-
+      // computed height) is already generic enough to reuse as-is for
+      // a signal panel - no new isSignalPanelFullyInBox needed, just
+      // its own height math. A frame has x/y/width/height directly, so
+      // isObjectFullyInBox (built for a SynopticObject, but only ever
+      // reads those four fields plus optional scale) is reusable for
+      // it exactly as it stands - no new isFrameFullyInBox either.
       const box = selectionBox;
       const objectIds = objects.filter(obj => isObjectFullyInBox(obj, box)).map(o => o.id);
       const meterIds = meters.filter(m => isMeterFullyInBox(m, computeMeterHeight(m), box)).map(m => m.id);
       const signalPanelIds = signalPanels.filter(p => isMeterFullyInBox(p, computeSignalPanelHeight(p), box)).map(p => p.id);
+      const frameIds = frames.filter(f => isObjectFullyInBox(f, box)).map(f => f.id);
       const connectionIds = connections.filter(c => isConnectionFullyInBox(c, box)).map(c => c.id);
 
-      if (objectIds.length > 0 || meterIds.length > 0 || signalPanelIds.length > 0 || connectionIds.length > 0) {
+      if (objectIds.length > 0 || meterIds.length > 0 || signalPanelIds.length > 0 || frameIds.length > 0 || connectionIds.length > 0) {
         if (e.evt.shiftKey) {
           // Shift+drag adds to whatever was already selected, per kind.
-          selectMixed({
-            objectIds: [...new Set([...selectedIds, ...objectIds])],
-            connectionIds: [...new Set([...selectedConnectionIds, ...connectionIds])],
-            meterIds: [...new Set([...selectedMeterIds, ...meterIds])],
-            signalPanelIds: [...new Set([...selectedSignalPanelIds, ...signalPanelIds])]
-          });
+          selectMixed(mergeSelectionAdditive(
+            { objectIds: selectedIds, connectionIds: selectedConnectionIds, meterIds: selectedMeterIds, signalPanelIds: selectedSignalPanelIds, frameIds: selectedFrameIds },
+            { objectIds, connectionIds, meterIds, signalPanelIds, frameIds }
+          ));
         } else {
-          selectMixed({ objectIds, connectionIds, meterIds, signalPanelIds });
+          selectMixed({ objectIds, connectionIds, meterIds, signalPanelIds, frameIds });
         }
       }
       // An empty box selects nothing new - a non-shift click already
@@ -713,8 +948,8 @@ export const Canvas: React.FC = () => {
       fill: '#c0c0c0',
       border: '#000000',
       text: def?.label || data.type,
-      font: 'Arial',
-      fontSize: 12,
+      font: FONT_UI,
+      fontSize: FONT_SIZE_BASE,
       editor: {
         preview_state: def?.defaultState || ''
       },
@@ -774,6 +1009,36 @@ export const Canvas: React.FC = () => {
     return lines;
   };
 
+  // Shared group outline (commit 2f): when more than one element is
+  // selected, across any mix of the four kinds, a single rectangle
+  // drawn around the whole group's combined bounds - the same "this is
+  // one selection" affordance a graphics program gives. A single
+  // selected element already has its own outline (Transformer handles,
+  // or one of the dashed rects above) - this only draws once there is
+  // more than one item to show as a group. Ignores object rotation
+  // (an axis-aligned box, not each object's own rotated bounds) - the
+  // same simplification isObjectFullyInBox already makes for the
+  // rubber-band box itself.
+  const selectedTotalCount = selectedIds.length + selectedMeterIds.length + selectedSignalPanelIds.length + selectedFrameIds.length + selectedConnectionIds.length;
+  const selectionGroupBounds = (() => {
+    if (selectedTotalCount <= 1) return null;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    const extend = (x1: number, y1: number, x2: number, y2: number) => {
+      minX = Math.min(minX, x1, x2);
+      minY = Math.min(minY, y1, y2);
+      maxX = Math.max(maxX, x1, x2);
+      maxY = Math.max(maxY, y1, y2);
+    };
+    objects.filter(o => selectedIds.includes(o.id)).forEach(o => extend(o.x, o.y, o.x + o.width, o.y + o.height));
+    meters.filter(m => selectedMeterIds.includes(m.id)).forEach(m => extend(m.x, m.y, m.x + m.width, m.y + computeMeterHeight(m)));
+    signalPanels.filter(p => selectedSignalPanelIds.includes(p.id)).forEach(p => extend(p.x, p.y, p.x + p.width, p.y + computeSignalPanelHeight(p)));
+    frames.filter(f => selectedFrameIds.includes(f.id)).forEach(f => extend(f.x, f.y, f.x + f.width, f.y + f.height));
+    connections.filter(c => selectedConnectionIds.includes(c.id)).forEach(c => c.points.forEach(pt => extend(pt.x, pt.y, pt.x, pt.y)));
+    if (!Number.isFinite(minX)) return null;
+    const padding = 8;
+    return { x: minX - padding, y: minY - padding, width: (maxX - minX) + padding * 2, height: (maxY - minY) + padding * 2 };
+  })();
+
   return (
     <div
       className="canvas-container"
@@ -798,11 +1063,64 @@ export const Canvas: React.FC = () => {
         style={{ cursor: isDrawingConnection ? 'crosshair' : (selectionStartRef.current ? 'crosshair' : 'default') }}
       >
         <Layer>
-          <Rect x={0} y={0} width={useStore.getState().canvasConfig.width} height={useStore.getState().canvasConfig.height} fill={useStore.getState().canvasConfig.background} />
-          <Rect x={0} y={0} width={canvasConfig.width || 1920} height={canvasConfig.height || 1080} fill={canvasConfig.background || COLOR_CANVAS_BACKGROUND} />
+          {/* feat/appearance-selection-frames commit 2: both background
+              rects need name="grid" too, not just the grid LINES drawn
+              over them - handleMouseDown's own clickedOnEmpty check
+              treats that name as "this is empty canvas, not an
+              object", and grid lines cover only a sliver of the
+              canvas's actual area (1-1.5px wide, GRID_SIZE apart) - an
+              ordinary click almost always lands on one of these two
+              rects instead, which had no name at all, so rubber-band
+              selection could only ever start by landing exactly on a
+              grid line. Confirmed by eye in the running app before this
+              fix: dragging a marquee from ordinary empty space selected
+              nothing. */}
+          <Rect x={0} y={0} width={useStore.getState().canvasConfig.width} height={useStore.getState().canvasConfig.height} fill={useStore.getState().canvasConfig.background} name="grid" />
+          <Rect x={0} y={0} width={canvasConfig.width || 1920} height={canvasConfig.height || 1080} fill={canvasConfig.background || COLOR_CANVAS_BACKGROUND} name="grid" />
           {drawGrid()}
         </Layer>
         <Layer>
+          {/* The frame element (commit 3): pure background graphic, no
+              terminals, no state - drawn first in this Layer so it sits
+              BELOW every wire and symbol that follows (3e: "warstwa
+              podkladu"), while still being above the grid/canvas
+              background Layer above. A symbol placed inside a frame's
+              own bounds draws later in this same Layer, so it is
+              visible above the frame, per that same requirement. */}
+          {frames.map((frame) => (
+            <FrameElementNode
+              key={frame.id}
+              frame={frame}
+              onSelect={(e: any) => selectFrames([frame.id], !!e?.evt?.shiftKey)}
+              onShapeRef={(node) => { groupDrag.registerNode(`frame:${frame.id}`, node); registerFrameShapeRef(frame.id, node); }}
+              onDragStart={() => {
+                if (isAltPressed) useStore.getState().duplicateFrameInPlace(frame.id);
+                groupDrag.start(`frame:${frame.id}`);
+              }}
+              onDragMove={(x, y) => {
+                if (groupDrag.isActive()) groupDrag.follow(x - frame.x, y - frame.y);
+              }}
+              onDragEnd={(x, y) => {
+                const finalX = snapValue(x, gridSize, isAltPressed);
+                const finalY = snapValue(y, gridSize, isAltPressed);
+                if (groupDrag.isActive()) {
+                  groupDrag.commit(finalX - frame.x, finalY - frame.y);
+                } else {
+                  updateFrame(frame.id, { x: finalX, y: finalY });
+                  useStore.getState().saveHistory();
+                }
+              }}
+              onResize={(x, y, width, height) => {
+                updateFrame(frame.id, {
+                  x: snapValue(x, gridSize, isAltPressed),
+                  y: snapValue(y, gridSize, isAltPressed),
+                  width: snapValue(width, gridSize, isAltPressed),
+                  height: snapValue(height, gridSize, isAltPressed)
+                });
+                useStore.getState().saveHistory();
+              }}
+            />
+          ))}
           {/* Node-based wiring model: a connection draws itself straight
               through its own points array now - no from/to object lookup
               needed here at all (that whole indirection is gone). A
@@ -816,6 +1134,7 @@ export const Canvas: React.FC = () => {
               onSelect={(multi: boolean) => selectConnections([conn.id], multi)}
               gridSize={gridSize}
               onAltClickSegment={handleAltClickSegment}
+              groupDrag={groupDrag}
             />
           ))}
           {/* In-progress wire preview: a thin line through every point
@@ -847,6 +1166,7 @@ export const Canvas: React.FC = () => {
               onChange={(newAttrs) => updateObject(obj.id, newAttrs)}
               gridSize={gridSize}
               onShapeRef={registerObjectShapeRef}
+              groupDrag={groupDrag}
             />
           ))}
           {/* Topology junctions (layer 4 - deliberately ABOVE symbols,
@@ -873,12 +1193,23 @@ export const Canvas: React.FC = () => {
               meter={meter}
               devices={devices}
               onSelect={(e: any) => selectMeters([meter.id], !!e?.evt?.shiftKey)}
+              onShapeRef={(node) => groupDrag.registerNode(`meter:${meter.id}`, node)}
               onDragStart={() => {
                 if (isAltPressed) useStore.getState().duplicateMeterInPlace(meter.id);
+                groupDrag.start(`meter:${meter.id}`);
+              }}
+              onDragMove={(x, y) => {
+                if (groupDrag.isActive()) groupDrag.follow(x - meter.x, y - meter.y);
               }}
               onDragEnd={(x, y) => {
-                updateMeter(meter.id, { x: snapValue(x, gridSize, isAltPressed), y: snapValue(y, gridSize, isAltPressed) });
-                useStore.getState().saveHistory();
+                const finalX = snapValue(x, gridSize, isAltPressed);
+                const finalY = snapValue(y, gridSize, isAltPressed);
+                if (groupDrag.isActive()) {
+                  groupDrag.commit(finalX - meter.x, finalY - meter.y);
+                } else {
+                  updateMeter(meter.id, { x: finalX, y: finalY });
+                  useStore.getState().saveHistory();
+                }
               }}
             />
           ))}
@@ -891,12 +1222,23 @@ export const Canvas: React.FC = () => {
               panel={panel}
               devices={devices}
               onSelect={(e: any) => selectSignalPanels([panel.id], !!e?.evt?.shiftKey)}
+              onShapeRef={(node) => groupDrag.registerNode(`panel:${panel.id}`, node)}
               onDragStart={() => {
                 if (isAltPressed) useStore.getState().duplicateSignalPanelInPlace(panel.id);
+                groupDrag.start(`panel:${panel.id}`);
+              }}
+              onDragMove={(x, y) => {
+                if (groupDrag.isActive()) groupDrag.follow(x - panel.x, y - panel.y);
               }}
               onDragEnd={(x, y) => {
-                updateSignalPanel(panel.id, { x: snapValue(x, gridSize, isAltPressed), y: snapValue(y, gridSize, isAltPressed) });
-                useStore.getState().saveHistory();
+                const finalX = snapValue(x, gridSize, isAltPressed);
+                const finalY = snapValue(y, gridSize, isAltPressed);
+                if (groupDrag.isActive()) {
+                  groupDrag.commit(finalX - panel.x, finalY - panel.y);
+                } else {
+                  updateSignalPanel(panel.id, { x: finalX, y: finalY });
+                  useStore.getState().saveHistory();
+                }
               }}
             />
           ))}
@@ -960,6 +1302,25 @@ export const Canvas: React.FC = () => {
               listening={false}
             />
           ))}
+          {selectedFrameIds.map((id) => (
+            <FrameTransformerHandle
+              key={`frame-tr-${id}`}
+              node={frameShapeRefs.current.get(id)}
+            />
+          ))}
+          {selectionGroupBounds && (
+            <Rect
+              x={selectionGroupBounds.x}
+              y={selectionGroupBounds.y}
+              width={selectionGroupBounds.width}
+              height={selectionGroupBounds.height}
+              stroke={COLOR_WHITE}
+              strokeWidth={1.5}
+              dash={[10, 6]}
+              fill="transparent"
+              listening={false}
+            />
+          )}
           {selectionBox && (
             <Rect
               x={selectionBox.x}

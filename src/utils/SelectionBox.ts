@@ -26,3 +26,31 @@ export function isConnectionFullyInBox(conn: { points: { x: number; y: number }[
   if (conn.points.length === 0) return false;
   return conn.points.every(p => p.x >= box.x && p.y >= box.y && p.x <= box.x + box.width && p.y <= box.y + box.height);
 }
+
+export interface MixedSelection {
+  objectIds: string[];
+  connectionIds: string[];
+  meterIds: string[];
+  signalPanelIds: string[];
+  frameIds: string[];
+}
+
+/**
+ * feat/appearance-selection-frames commit 2d: what a Shift+drag rubber-
+ * band adds to an existing selection - every id newly found inside the
+ * box, unioned into whatever was already selected, per kind,
+ * duplicate-free. Extracted out of Canvas.tsx's own handleMouseUp (the
+ * same reason every other pure piece of rubber-band logic in this file
+ * already lives here, not inline in the component) so this specific
+ * "Shift adds instead of replacing" rule is directly testable without
+ * a Konva rendering harness.
+ */
+export function mergeSelectionAdditive(existing: MixedSelection, found: Partial<MixedSelection>): MixedSelection {
+  return {
+    objectIds: [...new Set([...existing.objectIds, ...(found.objectIds || [])])],
+    connectionIds: [...new Set([...existing.connectionIds, ...(found.connectionIds || [])])],
+    meterIds: [...new Set([...existing.meterIds, ...(found.meterIds || [])])],
+    signalPanelIds: [...new Set([...existing.signalPanelIds, ...(found.signalPanelIds || [])])],
+    frameIds: [...new Set([...existing.frameIds, ...(found.frameIds || [])])]
+  };
+}

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Group, Rect, Circle, Text } from 'react-konva';
 import type { SynopticObject } from '../store';
+import { FONT_UI, FONT_SIZE_BASE } from '../theme/ScadaTheme';
 import { CircuitBreakerSymbol } from './electrical/CircuitBreakerSymbol';
 import { DisconnectSwitchSymbol } from './electrical/DisconnectSwitchSymbol';
 import { ContactorSymbol } from './electrical/ContactorSymbol';
@@ -66,6 +67,26 @@ export interface SymbolProps {
   state: string; // the resolved state (either preview_state or fallback default)
 }
 
+// feat/appearance-selection-frames commit 4c: PropertyInspector.tsx's
+// own "Text" field only makes sense to show for a type whose renderer
+// actually reads obj.text somewhere - every other type's own dedicated
+// component (the switch below) never looks at it at all, so editing it
+// there did nothing but leave a stale, misleading value ("Meter
+// (SCADA)", "Indicator Lamp" - literally def.label from the moment it
+// was dropped, per Canvas.tsx's own handleDrop) sitting in the field.
+// Kept in sync with the switch by construction: graphics.* is exactly
+// the one prefix with no dedicated case at all (falls to GenericSymbol,
+// which reads obj.text || obj.type directly) - confirmed against every
+// registry file, not assumed. The other three are dedicated components
+// that still read obj.text as their own fallback when a more specific
+// field (description/tag) is empty.
+// oxlint-disable-next-line react/only-export-components -- kept beside the component/switch it describes, for the same reason GenericSymbol itself lives here.
+export function symbolUsesTextField(type: string): boolean {
+  if (type.startsWith('graphics.')) return true;
+  if (type.startsWith('measurements.')) return true;
+  return type === 'scada.label_frame' || type === 'scada.boundary_point';
+}
+
 export const GenericSymbol: React.FC<SymbolProps> = ({ obj }) => {
   const isCircle = obj.type === 'graphics.circle' || (!obj.type.startsWith('graphics.') && (obj.type.includes('pump') || obj.type.includes('valve') || obj.type.includes('meter')));
 
@@ -95,8 +116,8 @@ export const GenericSymbol: React.FC<SymbolProps> = ({ obj }) => {
         height={obj.height}
         align="center"
         verticalAlign="middle"
-        fontSize={obj.fontSize || 12}
-        fontFamily={obj.font || "system-ui"}
+        fontSize={obj.fontSize || FONT_SIZE_BASE}
+        fontFamily={obj.font || FONT_UI}
         fill="#000"
       />
     </Group>

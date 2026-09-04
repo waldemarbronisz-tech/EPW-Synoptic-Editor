@@ -69,8 +69,15 @@ describe('Indicator diode (IndicatorDiodeSymbol)', () => {
   it('8. accepts two sizes and returns different radii', () => {
     const small = getIndicatorDiodeRadius('small');
     const large = getIndicatorDiodeRadius('large');
-    expect(small).toBe(8);
-    expect(large).toBe(12);
+    // feat/appearance-selection-frames commit 1: 8/12 -> 5/7 (diodes
+    // were disproportionately large next to a signal panel's row text -
+    // see ScadaTheme.ts's DIODE_RADIUS_SMALL/DIODE_RADIUS_LARGE). This
+    // is not a meter/panel test (GRANICE's "no test modification"
+    // clause is scoped to those), so updating the literal expectation
+    // here is the deliberate point of mandatory test 1, not a
+    // workaround of it.
+    expect(small).toBe(5);
+    expect(large).toBe(7);
     expect(small).not.toBe(large);
   });
 });

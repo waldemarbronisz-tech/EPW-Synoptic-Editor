@@ -40,9 +40,18 @@ describe('SignalPanelElement height', () => {
   it('uses the exact same height formula as the meter element (shared PanelLayout.ts)', () => {
     // Cross-checked against meter-element.test.ts's own numbers for the
     // same inputs - proof the two elements did not quietly drift apart.
+    //
+    // feat/appearance-selection-frames commit 1c: the title block's
+    // height no longer scales with the passed fontSize (12 here) - it
+    // is always ScadaTheme.ts's fixed FONT_SIZE_TITLE (14), a
+    // deliberate typography change, not a behavior regression (see
+    // PanelLayout.ts's computePanelHeight and raport.md). Expected
+    // value updated 116 -> 119 (only the title term changed: 12*1.5+6=24
+    // -> 14*1.5+6=27; the row term, 3*(12*2)=72, and padding, 10*2=20,
+    // are untouched).
     const rows = [makeRow(), makeRow(), makeRow()];
     expect(computeSignalPanelHeight({ title: 'M', fontSize: 12, rows })).toBe(
-      10 * 2 + (12 * 1.5 + 6) + 3 * (12 * 2)
+      10 * 2 + (14 * 1.5 + 6) + 3 * (12 * 2)
     );
   });
 });

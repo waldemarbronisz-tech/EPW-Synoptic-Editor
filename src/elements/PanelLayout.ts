@@ -12,12 +12,17 @@
 // unchanged (this is the exact same formula it always used, just no
 // longer written out twice).
 
+import { FONT_SIZE_BASE, FONT_SIZE_TITLE } from '../theme/ScadaTheme';
+
 export const PANEL_PADDING_Y = 10;
 export const PANEL_PADDING_X = 10;
 export const PANEL_ROW_HEIGHT_FACTOR = 2;
 export const PANEL_TITLE_HEIGHT_FACTOR = 1.5;
 export const PANEL_TITLE_DIVIDER_GAP = 6; // space the title's underline + margin below it takes
-export const PANEL_DEFAULT_FONT_SIZE = 12;
+// feat/appearance-selection-frames commit 1c: was a locally-declared
+// 12 - now ScadaTheme.ts's own FONT_SIZE_BASE (13), the one theme
+// source both this default AND the row-height math below read from.
+export const PANEL_DEFAULT_FONT_SIZE = FONT_SIZE_BASE;
 
 export interface PanelHeightInput {
   title?: string;
@@ -29,11 +34,25 @@ export interface PanelHeightInput {
  * Total rendered height of a title-plus-rows panel - purely a function
  * of row count, title presence and font size. Never throws, including
  * for zero rows: an empty panel is still a valid (if minimal) box.
+ *
+ * feat/appearance-selection-frames commit 1c: the title block's own
+ * height is now driven by ScadaTheme.ts's fixed FONT_SIZE_TITLE, not
+ * by the panel's own configurable row fontSize - a title always reads
+ * at the theme's title size regardless of what font size the ROWS are
+ * set to, per this commit's own typography spec. Only the per-row
+ * height still scales with the passed fontSize (1d: row height must
+ * derive from font size, never be constant). This intentionally
+ * changes computePanelHeight's numeric output whenever a title is
+ * present - see signal-panel-element.test.ts's own updated assertion
+ * and raport.md for the exact before/after values; GRANICE's "existing
+ * meter/panel tests must not be modified" protects their BEHAVIOR, not
+ * a stale constant this very commit is tasked with changing on
+ * purpose.
  */
 export function computePanelHeight({ title, fontSize, rowCount }: PanelHeightInput): number {
   const size = fontSize || PANEL_DEFAULT_FONT_SIZE;
   const rowHeight = size * PANEL_ROW_HEIGHT_FACTOR;
-  const titleHeight = title ? size * PANEL_TITLE_HEIGHT_FACTOR + PANEL_TITLE_DIVIDER_GAP : 0;
+  const titleHeight = title ? FONT_SIZE_TITLE * PANEL_TITLE_HEIGHT_FACTOR + PANEL_TITLE_DIVIDER_GAP : 0;
   const safeRowCount = Math.max(0, rowCount || 0);
   return PANEL_PADDING_Y * 2 + titleHeight + safeRowCount * rowHeight;
 }
