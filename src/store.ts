@@ -195,7 +195,13 @@ interface AppState {
   // convention as the wire tool above, until toggled off again.
   isDrawingFrame: boolean;
   drawingFrameVariant: FrameElement['variant'];
-  setDrawingFrameMode: (active: boolean, variant?: FrameElement['variant']) => void;
+  // fix/handles-insert-mode-diodes commit 2: whether Shift was held
+  // when this tool was last armed - true means the tool stays active
+  // after placing one frame/building (continuous mode, for placing
+  // several in a row); false (the default) means placing one returns
+  // straight to select mode, per this fix's own required behavior.
+  frameToolContinuous: boolean;
+  setDrawingFrameMode: (active: boolean, variant?: FrameElement['variant'], continuous?: boolean) => void;
 
   // feat/media-and-proportions part C: the medium/style a NEW wire is
   // drawn with, chosen up front in the toolbar rather than after the
@@ -324,6 +330,7 @@ export const useStore = create<AppState>((set, get) => ({
   isDrawingConnection: false,
   isDrawingFrame: false,
   drawingFrameVariant: 'PLAIN',
+  frameToolContinuous: false,
   snapToGridEnabled: true,
   drawingMedium: 'ELECTRICAL',
   drawingStyle: 'NORMAL',
@@ -337,10 +344,16 @@ export const useStore = create<AppState>((set, get) => ({
   // implicitly is the only such tool today) - a stray in-progress wire
   // drag and a frame drag fighting over the same mouse gesture would
   // be a genuine conflict, not just visual noise.
-  setDrawingFrameMode: (active, variant) => set((state) => ({
+  setDrawingFrameMode: (active, variant, continuous) => set((state) => ({
     isDrawingFrame: active,
     drawingFrameVariant: variant || state.drawingFrameVariant,
-    isDrawingConnection: active ? false : state.isDrawingConnection
+    isDrawingConnection: active ? false : state.isDrawingConnection,
+    // fix/handles-insert-mode-diodes commit 2: continuous is only ever
+    // meaningful at the moment the tool is ARMED (active=true, Shift
+    // was or wasn't held on the toolbar click that got us here) - once
+    // turned off, always reset to false so a later plain (non-Shift)
+    // re-arm never inherits a stale continuous flag from before.
+    frameToolContinuous: active ? !!continuous : false
   })),
 
   setDrawingMedium: (medium) => set({ drawingMedium: medium }),

@@ -107,21 +107,28 @@ export const Toolbar: React.FC = () => {
           the canvas, like graphics.rectangle already is - two separate
           buttons for the two variants rather than one button plus a
           selector, matching this toolbar's own convention of dedicated
-          single-purpose buttons. Toggles the same way the wire tool
-          above does: stays active across multiple drags until clicked
-          again (or the other one is clicked, which switches variant
-          without needing to turn the tool off first). */}
+          single-purpose buttons.
+          fix/handles-insert-mode-diodes commit 2: a plain click now
+          arms the tool for ONE placement only - it returns to select
+          mode right after a frame/building is drawn (Canvas.tsx's own
+          handleMouseUp). Shift+click arms CONTINUOUS mode instead (the
+          tool stays active, and stays highlighted below via the same
+          isDrawingFrame-driven backgroundColor as before, for placing
+          several in a row) - frameToolContinuous carries that choice
+          from here through to Canvas.tsx's placement logic. Clicking
+          the other button while one is already active still switches
+          variant without needing to turn the tool off first. */}
       <div className="toolbar-group">
         <button
-          title="Rysuj ramkę"
-          onClick={() => setDrawingFrameMode(!(isDrawingFrame && drawingFrameVariant === 'PLAIN'), 'PLAIN')}
+          title="Rysuj ramkę (Shift = tryb ciągły)"
+          onClick={(e) => setDrawingFrameMode(!(isDrawingFrame && drawingFrameVariant === 'PLAIN'), 'PLAIN', e.shiftKey)}
           style={{ backgroundColor: isDrawingFrame && drawingFrameVariant === 'PLAIN' ? COLOR_RUN : 'transparent', color: isDrawingFrame && drawingFrameVariant === 'PLAIN' ? COLOR_WHITE : undefined }}
         >
           <Square size={16} />
         </button>
         <button
-          title="Rysuj budynek"
-          onClick={() => setDrawingFrameMode(!(isDrawingFrame && drawingFrameVariant === 'BUILDING'), 'BUILDING')}
+          title="Rysuj budynek (Shift = tryb ciągły)"
+          onClick={(e) => setDrawingFrameMode(!(isDrawingFrame && drawingFrameVariant === 'BUILDING'), 'BUILDING', e.shiftKey)}
           style={{ backgroundColor: isDrawingFrame && drawingFrameVariant === 'BUILDING' ? COLOR_RUN : 'transparent', color: isDrawingFrame && drawingFrameVariant === 'BUILDING' ? COLOR_WHITE : undefined }}
         >
           <Home size={16} />

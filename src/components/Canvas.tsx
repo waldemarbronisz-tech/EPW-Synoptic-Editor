@@ -25,6 +25,7 @@ import { clampZoom, computeContentBounds, computeFitView, GRID_THIN_BELOW_ZOOM }
 import { FrameElementNode } from './FrameElementNode';
 import { computeFrameRectFromDrag } from '../elements/FrameElement';
 import { computeResizeFromAnchor, setActiveResizeAnchor, getActiveResizeAnchor } from '../utils/ResizeHandles';
+import { shouldExitInsertModeAfterPlacing } from '../utils/InsertMode';
 
 // Momentary Alt-key bypass for grid snapping. Deliberately outside React
 // state: every ObjectNode's drag handlers need the CURRENT key state at
@@ -517,7 +518,7 @@ export const Canvas: React.FC = () => {
   const { objects, selectedIds, selectObjects, clearSelection, addObject, updateObject, canvasState, setCanvasState } = useStore();
   const { meters, selectedMeterIds, selectMeters, updateMeter, devices } = useStore();
   const { signalPanels, selectedSignalPanelIds, selectSignalPanels, updateSignalPanel } = useStore();
-  const { frames, selectedFrameIds, selectFrames, addFrame, updateFrame, isDrawingFrame, drawingFrameVariant } = useStore();
+  const { frames, selectedFrameIds, selectFrames, addFrame, updateFrame, isDrawingFrame, drawingFrameVariant, frameToolContinuous, setDrawingFrameMode } = useStore();
   const { selectMixed } = useStore();
   const [size, setSize] = useState({ width: 800, height: 600 });
   // Mirrors `size` for the keydown handler below (registered once,
@@ -674,18 +675,32 @@ export const Canvas: React.FC = () => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Alt') isAltPressed = true;
       if (isTypingInField()) return;
-      if (e.key === 'Escape' && drawingPointsRef.current) {
-        setDrawingPoints(null);
-        setDrawingPreview(null);
+      if (e.key === 'Escape') {
+        // fix/handles-insert-mode-diodes commit 2: Escape exits insert
+        // mode back to select. Cancels any in-progress wire polyline
+        // first (existing behavior - the wire tool otherwise still
+        // stays continuous by default), THEN turns off the wire tool
+        // and/or the frame/building tool if either is currently armed.
+        // Only when neither applied (nothing was in insert mode to
+        // begin with) does Escape fall back to its plain, older
+        // behavior of just clearing the current selection.
+        const s = useStore.getState();
+        const wasMidDraw = !!drawingPointsRef.current;
+        const wasInsertMode = s.isDrawingConnection || s.isDrawingFrame;
+        if (wasMidDraw) {
+          setDrawingPoints(null);
+          setDrawingPreview(null);
+        }
+        if (s.isDrawingConnection) s.setDrawingMode(false);
+        if (s.isDrawingFrame) s.setDrawingFrameMode(false);
+        if (!wasMidDraw && !wasInsertMode) {
+          s.clearSelection();
+        }
       } else if (e.key === 'Enter' && drawingPointsRef.current) {
         finishDrawing();
       } else if (e.key === 'Backspace' && drawingPointsRef.current) {
         e.preventDefault();
         setDrawingPoints(prev => (prev ? removeLastWirePoint(prev) : prev));
-      } else if (e.key === 'Escape') {
-        // Not mid-draw (the branch above already handled that case) -
-        // Escape just clears whatever is currently selected.
-        useStore.getState().clearSelection();
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         // Reads the CURRENT selection from the store rather than this
         // render's destructured selectedIds/selectedConnectionIds/
@@ -944,6 +959,17 @@ export const Canvas: React.FC = () => {
         addFrame({ ...rect, titlePosition: 'TOP_LEFT', variant: drawingFrameVariant });
         const newest = useStore.getState().frames[useStore.getState().frames.length - 1];
         if (newest) selectFrames([newest.id], false);
+
+        // fix/handles-insert-mode-diodes commit 2: return to select
+        // mode after placing ONE frame/building - the previous
+        // behavior left the tool armed forever, so every further click
+        // silently placed another element. Shift held when the tool
+        // was chosen (frameToolContinuous, set by Toolbar.tsx's own
+        // onClick) keeps it armed instead, for placing several in a
+        // row.
+        if (shouldExitInsertModeAfterPlacing(frameToolContinuous)) {
+          setDrawingFrameMode(false);
+        }
       }
       selectionStartRef.current = null;
       setSelectionBox(null);
@@ -1175,7 +1201,11 @@ export const Canvas: React.FC = () => {
         onMouseUp={handleMouseUp}
         onDblClick={handleDblClick}
         onDblTap={handleDblClick}
-        style={{ cursor: isDrawingConnection ? 'crosshair' : (selectionStartRef.current ? 'crosshair' : 'default') }}
+        // fix/handles-insert-mode-diodes commit 2: the cursor differs
+        // from the select cursor for the WHOLE time an insert tool is
+        // armed (isDrawingFrame included, not just isDrawingConnection
+        // as before) - not only once a drag is already underway.
+        style={{ cursor: (isDrawingConnection || isDrawingFrame) ? 'crosshair' : (selectionStartRef.current ? 'crosshair' : 'default') }}
       >
         <Layer>
           {/* feat/appearance-selection-frames commit 2: both background
