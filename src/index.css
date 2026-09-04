@@ -393,3 +393,38 @@ body, html, #root {
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100%' height='100%' fill='black'><polygon points='4,4 10,8 4,12'/></svg>");
   background-position: center;
 }
+
+/* Internal-audit fix: top-level React error boundary crash screen
+   (src/components/ErrorBoundary.tsx) - reuses the same alarm red the
+   symbols already use for a faulted state, rather than a new color. */
+.error-boundary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: center;
+  height: 100%;
+  padding: 32px 48px;
+  background-color: var(--sys-bg);
+  color: var(--sys-text);
+  user-select: text;
+}
+
+.error-boundary h1 {
+  font-size: var(--scada-font-size-large, 16px);
+  color: var(--scada-alarm);
+}
+
+.error-boundary pre {
+  max-width: 100%;
+  padding: 8px;
+  background-color: var(--scada-value-field);
+  border: 1px solid var(--sys-dark);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.error-boundary button {
+  padding: 4px 16px;
+  cursor: pointer;
+}

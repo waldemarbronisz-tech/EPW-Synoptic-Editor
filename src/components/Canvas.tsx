@@ -1,17 +1,15 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Stage, Layer, Rect, Circle, Group, Transformer, Path } from 'react-konva';
+import { Stage, Layer, Rect, Circle, Group, Path } from 'react-konva';
 import { useStore } from '../store';
-import type { SynopticObject, SynopticConnection, WirePoint } from '../store';
-import { SymbolRenderer } from '../symbols/SymbolRenderer';
+import type { SynopticConnection, WirePoint } from '../store';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
-import { ConnectionLine, pathFromPoints, getConductorCoreColor } from './ConnectionLine';
+import { pathFromPoints, getConductorCoreColor } from './ConnectionLine';
 import { ObjectLabelRenderer } from './ObjectLabelRenderer';
 import { COLOR_CANVAS_BACKGROUND, COLOR_OUTLINE, COLOR_WATER, COLOR_WHITE, CONDUCTOR_WIDTH, FONT_SIZE_BASE, FONT_UI } from '../theme/ScadaTheme';
 import { snapValue } from '../utils/GridSnap';
-import { getObjectTerminals } from '../utils/Terminals';
 import {
   snapPointToGrid, appendWirePoint, removeLastWirePoint,
-  reorthogonalizeAfterMove, insertBendOnSegment, nearestPointOnPolyline
+  insertBendOnSegment, nearestPointOnPolyline
 } from '../utils/WireDrawing';
 import { resolveNets, getJunctionPoints } from '../project/NetResolver';
 import { describeObject } from '../utils/ObjectDisplay';
@@ -24,474 +22,23 @@ import { isObjectFullyInBox, isMeterFullyInBox, isConnectionFullyInBox, mergeSel
 import { clampZoom, computeContentBounds, computeFitView, GRID_THIN_BELOW_ZOOM } from '../utils/CanvasView';
 import { FrameElementNode } from './FrameElementNode';
 import { computeFrameRectFromDrag } from '../elements/FrameElement';
-import { computeResizeFromAnchor, setActiveResizeAnchor, getActiveResizeAnchor } from '../utils/ResizeHandles';
 import { shouldExitInsertModeAfterPlacing } from '../utils/InsertMode';
+import { isAltKeyDown, isSpaceKeyDown, setAltKeyDown, setSpaceKeyDown } from '../utils/CanvasInputState';
+import type { DragKey, GroupDragApi } from './canvas/types';
+import { ObjectNode } from './canvas/ObjectNode';
+import { ConnectionNode } from './canvas/ConnectionNode';
+import { ObjectTransformerHandle, FrameTransformerHandle, WidthOnlyTransformerHandle } from './canvas/TransformerHandles';
 
-// Momentary Alt-key bypass for grid snapping. Deliberately outside React
-// state: every ObjectNode's drag handlers need the CURRENT key state at
-// the instant a drag ends, not a value captured in a stale closure or
-// re-rendered prop, and a keypress should never trigger a re-render of
-// the whole canvas by itself.
-let isAltPressed = false;
-
-// fix/handles-insert-mode-diodes commit 1: which Transformer anchor
-// started the CURRENT resize gesture - tracked in utils/ResizeHandles.ts
-// itself (setActiveResizeAnchor/getActiveResizeAnchor), not here,
-// because FrameElementNode.tsx/MeterElementNode.tsx/
-// SignalPanelElementNode.tsx each need to read it from their own
-// onTransformEnd too, in files separate from this one. See that
-// module's own comment for the full reasoning.
-
-// Same reasoning as isAltPressed above - held Space (commit 4) turns
-// the cursor into a hand and lets a left-button drag pan the canvas,
-// without waiting for a React re-render to notice the key state.
-let isSpacePressed = false;
-
-// feat/appearance-selection-frames commit 2c: group move. Dragging ANY
-// selected element, when more than one thing is selected, moves the
-// WHOLE selection together, keeping relative positions, as one history
-// entry - "like a graphics program", per this commit's own spec. The
-// store already has exactly the right primitive for this
-// (moveSelectionBy, built for arrow-key movement: skips locked
-// objects, touches all four kinds atomically, one saveHistory() call);
-// this just drives it from a mouse drag too, with a live visual follow
-// for every OTHER selected element while the drag is in progress.
-//
-// A connection's own move-Group (ConnectionNode below) has no absolute
-// x/y of its own - its x/y IS a pending delta from its last committed
-// points, reset to (0,0) after every drag - so a connection's own
-// "position" for this purpose is always (0,0), never its points' own
-// coordinates. Every other kind (object/meter/signal panel) is
-// absolute, matching its own x/y field directly.
-type DragKey = string; // "obj:<id>" | "meter:<id>" | "panel:<id>" | "conn:<id>"
-interface GroupDragApi {
-  // Reports one element's own Konva node so ANOTHER element's leader
-  // drag can reposition it live as a follower. Passing null
-  // unregisters it (unmount).
-  registerNode: (key: DragKey, node: any) => void;
-  // Called from an element's own onDragStart. Starts a group drag only
-  // when that element is part of a selection of MORE than one item;
-  // otherwise clears any previous group-drag state so a lone drag
-  // falls through to that element's own existing solo behavior.
-  start: (key: DragKey) => void;
-  isActive: () => boolean;
-  // Called from the leader's own onDragMove with how far ITS OWN Konva
-  // node has moved from where the drag started (raw, unsnapped - final
-  // snapping happens once, together, at commit). Repositions every
-  // OTHER selected element's Konva node by the same amount, display
-  // only - nothing is written to the store until commit.
-  follow: (dx: number, dy: number) => void;
-  // Called from the leader's own onDragEnd with the final, already
-  // grid-snapped delta. Writes the whole group to the store in one
-  // moveSelectionBy call, resets every follower connection's move-
-  // Group back to its neutral (0,0), and clears the group-drag state.
-  commit: (dx: number, dy: number) => void;
-}
-
-// isSelected is no longer a prop here (commit 5) - the Transformer that
-// used to read it moved out to its own top-level pass (
-// ObjectTransformerHandle below), and nothing else in this component's
-// own rendering depends on selection state.
-const ObjectNode = ({ obj, onSelect, onChange, gridSize, onShapeRef, groupDrag }: {
-  gridSize: number,
-  obj: SynopticObject,
-  // Receives the raw Konva event (onClick={onSelect} forwards it
-  // positionally) so the caller can read Shift for multi-select - see
-  // Canvas.tsx's own call site.
-  onSelect: (e?: any) => void,
-  onChange: (newAttrs: Partial<SynopticObject>) => void,
-  // Layers (commit 5): the Transformer for a selected object is no
-  // longer rendered here - it moves to its own top-level pass
-  // (ObjectTransformerHandle below) so a selection's resize handles
-  // always draw ABOVE every symbol, never just above this one object's
-  // own. This reports the Group's own Konva node up to Canvas so that
-  // later pass can still attach a Transformer to it.
-  onShapeRef: (id: string, node: any) => void,
-  groupDrag: GroupDragApi,
-}) => {
-  const [isHovered, setIsHovered] = useState(false);
-  const shapeRef = useRef<any>(null);
-  const dragKey: DragKey = `obj:${obj.id}`;
-
-  useEffect(() => {
-    onShapeRef(obj.id, shapeRef.current);
-    groupDrag.registerNode(dragKey, shapeRef.current);
-  });
-
-  // Node-based wiring model: a symbol has terminals now, not ports - see
-  // utils/Terminals.ts. The old click-a-port-to-drag-a-wire interaction
-  // (onPortMouseDown/Up/Click, the busbar's dynamic-port onMouseUp
-  // special case) is gone entirely; a terminal is purely a visual hint
-  // now (radius 6, shown on hover) of where a freehand-drawn wire
-  // actually needs to end to connect - simply sharing that grid point.
-  const terminals = getObjectTerminals(obj);
-
-  return (
-      <Group
-        ref={shapeRef}
-        x={obj.x}
-        y={obj.y}
-        rotation={obj.rotation || 0}
-        scaleX={obj.scaleX || 1}
-        scaleY={obj.scaleY || 1}
-        draggable={!obj.locked}
-        visible={obj.visible !== false}
-        onClick={onSelect}
-        onTap={onSelect}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        onDragStart={() => {
-          // Alt+drag (commit 2): a copy is left behind at THIS exact
-          // spot the instant the drag starts, unselected and with no
-          // history entry of its own - the object actually under the
-          // cursor then keeps moving as an ordinary drag would, so the
-          // eventual onDragEnd's saveHistory() covers the new copy and
-          // the move together as one undo step.
-          if (isAltPressed) {
-            useStore.getState().duplicateObjectInPlace(obj.id);
-          }
-          groupDrag.start(dragKey);
-        }}
-        onDragMove={(e) => {
-          // Snap during drag for visual feedback (doesn't mutate store yet).
-          // Held Alt bypasses this exactly as it bypasses the final snap
-          // on release, so the preview matches where the object will land.
-          const snappedX = snapValue(e.target.x(), gridSize, isAltPressed);
-          const snappedY = snapValue(e.target.y(), gridSize, isAltPressed);
-          e.target.x(snappedX);
-          e.target.y(snappedY);
-          if (groupDrag.isActive()) {
-            groupDrag.follow(snappedX - obj.x, snappedY - obj.y);
-          }
-        }}
-        onDragEnd={(e) => {
-          const finalX = snapValue(e.target.x(), gridSize, isAltPressed);
-          const finalY = snapValue(e.target.y(), gridSize, isAltPressed);
-          if (groupDrag.isActive()) {
-            // The whole selection moves together, one history entry
-            // (moveSelectionBy's own) - not this object's own onChange.
-            groupDrag.commit(finalX - obj.x, finalY - obj.y);
-          } else {
-            // Push final position, then commit exactly one history entry
-            // for the whole drag (updateObject itself no longer touches
-            // history).
-            onChange({ x: finalX, y: finalY });
-            useStore.getState().saveHistory();
-          }
-        }}
-        onTransformEnd={() => {
-          const node = shapeRef.current;
-          const anchor = getActiveResizeAnchor();
-          setActiveResizeAnchor(null);
-
-          // fix/handles-insert-mode-diodes commit 1: a genuine resize
-          // (one of the 8 corner/edge anchors, not the rotate handle)
-          // goes through computeResizeFromAnchor - grid-snapped,
-          // minimum-clamped (GRID_SIZE, the closest this app has to a
-          // universal "a symbol's own minimum" - no dedicated constant
-          // exists for symbols the way FRAME_MIN_SIZE/METER_MIN_WIDTH
-          // do), and guaranteed to keep the OPPOSITE corner/edge fixed
-          // by construction. Only handled for an unrotated object - see
-          // this file's own note above computeResizeFromAnchor's import
-          // for why a rotated resize falls back to the older,
-          // independently-snapped x/y instead.
-          if (anchor && anchor !== 'rotater' && !(obj.rotation || 0)) {
-            const rawWidth = obj.width * node.scaleX();
-            const rawHeight = obj.height * node.scaleY();
-            const resized = computeResizeFromAnchor(
-              anchor,
-              { x: obj.x, y: obj.y, width: obj.width, height: obj.height },
-              rawWidth, rawHeight, gridSize, gridSize, gridSize, !isAltPressed
-            );
-            // Konva's own Transformer mutates this node's x/y/scaleX/
-            // scaleY directly and imperatively while the drag is live -
-            // when the committed value happens to equal what it already
-            // was (the fixed corner, by design, usually does), React
-            // sees no prop change and never re-applies it, leaving
-            // Konva's own live-drag value on screen instead of the
-            // value just committed to the store. Set explicitly so the
-            // node's on-screen state can never drift from the store's.
-            const newScaleX = resized.width / obj.width;
-            const newScaleY = resized.height / obj.height;
-            node.x(resized.x);
-            node.y(resized.y);
-            node.scaleX(newScaleX);
-            node.scaleY(newScaleY);
-            onChange({
-              x: resized.x,
-              y: resized.y,
-              rotation: 0,
-              scaleX: newScaleX,
-              scaleY: newScaleY,
-            });
-            useStore.getState().saveHistory();
-            return;
-          }
-
-          const scaleX = node.scaleX();
-          const scaleY = node.scaleY();
-
-          onChange({
-            x: snapValue(node.x(), gridSize, isAltPressed),
-            y: snapValue(node.y(), gridSize, isAltPressed),
-            rotation: node.rotation(),
-            scaleX: Math.max(0.1, scaleX),
-            scaleY: Math.max(0.1, scaleY),
-          });
-          useStore.getState().saveHistory();
-        }}
-      >
-        <SymbolRenderer obj={obj} />
-
-        {/* Terminals highlight on hover only (usterka D3's precedent,
-            carried forward) - radius 6, contrasting fill, black outline. */}
-        {isHovered && terminals.map((t) => (
-          <Circle
-            key={`term-${t.id}`}
-            x={t.x}
-            y={t.y}
-            radius={6}
-            fill={COLOR_WATER}
-            stroke={COLOR_OUTLINE}
-            strokeWidth={1}
-            listening={false}
-          />
-        ))}
-      </Group>
-  );
-};
-
-// Layer 7 (commit 5): the resize/rotate handles for one selected,
-// unlocked object - rendered in Canvas's own final "zaznaczenie i
-// uchwyty" pass so they always draw above every symbol, not just above
-// this one object's own (two overlapping objects, the later one drawn
-// after the selected one, used to be able to cover its handles - this
-// is what that bug looked like). Attaches to `node` (the target
-// object's own Konva Group, reported via ObjectNode's onShapeRef) -
-// resize/rotate itself is still handled by that Group's own existing
-// onTransformEnd, unchanged; this component only draws the handles and
-// (fix/handles-insert-mode-diodes commit 1) records which anchor
-// started the gesture via setActiveResizeAnchor (ResizeHandles.ts), for
-// that onTransformEnd to read back.
-//
-// keepRatio is Konva's own Transformer default - true unless told
-// otherwise - which locks width/height together on every corner drag.
-// That default is exactly usterka 1's own symptom ("chwycenie uchwytu
-// w rogu... nie pozwala zmieniac szerokosci i wysokosci niezaleznie");
-// explicitly false here (and on every other Transformer in this file)
-// is the one-line fix underneath everything else this commit adds.
-const ObjectTransformerHandle = ({ node }: { node: any }) => {
-  const trRef = useRef<any>(null);
-
-  useEffect(() => {
-    if (node && trRef.current) {
-      trRef.current.nodes([node]);
-      trRef.current.getLayer()?.batchDraw();
-    }
-  });
-
-  if (!node) return null;
-
-  return (
-    <Transformer
-      ref={trRef}
-      keepRatio={false}
-      onTransformStart={() => {
-        setActiveResizeAnchor((trRef.current?.getActiveAnchor() || null) as any);
-      }}
-      boundBoxFunc={(oldBox, newBox) => {
-        if (newBox.width < 10 || newBox.height < 10) {
-          return oldBox;
-        }
-        return newBox;
-      }}
-      borderStroke={COLOR_WHITE}
-      borderStrokeWidth={2}
-      borderDash={[6, 4]}
-    />
-  );
-};
-
-// The same Transformer-relocation pattern as ObjectTransformerHandle
-// above, for a frame's own resize handles (3f) - rotation disabled
-// (frames do not rotate, per this element's own 3a spec, which lists
-// only x/y/width/height/title/titlePosition/variant). keepRatio false
-// for the same reason as ObjectTransformerHandle above. No live
-// boundBoxFunc floor beyond a small pixel minimum: the REAL 2-grid-
-// cell minimum (3g) is enforced where it actually matters, in
-// FrameElementNode's own onTransformEnd (computeResizeFromAnchor's own
-// minWidth/minHeight), which runs regardless of zoom level - a
-// boundBoxFunc here only sees on-screen pixels, not the frame's own
-// local units.
-const FrameTransformerHandle = ({ node }: { node: any }) => {
-  const trRef = useRef<any>(null);
-
-  useEffect(() => {
-    if (node && trRef.current) {
-      trRef.current.nodes([node]);
-      trRef.current.getLayer()?.batchDraw();
-    }
-  });
-
-  if (!node) return null;
-
-  return (
-    <Transformer
-      ref={trRef}
-      rotateEnabled={false}
-      keepRatio={false}
-      onTransformStart={() => {
-        setActiveResizeAnchor((trRef.current?.getActiveAnchor() || null) as any);
-      }}
-      boundBoxFunc={(oldBox, newBox) => {
-        if (newBox.width < 10 || newBox.height < 10) {
-          return oldBox;
-        }
-        return newBox;
-      }}
-      borderStroke={COLOR_WHITE}
-      borderStrokeWidth={2}
-      borderDash={[6, 4]}
-    />
-  );
-};
-
-// fix/handles-insert-mode-diodes commit 1: the meter and signal panel
-// elements resize ONLY their own width by hand - height is always
-// computed from row count (1's own note). Only the two vertical-edge
-// anchors are enabled at all; every corner and the two horizontal
-// (top/bottom) anchors are left out of enabledAnchors entirely, so
-// they are not merely inactive but genuinely absent from the handle -
-// there is nothing there to grab that could touch height.
-const WidthOnlyTransformerHandle = ({ node }: { node: any }) => {
-  const trRef = useRef<any>(null);
-
-  useEffect(() => {
-    if (node && trRef.current) {
-      trRef.current.nodes([node]);
-      trRef.current.getLayer()?.batchDraw();
-    }
-  });
-
-  if (!node) return null;
-
-  return (
-    <Transformer
-      ref={trRef}
-      rotateEnabled={false}
-      keepRatio={false}
-      enabledAnchors={['middle-left', 'middle-right']}
-      onTransformStart={() => {
-        setActiveResizeAnchor((trRef.current?.getActiveAnchor() || null) as any);
-      }}
-      boundBoxFunc={(oldBox, newBox) => {
-        if (newBox.width < 10) return oldBox;
-        return newBox;
-      }}
-      borderStroke={COLOR_WHITE}
-      borderStrokeWidth={2}
-      borderDash={[6, 4]}
-    />
-  );
-};
-
-// A finished wire: draws itself (ConnectionLine), can be dragged whole
-// (translating every point, grid-snapped), and - while selected - shows
-// a draggable handle at each of its own points so a bend can be grabbed
-// and moved without breaking orthogonality (WireDrawing.
-// reorthogonalizeAfterMove fixes up its two neighboring segments).
-// Alt+click on a segment (not a handle) inserts a brand new bend there.
-const ConnectionNode = ({ conn, isSelected, onSelect, gridSize, onAltClickSegment, groupDrag }: {
-  conn: SynopticConnection,
-  isSelected: boolean,
-  onSelect: (multi: boolean) => void,
-  gridSize: number,
-  onAltClickSegment: (conn: SynopticConnection, worldPoint: WirePoint) => void,
-  groupDrag: GroupDragApi,
-}) => {
-  const moveGroupRef = useRef<any>(null);
-  const dragKey: DragKey = `conn:${conn.id}`;
-
-  useEffect(() => {
-    groupDrag.registerNode(dragKey, moveGroupRef.current);
-  });
-
-  return (
-    <React.Fragment>
-      <Group
-        ref={moveGroupRef}
-        draggable={isSelected}
-        onDragStart={() => {
-          groupDrag.start(dragKey);
-        }}
-        onDragMove={(e) => {
-          const snappedX = snapValue(e.target.x(), gridSize, isAltPressed);
-          const snappedY = snapValue(e.target.y(), gridSize, isAltPressed);
-          e.target.x(snappedX);
-          e.target.y(snappedY);
-          // This move-Group's own x/y already IS a delta from (0,0) -
-          // no baseline subtraction needed, unlike an object/meter/
-          // panel's absolute position (see GroupDragApi's own comment).
-          if (groupDrag.isActive()) {
-            groupDrag.follow(snappedX, snappedY);
-          }
-        }}
-        onDragEnd={(e) => {
-          const dx = snapValue(e.target.x(), gridSize, isAltPressed);
-          const dy = snapValue(e.target.y(), gridSize, isAltPressed);
-          if (groupDrag.isActive()) {
-            groupDrag.commit(dx, dy);
-          } else if (dx !== 0 || dy !== 0) {
-            useStore.getState().updateConnection(conn.id, {
-              points: conn.points.map(p => ({ x: p.x + dx, y: p.y + dy }))
-            });
-            useStore.getState().saveHistory();
-          }
-          e.target.x(0);
-          e.target.y(0);
-        }}
-      >
-        <ConnectionLine
-          conn={conn}
-          isSelected={isSelected}
-          onSelect={(e: any) => {
-            if (e?.evt?.altKey) {
-              e.cancelBubble = true;
-              const stage = e.target.getStage();
-              const pos = stage?.getPointerPosition();
-              if (!pos) return;
-              const { panX, panY, zoom } = useStore.getState().canvasState;
-              onAltClickSegment(conn, snapPointToGrid((pos.x - panX) / zoom, (pos.y - panY) / zoom));
-              return;
-            }
-            onSelect(!!e?.evt?.shiftKey);
-          }}
-        />
-      </Group>
-      {isSelected && conn.points.map((p, idx) => (
-        <Circle
-          key={idx}
-          x={p.x}
-          y={p.y}
-          radius={6}
-          fill={COLOR_WHITE}
-          stroke={COLOR_OUTLINE}
-          strokeWidth={1.5}
-          draggable
-          onDragMove={(e) => {
-            e.target.x(snapValue(e.target.x(), gridSize, isAltPressed));
-            e.target.y(snapValue(e.target.y(), gridSize, isAltPressed));
-          }}
-          onDragEnd={(e) => {
-            const newPoints = reorthogonalizeAfterMove(conn.points, idx, { x: e.target.x(), y: e.target.y() });
-            useStore.getState().updateConnection(conn.id, { points: newPoints });
-            useStore.getState().saveHistory();
-          }}
-        />
-      ))}
-    </React.Fragment>
-  );
-};
+// Internal-audit fix (god-file breakup): this file used to define five
+// sub-components (ObjectNode, ObjectTransformerHandle,
+// FrameTransformerHandle, WidthOnlyTransformerHandle, ConnectionNode) at
+// module scope before ever getting to the Canvas component itself - all
+// five, plus the DragKey/GroupDragApi types and the isAltPressed/
+// isSpacePressed module state they (and Canvas below) all share, now
+// live in ./canvas/ and ../utils/CanvasInputState.ts instead. This is a
+// pure move: every one of those five components is unchanged, comments
+// included - see their own files for the reasoning that used to sit
+// here. What follows is only the Canvas component itself.
 
 export const Canvas: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -553,13 +100,13 @@ export const Canvas: React.FC = () => {
   // every new wire is drawn with whichever is currently chosen.
   const { connections, selectedConnectionIds, selectConnections, isDrawingConnection, drawingMedium } = useStore();
 
-  // Group move (commit 2c) - see GroupDragApi's own comment above for
-  // the full reasoning. dragNodeRefs is a plain mutable Map, not React
-  // state, for the same reason objectShapeRefs above is one: a Konva
-  // node reference never needs to trigger a re-render when it changes.
-  // groupDragRef tracks the in-progress drag itself (which element
-  // started it, and every key that must follow it) - also not React
-  // state, since it only ever needs to be read/written from Konva
+  // Group move (commit 2c) - see GroupDragApi's own comment (canvas/
+  // types.ts) for the full reasoning. dragNodeRefs is a plain mutable
+  // Map, not React state, for the same reason objectShapeRefs above is
+  // one: a Konva node reference never needs to trigger a re-render when
+  // it changes. groupDragRef tracks the in-progress drag itself (which
+  // element started it, and every key that must follow it) - also not
+  // React state, since it only ever needs to be read/written from Konva
   // event handlers mid-gesture, never from a render.
   const dragNodeRefs = useRef<Map<DragKey, any>>(new Map());
   const groupDragRef = useRef<{ leaderKey: DragKey; keys: DragKey[] } | null>(null);
@@ -673,7 +220,7 @@ export const Canvas: React.FC = () => {
       return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
     };
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Alt') isAltPressed = true;
+      if (e.key === 'Alt') setAltKeyDown(true);
       if (isTypingInField()) return;
       if (e.key === 'Escape') {
         // fix/handles-insert-mode-diodes commit 2: Escape exits insert
@@ -763,14 +310,14 @@ export const Canvas: React.FC = () => {
         // left-button drag pans - guarded behind isTypingInField()
         // (checked above, unlike Alt) since typing a space is common
         // and must not put the canvas into pan mode.
-        isSpacePressed = true;
+        setSpaceKeyDown(true);
         if (containerRef.current && !isPanningRef.current) containerRef.current.style.cursor = 'grab';
       }
     };
     const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.key === 'Alt') isAltPressed = false;
+      if (e.key === 'Alt') setAltKeyDown(false);
       if (e.key === ' ') {
-        isSpacePressed = false;
+        setSpaceKeyDown(false);
         if (containerRef.current && !isPanningRef.current) containerRef.current.style.cursor = 'default';
       }
     };
@@ -778,8 +325,8 @@ export const Canvas: React.FC = () => {
     // window (e.g. while alt-tabbing) would otherwise never fire their
     // own keyup here.
     const handleBlur = () => {
-      isAltPressed = false;
-      isSpacePressed = false;
+      setAltKeyDown(false);
+      setSpaceKeyDown(false);
       if (containerRef.current && !isPanningRef.current) containerRef.current.style.cursor = 'default';
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -839,7 +386,7 @@ export const Canvas: React.FC = () => {
   const handleMouseDown = (e: any) => {
     // Middle-button pan (unchanged), or a left-button drag while Space
     // is held (commit 4) - the same panning gesture either way.
-    if (e.evt.button === 1 || (isSpacePressed && e.evt.button === 0)) {
+    if (e.evt.button === 1 || (isSpaceKeyDown() && e.evt.button === 0)) {
       isPanningRef.current = true;
       lastPanPosRef.current = { x: e.evt.clientX, y: e.evt.clientY };
       if (containerRef.current) containerRef.current.style.cursor = 'grabbing';
@@ -1065,8 +612,8 @@ export const Canvas: React.FC = () => {
     // with the tracked flag - a drag-and-drop gesture can be less
     // reliable about delivering keydown/keyup than a plain mouse drag on
     // some platforms.
-    x = snapValue(x, gridSize, isAltPressed || e.altKey);
-    y = snapValue(y, gridSize, isAltPressed || e.altKey);
+    x = snapValue(x, gridSize, isAltKeyDown() || e.altKey);
+    y = snapValue(y, gridSize, isAltKeyDown() || e.altKey);
 
     const def = getSymbolDefinition(data.type);
     const width = def?.defaultWidth || 80;
@@ -1239,15 +786,15 @@ export const Canvas: React.FC = () => {
               onSelect={(e: any) => selectFrames([frame.id], !!e?.evt?.shiftKey)}
               onShapeRef={(node) => { groupDrag.registerNode(`frame:${frame.id}`, node); registerFrameShapeRef(frame.id, node); }}
               onDragStart={() => {
-                if (isAltPressed) useStore.getState().duplicateFrameInPlace(frame.id);
+                if (isAltKeyDown()) useStore.getState().duplicateFrameInPlace(frame.id);
                 groupDrag.start(`frame:${frame.id}`);
               }}
               onDragMove={(x, y) => {
                 if (groupDrag.isActive()) groupDrag.follow(x - frame.x, y - frame.y);
               }}
               onDragEnd={(x, y) => {
-                const finalX = snapValue(x, gridSize, isAltPressed);
-                const finalY = snapValue(y, gridSize, isAltPressed);
+                const finalX = snapValue(x, gridSize, isAltKeyDown());
+                const finalY = snapValue(y, gridSize, isAltKeyDown());
                 if (groupDrag.isActive()) {
                   groupDrag.commit(finalX - frame.x, finalY - frame.y);
                 } else {
@@ -1343,15 +890,15 @@ export const Canvas: React.FC = () => {
               onSelect={(e: any) => selectMeters([meter.id], !!e?.evt?.shiftKey)}
               onShapeRef={(node) => groupDrag.registerNode(`meter:${meter.id}`, node)}
               onDragStart={() => {
-                if (isAltPressed) useStore.getState().duplicateMeterInPlace(meter.id);
+                if (isAltKeyDown()) useStore.getState().duplicateMeterInPlace(meter.id);
                 groupDrag.start(`meter:${meter.id}`);
               }}
               onDragMove={(x, y) => {
                 if (groupDrag.isActive()) groupDrag.follow(x - meter.x, y - meter.y);
               }}
               onDragEnd={(x, y) => {
-                const finalX = snapValue(x, gridSize, isAltPressed);
-                const finalY = snapValue(y, gridSize, isAltPressed);
+                const finalX = snapValue(x, gridSize, isAltKeyDown());
+                const finalY = snapValue(y, gridSize, isAltKeyDown());
                 if (groupDrag.isActive()) {
                   groupDrag.commit(finalX - meter.x, finalY - meter.y);
                 } else {
@@ -1380,15 +927,15 @@ export const Canvas: React.FC = () => {
               onSelect={(e: any) => selectSignalPanels([panel.id], !!e?.evt?.shiftKey)}
               onShapeRef={(node) => groupDrag.registerNode(`panel:${panel.id}`, node)}
               onDragStart={() => {
-                if (isAltPressed) useStore.getState().duplicateSignalPanelInPlace(panel.id);
+                if (isAltKeyDown()) useStore.getState().duplicateSignalPanelInPlace(panel.id);
                 groupDrag.start(`panel:${panel.id}`);
               }}
               onDragMove={(x, y) => {
                 if (groupDrag.isActive()) groupDrag.follow(x - panel.x, y - panel.y);
               }}
               onDragEnd={(x, y) => {
-                const finalX = snapValue(x, gridSize, isAltPressed);
-                const finalY = snapValue(y, gridSize, isAltPressed);
+                const finalX = snapValue(x, gridSize, isAltKeyDown());
+                const finalY = snapValue(y, gridSize, isAltKeyDown());
                 if (groupDrag.isActive()) {
                   groupDrag.commit(finalX - panel.x, finalY - panel.y);
                 } else {

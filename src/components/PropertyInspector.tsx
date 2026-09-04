@@ -1,15 +1,25 @@
-import React, { useState } from 'react';
+import React, { Suspense, lazy, useState } from 'react';
 import { useStore } from '../store';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 import { symbolUsesTextField } from '../symbols/SymbolRenderer';
 import { clampMeterWidth, METER_MIN_WIDTH, METER_MAX_WIDTH, METER_DEFAULT_FONT_SIZE } from '../meter/MeterElement';
 import type { MeterElementRow } from '../meter/MeterElement';
-import { MeterWizardDialog } from './MeterWizardDialog';
 import { clampSignalPanelWidth, SIGNAL_PANEL_MIN_WIDTH, SIGNAL_PANEL_MAX_WIDTH, SIGNAL_PANEL_DEFAULT_FONT_SIZE } from '../elements/SignalPanelElement';
 import type { SignalPanelRow } from '../elements/SignalPanelElement';
 import { INDICATOR_DIODE_STATES } from '../symbols/scada/IndicatorDiodeSymbol';
-import { SignalPanelWizardDialog } from './SignalPanelWizardDialog';
 import { FONT_SIZE_BASE, FONT_SIZE_SMALL } from '../theme/ScadaTheme';
+import type { SynopticConnection, SynopticObject } from '../store';
+
+// Internal-audit fix: these two wizards are only ever mounted after an
+// explicit "+ Wizard" click (see showMeterWizard/showSignalPanelWizard
+// below) - lazy-loading them keeps their code out of the initial bundle
+// for the (common) session that never opens either one.
+const MeterWizardDialog = lazy(() =>
+  import('./MeterWizardDialog').then(m => ({ default: m.MeterWizardDialog }))
+);
+const SignalPanelWizardDialog = lazy(() =>
+  import('./SignalPanelWizardDialog').then(m => ({ default: m.SignalPanelWizardDialog }))
+);
 
 // feat/appearance-selection-frames commit 1e: every small utility-
 // button/annotation size in this file used to be its own literal
@@ -83,13 +93,19 @@ export const PropertyInspector: React.FC = () => {
       const group = parts[1];
       const key = parts[2];
 
-      const newBindings = { ...(selectedObj.bindings || {}) };
-      newBindings[group as keyof typeof newBindings] = {
-        ...((newBindings as any)[group] || {}),
+      // Each binding group (state/value/command/alarm/quality) has a
+      // slightly different shape (only `command` carries `access`), so
+      // TS can't infer a single dynamic-key assignment across all of
+      // them - built loosely here, then asserted back to the real
+      // `bindings` shape once, at the single point it re-joins typed
+      // state, rather than laundering the whole object through `any`.
+      const newBindings: Record<string, { tag?: string; data_type?: string; access?: string }> = { ...(selectedObj.bindings || {}) };
+      newBindings[group] = {
+        ...(newBindings[group] || {}),
         [key]: finalValue
       };
 
-      updateObject(selectedObj.id, { bindings: newBindings });
+      updateObject(selectedObj.id, { bindings: newBindings as SynopticObject['bindings'] });
     } else {
       updateObject(selectedObj.id, { [name]: finalValue });
     }
@@ -98,7 +114,7 @@ export const PropertyInspector: React.FC = () => {
   const handleConnChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     if (!selectedConn) return;
     const { name, value } = e.target;
-    updateConnection(selectedConn.id, { [name]: value } as any);
+    updateConnection(selectedConn.id, { [name]: value } as Partial<SynopticConnection>);
     useStore.getState().saveHistory();
   };
 
@@ -304,15 +320,17 @@ export const PropertyInspector: React.FC = () => {
         </div>
       </div>
       {showMeterWizard && (
-        <MeterWizardDialog
-          devices={devices}
-          onCancel={() => setShowMeterWizard(false)}
-          onAddManualRow={addManualRow}
-          onConfirm={(newRows) => {
-            setRows([...selectedMeter.rows, ...newRows]);
-            setShowMeterWizard(false);
-          }}
-        />
+        <Suspense fallback={null}>
+          <MeterWizardDialog
+            devices={devices}
+            onCancel={() => setShowMeterWizard(false)}
+            onAddManualRow={addManualRow}
+            onConfirm={(newRows) => {
+              setRows([...selectedMeter.rows, ...newRows]);
+              setShowMeterWizard(false);
+            }}
+          />
+        </Suspense>
       )}
       </>
     );
@@ -430,15 +448,17 @@ export const PropertyInspector: React.FC = () => {
         </div>
       </div>
       {showSignalPanelWizard && (
-        <SignalPanelWizardDialog
-          devices={devices}
-          onCancel={() => setShowSignalPanelWizard(false)}
-          onAddManualRow={addManualRow}
-          onConfirm={(newRows) => {
-            setRows([...selectedSignalPanel.rows, ...newRows]);
-            setShowSignalPanelWizard(false);
-          }}
-        />
+        <Suspense fallback={null}>
+          <SignalPanelWizardDialog
+            devices={devices}
+            onCancel={() => setShowSignalPanelWizard(false)}
+            onAddManualRow={addManualRow}
+            onConfirm={(newRows) => {
+              setRows([...selectedSignalPanel.rows, ...newRows]);
+              setShowSignalPanelWizard(false);
+            }}
+          />
+        </Suspense>
       )}
       </>
     );

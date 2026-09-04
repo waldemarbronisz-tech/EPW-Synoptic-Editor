@@ -8,7 +8,15 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    # Internal-audit fix: primary devs run this on Windows (START_EPW_SYNOPTIC.bat,
+    # the .bat launcher, native file dialogs) but CI only ever exercised Ubuntu.
+    # A matrix catches path-separator/case-sensitivity/line-ending issues the
+    # single ubuntu-latest job never could.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
     - uses: actions/checkout@v4
