@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
+import { symbolUsesTextField } from '../symbols/SymbolRenderer';
 import { clampMeterWidth, METER_MIN_WIDTH, METER_MAX_WIDTH, METER_DEFAULT_FONT_SIZE } from '../meter/MeterElement';
 import type { MeterElementRow } from '../meter/MeterElement';
 import { MeterWizardDialog } from './MeterWizardDialog';
@@ -580,18 +581,30 @@ export const PropertyInspector: React.FC = () => {
               onBlur={() => useStore.getState().saveHistory()}
             />
           </div>
-          <div className="property-row">
-            <label>Height</label>
-            <input
-              type="number"
-              value={Math.round(selectedObj.height)}
-              onChange={(e) => {
-                const newHeight = parseFloat(e.target.value);
-                if (!isNaN(newHeight)) updateObject(selectedObj.id, { height: newHeight });
-              }}
-              onBlur={() => useStore.getState().saveHistory()}
-            />
-          </div>
+          {/* feat/appearance-selection-frames commit 4b: for the static
+              scada.meter symbol, obj.height is never actually read -
+              ScadaMeterAdapter passes only obj.width into MeterSymbol,
+              which computes its own height from row count
+              (getMeterHeight), exactly like the dynamic meter/signal
+              panel elements do. Editing this field DID silently
+              overwrite the stored obj.height value - it just never had
+              any visible effect, since nothing ever read it back. Only
+              hidden for this one type; every other object's own Height
+              field is real and stays. */}
+          {selectedObj.type !== 'scada.meter' && (
+            <div className="property-row">
+              <label>Height</label>
+              <input
+                type="number"
+                value={Math.round(selectedObj.height)}
+                onChange={(e) => {
+                  const newHeight = parseFloat(e.target.value);
+                  if (!isNaN(newHeight)) updateObject(selectedObj.id, { height: newHeight });
+                }}
+                onBlur={() => useStore.getState().saveHistory()}
+              />
+            </div>
+          )}
           <div className="property-row">
             <label>X</label>
             <input type="number" name="x" value={Math.round(selectedObj.x)} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
@@ -624,10 +637,12 @@ export const PropertyInspector: React.FC = () => {
             <label>Border</label>
             <input type="color" name="border" value={selectedObj.border || '#000000'} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
-          <div className="property-row">
-            <label>Text</label>
-            <input type="text" name="text" value={selectedObj.text || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
-          </div>
+          {symbolUsesTextField(selectedObj.type) && (
+            <div className="property-row">
+              <label>Text</label>
+              <input type="text" name="text" value={selectedObj.text || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
+            </div>
+          )}
           <div className="property-row">
             <label>Font</label>
             <input type="text" name="font" value={selectedObj.font || 'Arial'} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
@@ -671,25 +686,36 @@ export const PropertyInspector: React.FC = () => {
           ) : null}
         </div>
 
-        <div className="property-group">
-          <div className="property-group-title">Bindings</div>
-          <div className="property-row">
-            <label>State</label>
-            <input type="text" name="bindings.state.tag" value={selectedObj.bindings?.state?.tag || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
+        {/* feat/appearance-selection-frames commit 4d: the static
+            scada.meter symbol takes its data through its own rows
+            (obj.meterRows), not through a tag binding - ScadaMeterAdapter
+            never reads obj.bindings at all, so this section did nothing
+            for it but invite a user to fill in tags that would never be
+            read. The dynamic meter/signal panel elements (their own
+            selectedMeter/selectedSignalPanel branches above) never had a
+            Bindings section to begin with - same reasoning, same fix,
+            nothing further to remove there. */}
+        {selectedObj.type !== 'scada.meter' && (
+          <div className="property-group">
+            <div className="property-group-title">Bindings</div>
+            <div className="property-row">
+              <label>State</label>
+              <input type="text" name="bindings.state.tag" value={selectedObj.bindings?.state?.tag || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
+            </div>
+            <div className="property-row">
+              <label>Value</label>
+              <input type="text" name="bindings.value.tag" value={selectedObj.bindings?.value?.tag || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
+            </div>
+            <div className="property-row">
+              <label>Alarm</label>
+              <input type="text" name="bindings.alarm.tag" value={selectedObj.bindings?.alarm?.tag || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
+            </div>
+            <div className="property-row">
+              <label>Command</label>
+              <input type="text" name="bindings.command.tag" value={selectedObj.bindings?.command?.tag || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
+            </div>
           </div>
-          <div className="property-row">
-            <label>Value</label>
-            <input type="text" name="bindings.value.tag" value={selectedObj.bindings?.value?.tag || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
-          </div>
-          <div className="property-row">
-            <label>Alarm</label>
-            <input type="text" name="bindings.alarm.tag" value={selectedObj.bindings?.alarm?.tag || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
-          </div>
-          <div className="property-row">
-            <label>Command</label>
-            <input type="text" name="bindings.command.tag" value={selectedObj.bindings?.command?.tag || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
-          </div>
-        </div>
+        )}
 
         {selectedObj.type === 'scada.meter' && (
           <div className="property-group">

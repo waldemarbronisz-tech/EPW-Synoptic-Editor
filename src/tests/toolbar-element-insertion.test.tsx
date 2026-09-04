@@ -84,18 +84,15 @@ describe('Toolbox (Object Library) - every visible symbol in the registry is act
   // is the same "visible" source of truth terminal-centering.test.ts
   // already iterates for a different property (terminal geometry) -
   // this iterates it for reachability instead.
-  it('lists exactly the symbols getSymbolsByCategory() considers visible, one .library-item per symbol, once every folder is expanded', () => {
+  it('lists exactly the symbols getSymbolsByCategory() considers visible, one .library-item per symbol - every folder already expanded, nothing to click first', () => {
+    // feat/appearance-selection-frames commit 4a fixed the discoverability
+    // quirk this test used to have to work around (HVAC/Instrumentation
+    // started collapsed, so this test used to expand every folder by
+    // hand before counting - see mandatory test 16's own dedicated test
+    // below for the direct "starts expanded" assertion). No expand step
+    // needed here any more: if every folder is already open, this and
+    // that test are asserting the same reachability from two angles.
     render(<Toolbox />);
-
-    // Every folder starts expanded EXCEPT HVAC and Instrumentation
-    // (Toolbox.tsx's own initial `expanded` state only sets Electrical/
-    // Water/SCADA true) - a real, pre-existing discoverability quirk
-    // flagged in raport.md, out of this task's own scope to fix
-    // (GRANICE: only what the panel itself needs). Expanding every
-    // folder here is what makes this assertion about REACHABILITY
-    // (does an item exist to drag at all) rather than about today's
-    // default collapse state, which is free to change independently.
-    screen.getAllByText('📁').forEach(collapsedFolder => fireEvent.click(collapsedFolder));
 
     const expected = Object.values(getSymbolsByCategory()).flat();
     const rendered = screen.getAllByText(/^📄 /);
@@ -104,6 +101,17 @@ describe('Toolbox (Object Library) - every visible symbol in the registry is act
     const renderedLabels = rendered.map(el => el.textContent?.replace('📄 ', '')).sort();
     const expectedLabels = expected.map(def => def.label).sort();
     expect(renderedLabels).toEqual(expectedLabels);
+  });
+
+  // 16. every Object Library group is expanded by default
+  it('every category starts expanded - no collapsed folder icon anywhere on first render', () => {
+    render(<Toolbox />);
+    expect(screen.queryByText('📁')).toBeNull();
+    // and every category actually rendered as open (📂), not just
+    // "no closed icon found because nothing rendered at all"
+    const categoryCount = Object.keys(getSymbolsByCategory()).length;
+    expect(categoryCount).toBeGreaterThan(0);
+    expect(screen.getAllByText('📂').length).toBe(categoryCount);
   });
 
   it('every SCADA-category symbol expected to be visible right now is listed (Label Frame, Indicator Diode, Meter (SCADA), Boundary Point) - and no more, no less', () => {
