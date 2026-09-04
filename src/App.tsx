@@ -6,9 +6,15 @@ import { Canvas } from './components/Canvas';
 import { PropertyInspector } from './components/PropertyInspector';
 import { MessagesPanel } from './components/MessagesPanel';
 import { StatusBar } from './components/StatusBar';
-import { ScadaStylePreview } from './components/ScadaStylePreview';
 import { useStore } from './store';
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
+
+// Internal-audit fix: a full-screen preview only ever mounted from the
+// menu bar's "Style Preview" action - lazy so its code isn't part of the
+// bundle every session pays for on first load.
+const ScadaStylePreview = lazy(() =>
+  import('./components/ScadaStylePreview').then(m => ({ default: m.ScadaStylePreview }))
+);
 
 function App() {
   const { projectName, fileName, isDirty } = useStore();
@@ -20,10 +26,29 @@ function App() {
     document.title = `EPW Synoptic Editor — ${titleName}${dirtyMark}`;
   }, [projectName, fileName, isDirty]);
 
+  // Internal-audit fix: isDirty was already tracked in the store (for the
+  // title-bar "*" above) but nothing warned before closing the tab/window,
+  // so an unsaved schematic could be lost with no prompt at all. Standard
+  // native confirmation dialog - browsers ignore any custom message text,
+  // but still show their own generic "changes you made may not be saved".
+  useEffect(() => {
+    if (!isDirty) return;
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isDirty]);
+
   return (
     <div className="app-container">
       <MenuBar onOpenScadaPreview={() => setShowScadaPreview(true)} />
-      {showScadaPreview && <ScadaStylePreview onClose={() => setShowScadaPreview(false)} />}
+      {showScadaPreview && (
+        <Suspense fallback={null}>
+          <ScadaStylePreview onClose={() => setShowScadaPreview(false)} />
+        </Suspense>
+      )}
       <Toolbar />
 
       <div className="main-workspace">
