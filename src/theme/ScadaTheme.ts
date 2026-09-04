@@ -62,6 +62,25 @@ export const GRID_SIZE = 16;
 export const DIODE_RADIUS_SMALL = 5;  // przy aparatach na schemacie
 export const DIODE_RADIUS_LARGE = 7;  // w panelach sygnalizacyjnych i stanu
 
+// fix/handles-insert-mode-diodes commit 3: a lit (ON/ALARM/QUALITY)
+// diode read as dark, matte, "painted" rather than actually glowing -
+// confirmed by eye in the running app. These are the diode's OWN
+// colors, deliberately separate from the state colors every other
+// symbol paints with (COLOR_RUN/COLOR_ALARM/COLOR_LAMP_LIT) per this
+// fix's own explicit spec, so the diode's own look can be tuned
+// (brightness, the lit-core highlight below) without changing what
+// every OTHER symbol's run/alarm/quality color means. The *_CORE
+// colors are a brighter, smaller inner circle drawn only for a LIT
+// state (IndicatorDiodeSymbol.tsx) - their own absence for OFF is
+// what makes OFF read as "not lit", not a color choice of its own.
+export const DIODE_ON = '#00E838';
+export const DIODE_ON_CORE = '#A0FFB0';
+export const DIODE_OFF = '#3C4048';
+export const DIODE_ALARM = '#FF2020';
+export const DIODE_ALARM_CORE = '#FFA0A0';
+export const DIODE_QUALITY = '#FFD000';
+export const DIODE_QUALITY_CORE = '#FFF0A0';
+
 // ---- Typography ----
 // One narrow sans-serif for everything that is a LABEL (row
 // descriptions, object labels, titles) and one fixed-width face for

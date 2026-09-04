@@ -15,11 +15,12 @@ import type { Device } from '../project/DeviceSchema';
 import { useStore } from '../store';
 import { PanelChrome, getPanelRowLayout } from './PanelChrome';
 import { PANEL_PADDING_X, PANEL_PADDING_Y } from '../elements/PanelLayout';
-import { getIndicatorDiodeFillColor, getIndicatorDiodeRadius, DIODE_OUTLINE_WIDTH } from '../symbols/scada/IndicatorDiodeSymbol';
+import { getIndicatorDiodeFillColor, getIndicatorDiodeCoreColor, getIndicatorDiodeCoreGeometry, getIndicatorDiodeRadius, DIODE_OUTLINE_WIDTH } from '../symbols/scada/IndicatorDiodeSymbol';
 import { computeWidthResizeFromAnchor, getActiveResizeAnchor, setActiveResizeAnchor } from '../utils/ResizeHandles';
 import { COLOR_OUTLINE, COLOR_TEXT, FONT_UI, FONT_SIZE_BASE, GRID_SIZE } from '../theme/ScadaTheme';
 
 const DIODE_RADIUS = getIndicatorDiodeRadius('large'); // 12, per this element's own spec - reusing the Indicator Diode symbol's own radius helper rather than a coincidentally-equal literal
+const diodeCore = getIndicatorDiodeCoreGeometry(DIODE_RADIUS); // fix/handles-insert-mode-diodes commit 3b: same lit-core geometry as IndicatorDiodeSymbol.tsx's own
 
 // A device-linked row's diode always previews ON (SignalPanelResolver.ts
 // has no live data to draw from, same as the meter's own preview value) -
@@ -155,6 +156,23 @@ export const SignalPanelElementNode: React.FC<SignalPanelElementNodeProps> = ({ 
                 stroke={COLOR_OUTLINE}
                 strokeWidth={DIODE_OUTLINE_WIDTH}
               />
+              {/* fix/handles-insert-mode-diodes commit 3b/3c: the same
+                  brighter, smaller, up-and-left offset inner circle as
+                  IndicatorDiodeSymbol.tsx's own ON/QUALITY rendering -
+                  same geometry helper, so a panel's diode row always
+                  matches that symbol's own look exactly, never a
+                  separately hand-tuned duplicate of it. OFF renders no
+                  core at all, same reasoning as that symbol's own. */}
+              {getIndicatorDiodeCoreColor(display.state) && (
+                <Circle
+                  x={diodeX - diodeCore.offset}
+                  y={rowCenterY - diodeCore.offset}
+                  radius={diodeCore.radius}
+                  fill={getIndicatorDiodeCoreColor(display.state)!}
+                  opacity={display.colorKind === 'PREVIEW' ? PREVIEW_DIODE_OPACITY : 1}
+                  listening={false}
+                />
+              )}
             </Group>
           );
         })}

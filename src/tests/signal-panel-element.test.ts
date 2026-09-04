@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
 import { computeSignalPanelHeight, clampSignalPanelWidth, SIGNAL_PANEL_MIN_WIDTH, SIGNAL_PANEL_MAX_WIDTH } from '../elements/SignalPanelElement';
 import type { SignalPanelRow } from '../elements/SignalPanelElement';
 import { getIndicatorDiodeFillColor } from '../symbols/scada/IndicatorDiodeSymbol';
-import { COLOR_RUN, COLOR_DE_ENERGIZED, COLOR_LAMP_LIT } from '../theme/ScadaTheme';
+import { DIODE_ON, DIODE_OFF, DIODE_QUALITY } from '../theme/ScadaTheme';
 
 function makeRow(overrides: Partial<SignalPanelRow> = {}): SignalPanelRow {
   return { device: '', label: '', manualState: 'OFF', ...overrides };
@@ -79,9 +79,17 @@ describe('Manual row state', () => {
     expect(row.manualState).toBe('ON');
   });
 
+  // fix/handles-insert-mode-diodes commit 3a: the diode now paints
+  // with ScadaTheme's own dedicated DIODE_ON/DIODE_OFF/DIODE_QUALITY,
+  // deliberately separate from COLOR_RUN/COLOR_DE_ENERGIZED/
+  // COLOR_LAMP_LIT (the state colors every OTHER symbol still uses) -
+  // a manual row's diode still reuses the Indicator Diode symbol's own
+  // color mapping unmodified, just that mapping itself now points at
+  // the diode's own palette. See DIODE_ON's own comment in
+  // ScadaTheme.ts and raport.md.
   it('the diode color for a manual row reuses the existing Indicator Diode symbol\'s own color mapping, unmodified', () => {
-    expect(getIndicatorDiodeFillColor('ON')).toBe(COLOR_RUN);
-    expect(getIndicatorDiodeFillColor('OFF')).toBe(COLOR_DE_ENERGIZED);
-    expect(getIndicatorDiodeFillColor('QUALITY')).toBe(COLOR_LAMP_LIT);
+    expect(getIndicatorDiodeFillColor('ON')).toBe(DIODE_ON);
+    expect(getIndicatorDiodeFillColor('OFF')).toBe(DIODE_OFF);
+    expect(getIndicatorDiodeFillColor('QUALITY')).toBe(DIODE_QUALITY);
   });
 });
