@@ -2,11 +2,15 @@ import { validateProjectSchema, createEmptyProject, CURRENT_SCHEMA_VERSION, FORM
 import { runMigrations } from './Migrations';
 import type { EPWProjectSchema } from './ProjectSchema';
 import { useStore } from '../store';
+import type { ScreenKind } from '../store';
 import { GRID_SIZE } from '../theme/ScadaTheme';
 
 export class ProjectManager {
-  static newProject(name: string = "New Project") {
-    const emptyProj = createEmptyProject(name);
+  // feat/isometric-engine commit 5: kind defaults to SCHEMATIC, same as
+  // createEmptyProject itself - every existing one-argument call site
+  // (MenuBar.tsx's plain "New") keeps creating a schematic project.
+  static newProject(name: string = "New Project", kind: ScreenKind = 'SCHEMATIC') {
+    const emptyProj = createEmptyProject(name, kind);
     this.loadProjectToStore(emptyProj, false);
     useStore.getState().addMessage(`[INFO] Project created: ${name}`);
   }
@@ -57,7 +61,9 @@ export class ProjectManager {
       signalPanels: state.signalPanels || [],
       frames: state.frames || [],
       devices: state.devices || [],
-      terrain: state.terrainTiles || {}
+      terrain: state.terrainTiles || {},
+      kind: state.screenKind,
+      planObjects: state.planObjects || []
     };
     const validation = validateProjectSchema(proj);
     if (!validation.valid) {
@@ -77,6 +83,11 @@ export class ProjectManager {
       frames: project.frames || [],
       devices: project.devices || [],
       terrainTiles: project.terrain || {},
+      // feat/isometric-engine commit 5: a file with no `kind` field at
+      // all (every file saved before this commit existed) loads as
+      // SCHEMATIC - the task's own explicit default.
+      screenKind: project.kind || 'SCHEMATIC',
+      planObjects: project.planObjects || [],
       projectName: project.project.name,
       projectMetadata: {
         description: project.project.description || "",
@@ -97,13 +108,15 @@ export class ProjectManager {
       },
       isDirty: isDirty,
       selectedIds: [],
+      selectedPlanObjectIds: [],
       history: [{
         objects: JSON.parse(JSON.stringify(project.objects)),
         connections: JSON.parse(JSON.stringify(project.connections || [])),
         meters: JSON.parse(JSON.stringify(project.meters || [])),
         signalPanels: JSON.parse(JSON.stringify(project.signalPanels || [])),
         frames: JSON.parse(JSON.stringify(project.frames || [])),
-        terrainTiles: JSON.parse(JSON.stringify(project.terrain || {}))
+        terrainTiles: JSON.parse(JSON.stringify(project.terrain || {})),
+        planObjects: JSON.parse(JSON.stringify(project.planObjects || []))
       }],
       historyIndex: 0
     });

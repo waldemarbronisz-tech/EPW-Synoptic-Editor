@@ -110,8 +110,18 @@ export function buildDrawOrder<T extends IsoObjectPlacement>(
 // re-downloading) an Image for each one.
 const imageCache = new Map<string, HTMLImageElement>();
 
+function spriteImageSrc(file: string): string {
+  return `/sprites/iso/${file}`;
+}
+
+/** The already-loaded image for a sprite state's own file, or null if it has not finished loading yet - PlanCanvas.tsx's own click hit-testing (SpriteHitTest.ts) reads through this same cache rather than keeping a second copy. */
+export function getCachedSpriteImage(file: string): HTMLImageElement | null {
+  const cached = imageCache.get(spriteImageSrc(file));
+  return cached && cached.complete && cached.naturalWidth > 0 ? cached : null;
+}
+
 function useSpriteImage(file: string): HTMLImageElement | null {
-  const src = `/sprites/iso/${file}`;
+  const src = spriteImageSrc(file);
   const [, forceRender] = useState(0);
 
   useEffect(() => {
@@ -124,8 +134,7 @@ function useSpriteImage(file: string): HTMLImageElement | null {
     img.src = src;
   }, [src]);
 
-  const cached = imageCache.get(src);
-  return cached && cached.complete && cached.naturalWidth > 0 ? cached : null;
+  return getCachedSpriteImage(file);
 }
 
 /**
