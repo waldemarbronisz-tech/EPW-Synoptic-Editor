@@ -56,7 +56,8 @@ export class ProjectManager {
       meters: state.meters || [],
       signalPanels: state.signalPanels || [],
       frames: state.frames || [],
-      devices: state.devices || []
+      devices: state.devices || [],
+      terrain: state.terrainTiles || {}
     };
     const validation = validateProjectSchema(proj);
     if (!validation.valid) {
@@ -75,6 +76,7 @@ export class ProjectManager {
       signalPanels: project.signalPanels || [],
       frames: project.frames || [],
       devices: project.devices || [],
+      terrainTiles: project.terrain || {},
       projectName: project.project.name,
       projectMetadata: {
         description: project.project.description || "",
@@ -100,7 +102,8 @@ export class ProjectManager {
         connections: JSON.parse(JSON.stringify(project.connections || [])),
         meters: JSON.parse(JSON.stringify(project.meters || [])),
         signalPanels: JSON.parse(JSON.stringify(project.signalPanels || [])),
-        frames: JSON.parse(JSON.stringify(project.frames || []))
+        frames: JSON.parse(JSON.stringify(project.frames || [])),
+        terrainTiles: JSON.parse(JSON.stringify(project.terrain || {}))
       }],
       historyIndex: 0
     });

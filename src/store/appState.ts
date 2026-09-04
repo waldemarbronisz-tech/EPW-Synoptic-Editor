@@ -8,6 +8,7 @@ import type { MeterElement } from '../meter/MeterElement';
 import type { SignalPanelElement } from '../elements/SignalPanelElement';
 import type { FrameElement } from '../elements/FrameElement';
 import type { Device } from '../project/DeviceSchema';
+import type { TerrainTileType } from '../iso/TerrainTile';
 import type { CanvasState, HistorySnapshot, Message, SynopticConnection, SynopticObject } from './types';
 
 export interface AppState {
@@ -170,4 +171,17 @@ export interface AppState {
 
   // Rotation
   rotateSelected: (direction: 'cw' | 'ccw') => void;
+
+  // PLAN screen terrain (feat/isometric-engine commit 3): a sparse map,
+  // one entry per PAINTED tile only - an unpainted tile is simply absent,
+  // not stored with some "empty" type, so the canvas shows the plot as
+  // an island on the background, not a rectangle filling the screen.
+  terrainTiles: Record<string, TerrainTileType>;
+  // Sets/overwrites one tile - called for every tile the paint tool's
+  // drag crosses. Deliberately does NOT call saveHistory itself (a drag
+  // can cross many tiles); commitTerrainStroke below does that once, so
+  // one whole mousedown-to-mouseup drag is one undo entry, never one per
+  // tile painted.
+  paintTerrainTile: (gx: number, gy: number, type: TerrainTileType) => void;
+  commitTerrainStroke: () => void;
 }

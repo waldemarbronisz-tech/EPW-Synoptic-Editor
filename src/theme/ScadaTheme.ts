@@ -35,6 +35,30 @@ export const COLOR_WHITE = '#FFFFFF';             // biel
 export const VENTILATION_ACTIVE = '#C89000';      // wentylacja aktywna
 export const VENTILATION_INACTIVE = '#8A7A50';    // wentylacja nieaktywna
 
+// Terrain tiles (PLAN screen, feat/isometric-engine commit 3): each type
+// has three tones - TOP (the diamond top face), LEFT and RIGHT (the two
+// visible side walls TerrainTile.ts extrudes below it, giving the tile
+// thickness). One light source from upper-left, same as every sprite in
+// public/sprites/iso/ is already painted with: the LEFT wall catches
+// that light and reads lighter than the top face, the RIGHT wall falls
+// into its own shadow and reads darker - never the other way round, for
+// every type below.
+export const TERRAIN_GRASS_TOP = '#5A9B4A';       // trawa
+export const TERRAIN_GRASS_LEFT = '#74B863';
+export const TERRAIN_GRASS_RIGHT = '#427238';
+export const TERRAIN_PAVING_TOP = '#A8A296';      // kostka brukowa
+export const TERRAIN_PAVING_LEFT = '#C2BCB0';
+export const TERRAIN_PAVING_RIGHT = '#868074';
+export const TERRAIN_SOIL_TOP = '#6B4A34';        // ziemia, grzadka
+export const TERRAIN_SOIL_LEFT = '#8A6448';
+export const TERRAIN_SOIL_RIGHT = '#4E3524';
+export const TERRAIN_GRAVEL_TOP = '#9C9488';      // zwir
+export const TERRAIN_GRAVEL_LEFT = '#B6AEA0';
+export const TERRAIN_GRAVEL_RIGHT = '#7A736A';
+export const TERRAIN_WATER_TOP = '#2E76C8';       // woda (oczko wodne na dzialce -
+export const TERRAIN_WATER_LEFT = '#4F94E0';      // deliberately its own set, not
+export const TERRAIN_WATER_RIGHT = '#1E5494';     // COLOR_WATER, which means the WATER medium's conductor on the schematic canvas, a different screen entirely
+
 // ---- Geometry ----
 
 // Conductor/symbol proportions derived directly from the grid (feat/

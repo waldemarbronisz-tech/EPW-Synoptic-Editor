@@ -3,6 +3,7 @@ import type { MeterElement } from '../meter/MeterElement';
 import type { SignalPanelElement } from '../elements/SignalPanelElement';
 import type { FrameElement } from '../elements/FrameElement';
 import type { Device } from './DeviceSchema';
+import type { TerrainTileType } from '../iso/TerrainTile';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 import { COLOR_CANVAS_BACKGROUND, GRID_SIZE } from '../theme/ScadaTheme';
 
@@ -51,6 +52,13 @@ export interface EPWProjectSchema {
   // unused would be dead weight. Optional and additive for the same
   // reason meters is - no schema version bump.
   devices?: Device[];
+  // feat/isometric-engine commit 3: the PLAN screen's painted terrain -
+  // same treatment as meters/signalPanels/frames/devices above: optional
+  // and additive, keyed by "gx,gy" (TerrainTile.ts's own terrainKey), one
+  // entry per painted tile only. An older project file simply has no
+  // terrain (loads as an empty map), not an invalid one - no schema
+  // version bump.
+  terrain?: Record<string, TerrainTileType>;
 }
 
 // v2: node-based wiring. A connection is a freehand orthogonal polyline

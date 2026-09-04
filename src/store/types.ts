@@ -8,6 +8,7 @@ import type { MeterRow } from '../symbols/scada/MeterSymbol';
 import type { MeterElement } from '../meter/MeterElement';
 import type { SignalPanelElement } from '../elements/SignalPanelElement';
 import type { FrameElement } from '../elements/FrameElement';
+import type { TerrainTileType } from '../iso/TerrainTile';
 
 export interface SynopticObject {
   zIndex?: number;
@@ -123,4 +124,11 @@ export interface HistorySnapshot {
   meters: MeterElement[];
   signalPanels: SignalPanelElement[];
   frames: FrameElement[];
+  // feat/isometric-engine commit 3: the PLAN screen's painted terrain,
+  // same treatment as every element kind above - optional so every
+  // snapshot taken before this field existed (and every schematic-mode
+  // snapshot, which never touches it) still satisfies this interface;
+  // historySlice.ts's own undo/redo fall back to {} for it exactly the
+  // way it already falls back to [] for meters/signalPanels/frames.
+  terrainTiles?: Record<string, TerrainTileType>;
 }
