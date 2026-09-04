@@ -6,7 +6,7 @@ import { SymbolRenderer } from '../symbols/SymbolRenderer';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 import { ConnectionLine, pathFromPoints, getConductorCoreColor } from './ConnectionLine';
 import { ObjectLabelRenderer } from './ObjectLabelRenderer';
-import { COLOR_CANVAS_BACKGROUND, COLOR_OUTLINE, COLOR_WATER, COLOR_WHITE, CONDUCTOR_WIDTH } from '../theme/ScadaTheme';
+import { COLOR_CANVAS_BACKGROUND, COLOR_OUTLINE, COLOR_WATER, COLOR_WHITE, CONDUCTOR_WIDTH, FONT_SIZE_BASE, FONT_UI } from '../theme/ScadaTheme';
 import { snapValue } from '../utils/GridSnap';
 import { getObjectTerminals } from '../utils/Terminals';
 import {
@@ -713,8 +713,8 @@ export const Canvas: React.FC = () => {
       fill: '#c0c0c0',
       border: '#000000',
       text: def?.label || data.type,
-      font: 'Arial',
-      fontSize: 12,
+      font: FONT_UI,
+      fontSize: FONT_SIZE_BASE,
       editor: {
         preview_state: def?.defaultState || ''
       },

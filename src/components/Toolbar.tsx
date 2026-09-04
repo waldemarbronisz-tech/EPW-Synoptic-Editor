@@ -8,6 +8,8 @@ import {
   Lock, Unlock, RotateCcw, RotateCw, PenLine, Zap, Droplet, Wind, Gauge, CircleDot
 } from 'lucide-react';
 import { COLOR_ENERGIZED, COLOR_WATER, VENTILATION_ACTIVE, COLOR_WHITE, COLOR_RUN } from '../theme/ScadaTheme';
+import { METER_DEFAULT_FONT_SIZE } from '../meter/MeterElement';
+import { SIGNAL_PANEL_DEFAULT_FONT_SIZE } from '../elements/SignalPanelElement';
 
 // One icon/color pair per medium - reused by both the toolbar buttons
 // below and nothing else, so this stays local rather than joining
@@ -61,7 +63,7 @@ export const Toolbar: React.FC = () => {
         <button
           title="Dodaj Miernik"
           onClick={() => {
-            addMeter({ x: 160, y: 160, width: 200, fontSize: 12, rows: [] });
+            addMeter({ x: 160, y: 160, width: 200, fontSize: METER_DEFAULT_FONT_SIZE, rows: [] });
             const newest = useStore.getState().meters[useStore.getState().meters.length - 1];
             if (newest) selectMeters([newest.id], false);
           }}
@@ -76,7 +78,7 @@ export const Toolbar: React.FC = () => {
         <button
           title="Dodaj Panel Sygnalizacyjny"
           onClick={() => {
-            addSignalPanel({ x: 160, y: 160, width: 160, fontSize: 12, rows: [] });
+            addSignalPanel({ x: 160, y: 160, width: 160, fontSize: SIGNAL_PANEL_DEFAULT_FONT_SIZE, rows: [] });
             const newest = useStore.getState().signalPanels[useStore.getState().signalPanels.length - 1];
             if (newest) selectSignalPanels([newest.id], false);
           }}

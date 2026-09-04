@@ -8,6 +8,14 @@ import { clampSignalPanelWidth, SIGNAL_PANEL_MIN_WIDTH, SIGNAL_PANEL_MAX_WIDTH, 
 import type { SignalPanelRow } from '../elements/SignalPanelElement';
 import { INDICATOR_DIODE_STATES } from '../symbols/scada/IndicatorDiodeSymbol';
 import { SignalPanelWizardDialog } from './SignalPanelWizardDialog';
+import { FONT_SIZE_BASE, FONT_SIZE_SMALL } from '../theme/ScadaTheme';
+
+// feat/appearance-selection-frames commit 1e: every small utility-
+// button/annotation size in this file used to be its own literal
+// ('10px', '11px', '12px', all slightly different for no reason) -
+// now the theme's own FONT_SIZE_SMALL, formatted once here rather
+// than re-stringified at each call site.
+const UI_SMALL = `${FONT_SIZE_SMALL}px`;
 
 export const PropertyInspector: React.FC = () => {
   const { objects, connections, selectedIds, selectedConnectionIds, updateObject, updateConnection } = useStore();
@@ -246,13 +254,13 @@ export const PropertyInspector: React.FC = () => {
           <div className="property-group">
             <div className="property-group-title">
               Rows
-              <button onClick={() => setShowMeterWizard(true)} style={{ marginLeft: 'auto', fontSize: '10px' }}>Kreator...</button>
-              <button onClick={addManualRow} style={{ fontSize: '10px' }}>+ Manual row</button>
+              <button onClick={() => setShowMeterWizard(true)} style={{ marginLeft: 'auto', fontSize: UI_SMALL }}>Kreator...</button>
+              <button onClick={addManualRow} style={{ fontSize: UI_SMALL }}>+ Manual row</button>
             </div>
             {selectedMeter.rows.map((row, idx) => (
               <div className="property-row" key={idx} style={{ gap: '2px', alignItems: 'center' }}>
-                <button onClick={() => moveRow(idx, -1)} disabled={idx === 0} style={{ fontSize: '10px' }}>up</button>
-                <button onClick={() => moveRow(idx, 1)} disabled={idx === selectedMeter.rows.length - 1} style={{ fontSize: '10px' }}>down</button>
+                <button onClick={() => moveRow(idx, -1)} disabled={idx === 0} style={{ fontSize: UI_SMALL }}>up</button>
+                <button onClick={() => moveRow(idx, 1)} disabled={idx === selectedMeter.rows.length - 1} style={{ fontSize: UI_SMALL }}>down</button>
                 <input
                   type="text"
                   placeholder="Label"
@@ -281,8 +289,8 @@ export const PropertyInspector: React.FC = () => {
                     />
                   </>
                 )}
-                {row.device && <span style={{ flex: 2, fontSize: '10px' }}><em>device: {row.device}</em></span>}
-                <button onClick={() => removeRow(idx)} style={{ fontSize: '10px' }}>x</button>
+                {row.device && <span style={{ flex: 2, fontSize: UI_SMALL }}><em>device: {row.device}</em></span>}
+                <button onClick={() => removeRow(idx)} style={{ fontSize: UI_SMALL }}>x</button>
               </div>
             ))}
             {selectedMeter.rows.length === 0 && (
@@ -383,13 +391,13 @@ export const PropertyInspector: React.FC = () => {
           <div className="property-group">
             <div className="property-group-title">
               Rows
-              <button onClick={() => setShowSignalPanelWizard(true)} style={{ marginLeft: 'auto', fontSize: '10px' }}>Kreator...</button>
-              <button onClick={addManualRow} style={{ fontSize: '10px' }}>+ Manual row</button>
+              <button onClick={() => setShowSignalPanelWizard(true)} style={{ marginLeft: 'auto', fontSize: UI_SMALL }}>Kreator...</button>
+              <button onClick={addManualRow} style={{ fontSize: UI_SMALL }}>+ Manual row</button>
             </div>
             {selectedSignalPanel.rows.map((row, idx) => (
               <div className="property-row" key={idx} style={{ gap: '2px', alignItems: 'center' }}>
-                <button onClick={() => moveRow(idx, -1)} disabled={idx === 0} style={{ fontSize: '10px' }}>up</button>
-                <button onClick={() => moveRow(idx, 1)} disabled={idx === selectedSignalPanel.rows.length - 1} style={{ fontSize: '10px' }}>down</button>
+                <button onClick={() => moveRow(idx, -1)} disabled={idx === 0} style={{ fontSize: UI_SMALL }}>up</button>
+                <button onClick={() => moveRow(idx, 1)} disabled={idx === selectedSignalPanel.rows.length - 1} style={{ fontSize: UI_SMALL }}>down</button>
                 <input
                   type="text"
                   placeholder="Label"
@@ -407,8 +415,8 @@ export const PropertyInspector: React.FC = () => {
                     {INDICATOR_DIODE_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 )}
-                {row.device && <span style={{ flex: 1, fontSize: '10px' }}><em>device: {row.device}</em></span>}
-                <button onClick={() => removeRow(idx)} style={{ fontSize: '10px' }}>x</button>
+                {row.device && <span style={{ flex: 1, fontSize: UI_SMALL }}><em>device: {row.device}</em></span>}
+                <button onClick={() => removeRow(idx)} style={{ fontSize: UI_SMALL }}>x</button>
               </div>
             ))}
             {selectedSignalPanel.rows.length === 0 && (
@@ -572,7 +580,7 @@ export const PropertyInspector: React.FC = () => {
           </div>
           <div className="property-row">
             <label>Font Size</label>
-            <input type="number" name="fontSize" value={selectedObj.fontSize || 12} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
+            <input type="number" name="fontSize" value={selectedObj.fontSize || FONT_SIZE_BASE} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
           <div className="property-row">
             <label>Tooltip</label>
@@ -633,7 +641,7 @@ export const PropertyInspector: React.FC = () => {
           <div className="property-group">
             <div className="property-group-title">
               Meter Rows
-              <button onClick={addMeterRow} style={{marginLeft: 'auto', fontSize: '10px'}}>+ Row</button>
+              <button onClick={addMeterRow} style={{marginLeft: 'auto', fontSize: UI_SMALL}}>+ Row</button>
             </div>
             {(selectedObj.meterRows || []).map((row, index) => (
               <div className="property-row" key={index} style={{ gap: '2px' }}>
@@ -661,7 +669,7 @@ export const PropertyInspector: React.FC = () => {
                   onBlur={() => useStore.getState().saveHistory()}
                   style={{ flex: 1 }}
                 />
-                <button onClick={() => removeMeterRow(index)} style={{ fontSize: '10px' }}>x</button>
+                <button onClick={() => removeMeterRow(index)} style={{ fontSize: UI_SMALL }}>x</button>
               </div>
             ))}
             {(selectedObj.meterRows || []).length === 0 && (
@@ -704,7 +712,7 @@ export const PropertyInspector: React.FC = () => {
         <div className="property-group">
           <div className="property-group-title">
             Custom Properties
-            <button onClick={addCustomProperty} style={{marginLeft: 'auto', fontSize: '10px'}}>+</button>
+            <button onClick={addCustomProperty} style={{marginLeft: 'auto', fontSize: UI_SMALL}}>+</button>
           </div>
           {Object.entries(selectedObj.customProperties || {}).map(([key, value]) => (
             <div className="property-row" key={key}>

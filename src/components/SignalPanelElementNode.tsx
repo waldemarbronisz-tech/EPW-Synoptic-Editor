@@ -16,7 +16,7 @@ import { useStore } from '../store';
 import { PanelChrome, getPanelRowLayout } from './PanelChrome';
 import { PANEL_PADDING_X, PANEL_PADDING_Y } from '../elements/PanelLayout';
 import { getIndicatorDiodeFillColor, getIndicatorDiodeRadius, DIODE_OUTLINE_WIDTH } from '../symbols/scada/IndicatorDiodeSymbol';
-import { COLOR_OUTLINE, COLOR_TEXT } from '../theme/ScadaTheme';
+import { COLOR_OUTLINE, COLOR_TEXT, FONT_UI, FONT_SIZE_BASE } from '../theme/ScadaTheme';
 
 const DIODE_RADIUS = getIndicatorDiodeRadius('large'); // 12, per this element's own spec - reusing the Indicator Diode symbol's own radius helper rather than a coincidentally-equal literal
 
@@ -57,7 +57,7 @@ export interface SignalPanelElementNodeProps {
 // removing later.
 
 export const SignalPanelElementNode: React.FC<SignalPanelElementNodeProps> = ({ panel, devices, onSelect, onDragEnd, onDragStart }) => {
-  const fontSize = panel.fontSize || 12;
+  const fontSize = panel.fontSize || FONT_SIZE_BASE;
   const height = computeSignalPanelHeight(panel);
   const hasTitle = !!panel.title;
   const { rowHeight, titleBlockHeight } = getPanelRowLayout(fontSize, hasTitle);
@@ -104,6 +104,7 @@ export const SignalPanelElementNode: React.FC<SignalPanelElementNodeProps> = ({ 
                 width={diodeX - PANEL_PADDING_X}
                 text={display.label}
                 fontSize={fontSize}
+                fontFamily={FONT_UI}
                 fill={COLOR_TEXT}
                 ellipsis
                 wrap="none"

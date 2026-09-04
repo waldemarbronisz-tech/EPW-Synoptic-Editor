@@ -1,6 +1,7 @@
 import React from 'react';
 import { Group, Rect, Circle, Text } from 'react-konva';
 import type { SynopticObject } from '../store';
+import { FONT_UI, FONT_SIZE_BASE } from '../theme/ScadaTheme';
 import { CircuitBreakerSymbol } from './electrical/CircuitBreakerSymbol';
 import { DisconnectSwitchSymbol } from './electrical/DisconnectSwitchSymbol';
 import { ContactorSymbol } from './electrical/ContactorSymbol';
@@ -95,8 +96,8 @@ export const GenericSymbol: React.FC<SymbolProps> = ({ obj }) => {
         height={obj.height}
         align="center"
         verticalAlign="middle"
-        fontSize={obj.fontSize || 12}
-        fontFamily={obj.font || "system-ui"}
+        fontSize={obj.fontSize || FONT_SIZE_BASE}
+        fontFamily={obj.font || FONT_UI}
         fill="#000"
       />
     </Group>

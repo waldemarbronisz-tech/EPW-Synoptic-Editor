@@ -1,7 +1,7 @@
 import React from 'react';
 import { Group, Rect, Text } from 'react-konva';
 import type { SymbolProps } from '../SymbolRenderer';
-import { COLOR_PANEL, COLOR_OUTLINE, COLOR_VALUE_FIELD, COLOR_TEXT, COLOR_ALARM } from '../../theme/ScadaTheme';
+import { COLOR_PANEL, COLOR_OUTLINE, COLOR_VALUE_FIELD, COLOR_TEXT, COLOR_ALARM, FONT_UI, FONT_VALUE, FONT_SIZE_BASE, FONT_SIZE_SMALL } from '../../theme/ScadaTheme';
 
 // Bug fix: this legacy symbol still painted its own pre-SCADA colors
 // (dark bezel, black LED background, green phosphor text) instead of the
@@ -48,8 +48,8 @@ export const MeasurementDisplaySymbol: React.FC<SymbolProps> = ({ obj, state }) 
         x={6} y={6}
         width={w-12} height={10}
         text={obj.tag || obj.text || "SENSOR"}
-        fontSize={10}
-        fontFamily="monospace"
+        fontSize={FONT_SIZE_SMALL}
+        fontFamily={FONT_UI}
         fill={COLOR_TEXT}
         align="center"
       />
@@ -60,8 +60,8 @@ export const MeasurementDisplaySymbol: React.FC<SymbolProps> = ({ obj, state }) 
         x={8} y={24}
         width={w-16} height={h-32}
         text={displayString}
-        fontSize={14}
-        fontFamily="Courier New, monospace"
+        fontSize={FONT_SIZE_BASE}
+        fontFamily={FONT_VALUE}
         fill={COLOR_TEXT}
         align="right"
         verticalAlign="middle"

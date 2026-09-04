@@ -14,7 +14,7 @@ import type { Device } from '../project/DeviceSchema';
 import { useStore } from '../store';
 import { PanelChrome, getPanelRowLayout } from './PanelChrome';
 import { PANEL_PADDING_X, PANEL_PADDING_Y } from '../elements/PanelLayout';
-import { COLOR_OUTLINE, COLOR_VALUE_FIELD, COLOR_TEXT, COLOR_DE_ENERGIZED, COLOR_ALARM } from '../theme/ScadaTheme';
+import { COLOR_OUTLINE, COLOR_VALUE_FIELD, COLOR_TEXT, COLOR_DE_ENERGIZED, COLOR_ALARM, FONT_UI, FONT_VALUE, FONT_SIZE_BASE } from '../theme/ScadaTheme';
 
 // Dimension literals local to this element, same convention every other
 // scada/ symbol already follows (ScadaTheme.ts holds colors and the
@@ -24,11 +24,13 @@ import { COLOR_OUTLINE, COLOR_VALUE_FIELD, COLOR_TEXT, COLOR_DE_ENERGIZED, COLOR
 // dimensions and outline widths the task gave it explicitly"). The
 // panel/title/divider dimensions themselves now live in PanelChrome.tsx,
 // shared with the signal panel - only what is specific to a VALUE ROW
-// (as opposed to a signal panel's diode row) stays here.
+// (as opposed to a signal panel's diode row) stays here. Font choices
+// are NOT this kind of local literal - both text faces below come from
+// ScadaTheme.ts's FONT_UI/FONT_VALUE (feat/appearance-selection-frames
+// commit 1c), same as every other element on the canvas.
 const VALUE_FIELD_OUTLINE_WIDTH = 2;
 const VALUE_FIELD_WIDTH_FRACTION = 0.42; // how much of the row's width the value field claims
 const VALUE_FIELD_INSET_Y = 3;
-const MONOSPACE_FONT = 'Consolas, "Courier New", monospace'; // fixed character width, per this element's own spec
 
 export interface MeterElementNodeProps {
   meter: MeterElement;
@@ -68,7 +70,7 @@ function colorForRow(colorKind: 'NORMAL' | 'PREVIEW' | 'MISSING'): string {
 }
 
 export const MeterElementNode: React.FC<MeterElementNodeProps> = ({ meter, devices, onSelect, onDragEnd, onDragStart }) => {
-  const fontSize = meter.fontSize || 12;
+  const fontSize = meter.fontSize || FONT_SIZE_BASE;
   const height = computeMeterHeight(meter);
   const hasTitle = !!meter.title;
   const { rowHeight, titleBlockHeight } = getPanelRowLayout(fontSize, hasTitle);
@@ -118,6 +120,7 @@ export const MeterElementNode: React.FC<MeterElementNodeProps> = ({ meter, devic
                 width={valueFieldX - PANEL_PADDING_X}
                 text={display.label}
                 fontSize={fontSize}
+                fontFamily={FONT_UI}
                 fill={COLOR_TEXT}
                 ellipsis
                 wrap="none"
@@ -137,7 +140,7 @@ export const MeterElementNode: React.FC<MeterElementNodeProps> = ({ meter, devic
                 width={valueFieldWidth - 6}
                 text={display.valueText}
                 fontSize={fontSize}
-                fontFamily={MONOSPACE_FONT}
+                fontFamily={FONT_VALUE}
                 align="right"
                 fill={colorForRow(display.colorKind)}
               />

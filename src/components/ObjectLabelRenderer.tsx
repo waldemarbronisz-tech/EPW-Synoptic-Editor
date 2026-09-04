@@ -4,15 +4,19 @@ import { Group, Rect, Text } from 'react-konva';
 import { useStore } from '../store';
 import type { SynopticObject } from '../store';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
-import { COLOR_OUTLINE, COLOR_WHITE } from '../theme/ScadaTheme';
+import { COLOR_OUTLINE, COLOR_WHITE, FONT_UI, FONT_SIZE_BASE, FONT_SIZE_SMALL } from '../theme/ScadaTheme';
 
 interface ObjectLabelRendererProps {
   obj: SynopticObject;
   onChange: (newAttrs: Partial<SynopticObject>) => void;
 }
 
-const PRIMARY_FONT_SIZE = 12;
-const SECONDARY_FONT_SIZE = 9;
+// feat/appearance-selection-frames commit 1c: the primary line
+// (designation) is "etykiety obiektow" - FONT_SIZE_BASE. The
+// secondary line (name) is the theme's own literal example of
+// FONT_SIZE_SMALL's purpose ("druga linia etykiety").
+const PRIMARY_FONT_SIZE = FONT_SIZE_BASE;
+const SECONDARY_FONT_SIZE = FONT_SIZE_SMALL;
 const PADDING_X = 4;
 const PADDING_Y = 2;
 const LINE_GAP = 1;
@@ -202,6 +206,7 @@ export const ObjectLabelRenderer: React.FC<ObjectLabelRendererProps> = ({ obj, o
             text={primaryText}
             align={align}
             fontSize={PRIMARY_FONT_SIZE}
+            fontFamily={FONT_UI}
             lineHeight={LINE_HEIGHT_FACTOR}
             wrap="word"
             ellipsis={true}
@@ -218,6 +223,7 @@ export const ObjectLabelRenderer: React.FC<ObjectLabelRendererProps> = ({ obj, o
             text={secondaryText}
             align={align}
             fontSize={SECONDARY_FONT_SIZE}
+            fontFamily={FONT_UI}
             lineHeight={LINE_HEIGHT_FACTOR}
             wrap="word"
             ellipsis={true}
@@ -239,6 +245,7 @@ export const ObjectLabelRenderer: React.FC<ObjectLabelRendererProps> = ({ obj, o
             zIndex: 10000,
             fontWeight: 'bold',
             fontSize: PRIMARY_FONT_SIZE,
+            fontFamily: FONT_UI,
             border: `1px solid ${COLOR_OUTLINE}`,
             background: COLOR_WHITE,
             color: COLOR_OUTLINE,

@@ -52,6 +52,34 @@ export const OUTLINE_WIDTH = 5;      // kontur ksztaltow wypelnionych (default; 
 export const BUSBAR_HEIGHT = 16;     // wysokosc szyny zbiorczej - dokladnie jedno oczko
 export const GRID_SIZE = 16;
 
+// feat/appearance-selection-frames commit 1: the indicator diode was
+// drawn far too large relative to the row text beside it (confirmed by
+// eye: a ten-row signal panel reads as a column of huge circles with
+// the label an afterthought). These replace the two literal radii
+// (8/12) IndicatorDiodeSymbol.tsx used to hold locally - moved here so
+// every other place a diode radius might be needed reads the same
+// single source, not a coincidentally-equal copy.
+export const DIODE_RADIUS_SMALL = 5;  // przy aparatach na schemacie
+export const DIODE_RADIUS_LARGE = 7;  // w panelach sygnalizacyjnych i stanu
+
+// ---- Typography ----
+// One narrow sans-serif for everything that is a LABEL (row
+// descriptions, object labels, titles) and one fixed-width face for
+// everything that is a VALUE (a number, with or without a unit) - the
+// same "flat, technical, nothing decorative" spirit the color palette
+// above already commits to. Narrow is deliberate: a retro-industrial
+// SCADA HMI's text reads denser and more technical than a default
+// Arial ever does. Every component that draws text on the canvas, or
+// in the surrounding HTML chrome, reads its font from here - never a
+// hand-picked family or pixel size of its own (this file's own header
+// comment already makes this rule for colors; it now also covers
+// fonts).
+export const FONT_UI = 'Tahoma, Verdana, "DejaVu Sans", sans-serif';
+export const FONT_VALUE = 'Consolas, "DejaVu Sans Mono", monospace';
+export const FONT_SIZE_BASE = 13;   // opisy wierszy, etykiety, teksty na plotnie
+export const FONT_SIZE_SMALL = 11;  // druga linia etykiety, opisy pomocnicze
+export const FONT_SIZE_TITLE = 14;  // tytuly miernika, panelu, ramki
+
 // ---- Bridge into CSS -----------------------------------------------------
 // CSS cannot import a TypeScript module, so the interface chrome (panels,
 // toolbar, property fields) reads these values through CSS custom
@@ -77,4 +105,9 @@ export function applyScadaCssVariables(target: HTMLElement = document.documentEl
   target.style.setProperty('--scada-water', COLOR_WATER);
   target.style.setProperty('--scada-ventilation-active', VENTILATION_ACTIVE);
   target.style.setProperty('--scada-ventilation-inactive', VENTILATION_INACTIVE);
+  target.style.setProperty('--scada-font-ui', FONT_UI);
+  target.style.setProperty('--scada-font-value', FONT_VALUE);
+  target.style.setProperty('--scada-font-size-base', `${FONT_SIZE_BASE}px`);
+  target.style.setProperty('--scada-font-size-small', `${FONT_SIZE_SMALL}px`);
+  target.style.setProperty('--scada-font-size-title', `${FONT_SIZE_TITLE}px`);
 }

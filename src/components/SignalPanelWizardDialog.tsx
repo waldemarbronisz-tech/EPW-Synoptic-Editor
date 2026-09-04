@@ -9,6 +9,7 @@ import React, { useState } from 'react';
 import type { Device } from '../project/DeviceSchema';
 import { groupSignalCapableDevicesByLocation, buildSignalPanelRowsFromSelection } from '../elements/SignalPanelWizard';
 import type { SignalPanelRow } from '../elements/SignalPanelElement';
+import { FONT_SIZE_BASE, FONT_SIZE_SMALL } from '../theme/ScadaTheme';
 
 export interface SignalPanelWizardDialogProps {
   devices: Device[];
@@ -78,7 +79,7 @@ export const SignalPanelWizardDialog: React.FC<SignalPanelWizardDialogProps> = (
             <>
               <div style={{ padding: '4px 12px' }}>
                 <button onClick={selectAll}>Zaznacz wszystko</button>
-                <span style={{ marginLeft: '8px', fontSize: '11px' }}>
+                <span style={{ marginLeft: '8px', fontSize: `${FONT_SIZE_SMALL}px` }}>
                   Zaznaczono: {selected.size}
                 </span>
               </div>
@@ -87,7 +88,7 @@ export const SignalPanelWizardDialog: React.FC<SignalPanelWizardDialogProps> = (
                   <div style={groupHeaderStyle} onClick={() => toggleExpanded(group.location)}>
                     <span>{expanded.has(group.location) ? '▼' : '▶'}</span>
                     <strong style={{ marginLeft: '6px' }}>{group.location}</strong>
-                    <span style={{ marginLeft: '6px', fontSize: '11px' }}>({group.devices.length})</span>
+                    <span style={{ marginLeft: '6px', fontSize: `${FONT_SIZE_SMALL}px` }}>({group.devices.length})</span>
                   </div>
                   {expanded.has(group.location) && (
                     <div style={{ paddingLeft: '20px' }}>
@@ -145,7 +146,7 @@ const groupHeaderStyle: React.CSSProperties = {
   display: 'flex', alignItems: 'center', padding: '4px 0', cursor: 'pointer'
 };
 
-const rowLabelStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', padding: '2px 0', fontSize: '12px' };
+const rowLabelStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', padding: '2px 0', fontSize: `${FONT_SIZE_BASE}px` };
 
 const footerStyle: React.CSSProperties = {
   display: 'flex', justifyContent: 'flex-end', gap: '8px', padding: '8px 12px', borderTop: '1px solid var(--scada-outline)'
