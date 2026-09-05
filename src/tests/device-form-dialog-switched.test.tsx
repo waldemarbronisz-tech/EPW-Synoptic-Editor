@@ -126,9 +126,15 @@ describe('DeviceFormDialog - SWITCHED section', () => {
 
     const diClosedRow = row('diClosed');
     const channelSelect = diClosedRow.querySelectorAll('select')[1] as HTMLSelectElement;
-    expect(channelSelect.options.length).toBe(64);
-    expect(channelSelect.options[0].value).toBe('1');
-    expect(channelSelect.options[63].value).toBe('64');
+    // An unset required field also shows one leading "-- wybierz --"
+    // placeholder (empirical fix: KROK 2 of manual verification found
+    // the channel picker otherwise looked pre-filled with channel 1
+    // before the user ever chose anything) - the 64 real, numbered
+    // channel options are everything after it.
+    const numberedOptions = Array.from(channelSelect.options).filter(o => o.value !== '');
+    expect(numberedOptions.length).toBe(64);
+    expect(numberedOptions[0].value).toBe('1');
+    expect(numberedOptions[63].value).toBe('64');
   });
 
   it('test 14: the device id is read-only when editing an existing device', () => {

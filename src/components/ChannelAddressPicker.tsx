@@ -30,6 +30,16 @@ export interface ChannelAddressPickerProps {
 export const ChannelAddressPicker: React.FC<ChannelAddressPickerProps> = ({ value, onChange, expectedKind, cards, occupied, allowEmpty }) => {
   const matchingCards = cards.filter(c => c.channelKind === expectedKind);
   const parsed = value ? parseChannelAddress(value) : null;
+  // Empirical fix (KROK 2 of this task's own manual verification): a
+  // brand-new required field defaults internally to the first matching
+  // card/channel 1 so a single click on either dropdown already emits a
+  // real address - but showing that phantom choice as already SELECTED,
+  // before the user ever touched it, looked exactly like a filled field
+  // while the actual stored value was still '' (only the validation
+  // text below gave away that it was not). hasValue is what the two
+  // <select>s below actually display; the phantom defaults still decide
+  // what a first interaction emits.
+  const hasValue = !!parsed;
   const selectedCard = parsed?.card ?? matchingCards[0]?.id ?? '';
   const selectedChannel = parsed?.channel ?? 1;
   const card = matchingCards.find(c => c.id === selectedCard);
@@ -41,11 +51,13 @@ export const ChannelAddressPicker: React.FC<ChannelAddressPickerProps> = ({ valu
 
   const selects = (
     <>
-      <select value={selectedCard} onChange={e => emit(e.target.value, selectedChannel)} style={selectStyle}>
+      <select value={hasValue ? selectedCard : ''} onChange={e => emit(e.target.value, selectedChannel)} style={selectStyle}>
         {matchingCards.length === 0 && <option value="">(brak kart {expectedKind})</option>}
+        {!hasValue && matchingCards.length > 0 && <option value="">-- wybierz --</option>}
         {matchingCards.map(c => <option key={c.id} value={c.id}>{c.id}</option>)}
       </select>
-      <select value={selectedChannel} onChange={e => emit(selectedCard, Number(e.target.value))} style={selectStyle} disabled={!card}>
+      <select value={hasValue ? selectedChannel : ''} onChange={e => emit(selectedCard, Number(e.target.value))} style={selectStyle} disabled={!card}>
+        {!hasValue && card && <option value="">-- wybierz --</option>}
         {card && Array.from({ length: card.channelCount }, (_, i) => i + 1).map(n => {
           const key = `${selectedCard}.${expectedKind}.${n}`;
           const usedBy = occupied.get(key);
