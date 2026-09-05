@@ -40,3 +40,18 @@ export function getDeviceChannelAddressFields(device: Device): DeviceAddressFiel
   }
   return result;
 }
+
+/**
+ * Splits a device's own channel-address fields (getDeviceChannelAddressFields
+ * above) into inputs and outputs, by field name alone - 'command.*' and
+ * 'setpointOutput' are the only fields the schema ever writes a command to,
+ * everything else is a feedback/measurement input. Used by the device list
+ * window's own Wejscia/Wyjscia columns (feat/device-list-ui commit 2) - a
+ * display grouping, not a validation rule.
+ */
+export function getDeviceIOFields(device: Device): { inputs: DeviceAddressField[]; outputs: DeviceAddressField[] } {
+  const all = getDeviceChannelAddressFields(device);
+  const outputs = all.filter(f => f.field.startsWith('command.') || f.field === 'setpointOutput');
+  const inputs = all.filter(f => !outputs.includes(f));
+  return { inputs, outputs };
+}

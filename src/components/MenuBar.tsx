@@ -9,9 +9,11 @@ export interface MenuBarProps {
   // (locations + cards) - a new top-level menu, same lazy-dialog-owned-
   // by-App.tsx convention as onOpenScadaPreview above.
   onOpenDeviceRegistries?: () => void;
+  // feat/device-list-ui commit 2: opens the "Lista aparatow" window.
+  onOpenDeviceList?: () => void;
 }
 
-export const MenuBar: React.FC<MenuBarProps> = ({ onOpenScadaPreview, onOpenDeviceRegistries }) => {
+export const MenuBar: React.FC<MenuBarProps> = ({ onOpenScadaPreview, onOpenDeviceRegistries, onOpenDeviceList }) => {
   const { undo, redo, copySelected, paste, deleteObjects, selectedIds, isDirty, snapToGridEnabled, toggleSnapToGrid } = useStore();
 
   const handleMenuClick = (action: () => void) => {
@@ -108,6 +110,7 @@ export const MenuBar: React.FC<MenuBarProps> = ({ onOpenScadaPreview, onOpenDevi
         <span>Aparaty</span>
         <div className="dropdown">
           <div className="dropdown-item" onClick={() => onOpenDeviceRegistries?.()}>Rejestry projektu...</div>
+          <div className="dropdown-item" onClick={() => onOpenDeviceList?.()}>Lista aparatow...</div>
         </div>
       </div>
     </div>

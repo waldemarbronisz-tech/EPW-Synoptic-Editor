@@ -24,10 +24,16 @@ const DeviceRegistriesDialog = lazy(() =>
   import('./components/DeviceRegistriesDialog').then(m => ({ default: m.DeviceRegistriesDialog }))
 );
 
+// feat/device-list-ui commit 2: same lazy convention.
+const DeviceListDialog = lazy(() =>
+  import('./components/DeviceListDialog').then(m => ({ default: m.DeviceListDialog }))
+);
+
 function App() {
   const { projectName, fileName, isDirty, screenKind } = useStore();
   const [showScadaPreview, setShowScadaPreview] = useState(false);
   const [showDeviceRegistries, setShowDeviceRegistries] = useState(false);
+  const [showDeviceList, setShowDeviceList] = useState(false);
 
   useEffect(() => {
     const titleName = fileName || `${projectName}.epwsyn`;
@@ -66,6 +72,7 @@ function App() {
       <MenuBar
         onOpenScadaPreview={() => setShowScadaPreview(true)}
         onOpenDeviceRegistries={() => setShowDeviceRegistries(true)}
+        onOpenDeviceList={() => setShowDeviceList(true)}
       />
       {showScadaPreview && (
         <Suspense fallback={null}>
@@ -75,6 +82,11 @@ function App() {
       {showDeviceRegistries && (
         <Suspense fallback={null}>
           <DeviceRegistriesDialog onClose={() => setShowDeviceRegistries(false)} />
+        </Suspense>
+      )}
+      {showDeviceList && (
+        <Suspense fallback={null}>
+          <DeviceListDialog onClose={() => setShowDeviceList(false)} />
         </Suspense>
       )}
       <Toolbar />
