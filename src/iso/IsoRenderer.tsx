@@ -186,7 +186,7 @@ export const IsoRenderer: React.FC<IsoRendererProps> = ({ terrainTiles, objects 
     <Layer imageSmoothingEnabled={false}>
       {drawOrder.map((item, index) =>
         item.kind === 'terrain'
-          ? <TerrainTileNode key={`terrain-${item.gx}-${item.gy}`} gx={item.gx} gy={item.gy} type={item.type} />
+          ? <TerrainTileNode key={`terrain-${item.gx}-${item.gy}`} gx={item.gx} gy={item.gy} type={item.type} terrainTiles={terrainTiles} />
           : <IsoSpriteNode key={item.placement.id ?? `object-${index}`} placement={item.placement} />
       )}
     </Layer>
