@@ -1,31 +1,35 @@
-// feat/device-list-ui commit 2 (shell) - the device configuration form.
-// This commit only builds the fields common to every behavior (id,
-// designation, name, kind, publishToHa, the behavior picker itself) plus
-// a default, schema-valid skeleton of whichever behavior is chosen -
-// enough for the device list window's own add/edit/duplicate buttons to
-// have something real to open. Commit 3 replaces the SWITCHED/SIGNAL
-// skeleton below with actual editable sections (and starts blocking Save
-// while validateDeviceRegistry reports an error); commit 4 does the same
-// for MEASURED/MODULATED. Until then, a freshly added device is a
-// well-formed Device object (DeviceFormDefaults.ts) that is very likely
-// still VALIDATION-invalid (e.g. an empty command.doClose) - exactly
-// what the list window's own "invalid rows shown in alarm color" feature
-// is for, not a bug in this shell.
+// feat/device-list-ui - the device configuration form.
+//
+// Commit 2 built the shell: the fields common to every behavior (id,
+// designation, name, kind, publishToHa, the behavior picker) plus a
+// schema-valid default skeleton for whichever behavior is chosen.
+// Commit 3 (this version) adds the real SWITCHED and SIGNAL sections and
+// starts blocking Save while validateDeviceRegistry reports an error for
+// either of those two behaviors; commit 4 does the same for MEASURED and
+// MODULATED (which still fall back to the commit-2 placeholder below
+// until then).
 //
 // Same modal convention as MeterWizardDialog.tsx / DeviceRegistriesDialog.tsx.
-// Every Save runs the candidate device through validateDeviceRegistry -
-// the only place any rule about it is decided; this file only displays
-// the resulting issues, never invents its own check.
+// Every keystroke re-runs the candidate device through
+// getDeviceOwnIssues/validateDeviceRegistry - the only place any rule
+// about it is decided; this file (and DeviceFormFieldErrors.ts) only
+// displays the resulting issues next to the field they are about, never
+// invents a rule of its own.
 
 import React, { useState } from 'react';
 import { useStore } from '../store';
-import type { Device, DeviceBehavior, DeviceCommon } from '../project/DeviceSchema';
-import { validateDeviceRegistry } from '../project/DeviceValidation';
+import type { Device, DeviceBehavior, DeviceCommon, ChannelAddress } from '../project/DeviceSchema';
 import { defaultFieldsForBehavior, assembleDevice } from '../project/DeviceFormDefaults';
-import type { DeviceOwnFields } from '../project/DeviceFormDefaults';
+import type { DeviceOwnFields, SwitchedOwnFields, SignalOwnFields } from '../project/DeviceFormDefaults';
+import { getDeviceOwnIssues, mapDeviceIssuesToFields } from '../project/DeviceFormFieldErrors';
+import { getOccupiedChannels } from '../project/DeviceRegistryQueries';
+import { ChannelAddressPicker } from './ChannelAddressPicker';
 import { FONT_SIZE_SMALL, COLOR_ALARM } from '../theme/ScadaTheme';
 
 const BEHAVIORS: DeviceBehavior[] = ['SWITCHED', 'SIGNAL', 'MEASURED', 'MODULATED'];
+// Commit 3 gives these two behaviors a real, field-level-validated form;
+// MEASURED/MODULATED still use the commit-2 placeholder until commit 4.
+const BEHAVIORS_WITH_FULL_FORM: DeviceBehavior[] = ['SWITCHED', 'SIGNAL'];
 
 function splitId(id: string): { code: string; suffix: string } {
   const idx = id.indexOf('_');
@@ -36,6 +40,12 @@ function extractOwnFields(device: Device): DeviceOwnFields {
   const { id: _id, designation: _designation, name: _name, behavior: _behavior, kind: _kind, publishToHa: _publishToHa, ...rest } = device;
   return rest as unknown as DeviceOwnFields;
 }
+
+/** Small helper: a field's own error messages, rendered directly under it. */
+const FieldErrors: React.FC<{ messages?: string[] }> = ({ messages }) => {
+  if (!messages || messages.length === 0) return null;
+  return <>{messages.map((m, i) => <div key={i} style={errorStyle}>{m}</div>)}</>;
+};
 
 export interface DeviceFormDialogProps {
   mode: 'add' | 'edit';
@@ -79,16 +89,51 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
   const common: DeviceCommon = { id, designation, name, behavior, kind, publishToHa };
   const candidateDevice = assembleDevice(common, ownFields);
 
-  const otherDevices = devices.filter(d => d.id !== (isEdit ? initialDevice?.id : undefined));
-  const validation = validateDeviceRegistry({ locations, cards, devices: [...otherDevices, candidateDevice] });
-  const ownIssues = validation.issues.filter(i => i.deviceId === id);
+  const excludeId = isEdit ? initialDevice?.id : undefined;
+  const otherDevices = devices.filter(d => d.id !== excludeId);
+  const occupied = getOccupiedChannels(devices, excludeId);
 
-  const canAttemptSave = id.length > 0 && designation.trim().length > 0 && name.trim().length > 0 && kind.trim().length > 0;
+  const ownIssues = getDeviceOwnIssues(candidateDevice, otherDevices, locations, cards);
+  const fieldErrors = mapDeviceIssuesToFields(ownIssues, candidateDevice);
+
+  const hasFullForm = BEHAVIORS_WITH_FULL_FORM.includes(behavior);
+  const commonFieldsFilled = id.length > 0 && designation.trim().length > 0 && name.trim().length > 0 && kind.trim().length > 0;
+  // Commit 3: for SWITCHED/SIGNAL, every field is now editable, so Save
+  // is withheld until every reported issue is resolved. MEASURED/
+  // MODULATED (commit 4's job) keep the earlier, lighter gate - their
+  // fields cannot be fixed through this UI yet.
+  const canAttemptSave = commonFieldsFilled && (!hasFullForm || ownIssues.length === 0);
 
   const handleSave = () => {
     if (!canAttemptSave) return;
     onSave(candidateDevice);
   };
+
+  const switched = behavior === 'SWITCHED' ? (ownFields as SwitchedOwnFields) : null;
+  const signal = behavior === 'SIGNAL' ? (ownFields as SignalOwnFields) : null;
+
+  const patchSwitched = (patch: Partial<SwitchedOwnFields>) => setOwnFields(prev => ({ ...(prev as SwitchedOwnFields), ...patch }));
+  const patchSwitchedFeedback = (patch: Partial<SwitchedOwnFields['feedback']>) =>
+    setOwnFields(prev => ({ ...(prev as SwitchedOwnFields), feedback: { ...(prev as SwitchedOwnFields).feedback, ...patch } }));
+  const patchSwitchedCommand = (patch: Partial<SwitchedOwnFields['command']>) =>
+    setOwnFields(prev => ({ ...(prev as SwitchedOwnFields), command: { ...(prev as SwitchedOwnFields).command, ...patch } }));
+  const patchSwitchedSupervision = (patch: Partial<SwitchedOwnFields['supervision']>) =>
+    setOwnFields(prev => ({ ...(prev as SwitchedOwnFields), supervision: { ...(prev as SwitchedOwnFields).supervision, ...patch } }));
+  const patchSwitchedSafeState = (patch: Partial<SwitchedOwnFields['safeState']>) =>
+    setOwnFields(prev => ({ ...(prev as SwitchedOwnFields), safeState: { ...(prev as SwitchedOwnFields).safeState, ...patch } }));
+  const patchSwitchedExtraInput = (addr: ChannelAddress | undefined) =>
+    setOwnFields(prev => ({ ...(prev as SwitchedOwnFields), extraInputs: addr ? { diFault: addr } : undefined }));
+
+  const patchSignal = (patch: Partial<SignalOwnFields>) => setOwnFields(prev => ({ ...(prev as SignalOwnFields), ...patch }));
+  const patchSignalFeedback = (patch: Partial<SignalOwnFields['feedback']>) =>
+    setOwnFields(prev => ({ ...(prev as SignalOwnFields), feedback: { ...(prev as SignalOwnFields).feedback, ...patch } }));
+
+  const outputHint = switched ? {
+    '1-MAINTAINED': 'Jedno wyjscie utrzymywane - typowy stycznik/zawor z jedna cewka trzymana pod napieciem w stanie zalaczonym.',
+    '1-PULSE': 'Jedno wyjscie impulsowe - typowy przekaznik bistabilny sterowany krotkim impulsem.',
+    '2-MAINTAINED': 'Dwa wyjscia utrzymywane - typowy siownik/zawor trojpolozeniowy z oddzielnymi cewkami OTWORZ/ZAMKNIJ.',
+    '2-PULSE': 'Dwa wyjscia impulsowe - typowy stycznik bistabilny z oddzielnymi impulsami ZALACZ/WYLACZ.'
+  }[`${switched.command.outputCount}-${switched.command.style}`] : '';
 
   return (
     <>
@@ -115,14 +160,17 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
                   <input value={suffix} onChange={e => setSuffix(e.target.value)} style={inputStyle} placeholder="KMG1" />
                 </div>
               )}
+              <FieldErrors messages={fieldErrors.get('id')} />
             </div>
             <div className="property-row">
               <label>Oznaczenie</label>
               <input value={designation} onChange={e => setDesignation(e.target.value)} style={inputStyle} placeholder="-K1" />
+              <FieldErrors messages={fieldErrors.get('designation')} />
             </div>
             <div className="property-row">
               <label>Nazwa</label>
               <input value={name} onChange={e => setName(e.target.value)} style={inputStyle} placeholder="Stycznik grzalki" />
+              <FieldErrors messages={fieldErrors.get('name')} />
             </div>
             <div className="property-row">
               <label>Zachowanie</label>
@@ -136,6 +184,7 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
               <datalist id="device-kind-suggestions">
                 <option value="contactor" /><option value="valve" /><option value="damper" /><option value="sensor" /><option value="vfd" />
               </datalist>
+              <FieldErrors messages={fieldErrors.get('kind')} />
             </div>
             <div className="property-row">
               <label>Publikuj do HA</label>
@@ -143,19 +192,165 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
             </div>
           </div>
 
-          <div style={{ padding: '8px 12px', fontSize: `${FONT_SIZE_SMALL}px` }}>
-            Szczegolowa konfiguracja zachowania {behavior} zostanie udostepniona w kolejnym kroku prac
-            (formularze SWITCHED/SIGNAL, nastepnie MEASURED/MODULATED). Aparat zapisany teraz uzywa
-            wartosci domyslnych i moze byc oznaczony jako niepoprawny do czasu uzupelnienia.
-          </div>
+          {switched && (
+            <div className="property-group">
+              <div style={sectionTitleStyle}>Wejscie zwrotne (feedback)</div>
+              <div style={warningStyle}>
+                Uwaga: tryb NONE oznacza sterowanie bez potwierdzenia rzeczywistego stanu aparatu -
+                system nigdy nie wykryje, ze aparat nie wykonal polecenia.
+              </div>
+              <div style={warningStyle}>
+                Uwaga: pojedyncze wejscie zwrotne (SINGLE) nie odroznia stanu posredniego ani zaniku
+                sygnalu od stanu OFF - tylko DUAL wykrywa taka rozbieznosc.
+              </div>
+              <div className="property-row">
+                <label>Tryb</label>
+                <select value={switched.feedback.mode} onChange={e => patchSwitchedFeedback({ mode: e.target.value as SwitchedOwnFields['feedback']['mode'] })} style={inputStyle}>
+                  <option value="DUAL">DUAL</option>
+                  <option value="SINGLE">SINGLE</option>
+                  <option value="NONE">NONE</option>
+                </select>
+              </div>
+              {(switched.feedback.mode === 'DUAL' || switched.feedback.mode === 'SINGLE') && (
+                <div className="property-row">
+                  <label>diClosed</label>
+                  <ChannelAddressPicker value={switched.feedback.diClosed} onChange={addr => patchSwitchedFeedback({ diClosed: addr })} expectedKind="DI" cards={cards} occupied={occupied} />
+                  <FieldErrors messages={fieldErrors.get('feedback.diClosed')} />
+                </div>
+              )}
+              {switched.feedback.mode === 'DUAL' && (
+                <div className="property-row">
+                  <label>diOpen</label>
+                  <ChannelAddressPicker value={switched.feedback.diOpen} onChange={addr => patchSwitchedFeedback({ diOpen: addr })} expectedKind="DI" cards={cards} occupied={occupied} />
+                  <FieldErrors messages={fieldErrors.get('feedback.diOpen')} />
+                </div>
+              )}
+              {switched.feedback.mode === 'SINGLE' && (
+                <div className="property-row">
+                  <label>Neguj (invert)</label>
+                  <input type="checkbox" checked={!!switched.feedback.invert} onChange={e => patchSwitchedFeedback({ invert: e.target.checked })} />
+                </div>
+              )}
 
-          {ownIssues.length > 0 && (
-            <div style={{ padding: '4px 12px' }}>
-              {ownIssues.map((issue, i) => (
-                <div key={i} style={errorStyle}>{issue.message}</div>
-              ))}
+              <details>
+                <summary>Wejscia dodatkowe</summary>
+                <div className="property-row">
+                  <label>diFault</label>
+                  <ChannelAddressPicker value={switched.extraInputs?.diFault} onChange={patchSwitchedExtraInput} expectedKind="DI" cards={cards} occupied={occupied} allowEmpty />
+                  <FieldErrors messages={fieldErrors.get('extraInputs.diFault')} />
+                </div>
+              </details>
+
+              <div style={sectionTitleStyle}>Sterowanie (command)</div>
+              <div className="property-row">
+                <label>Liczba wyjsc</label>
+                <select value={switched.command.outputCount} onChange={e => patchSwitchedCommand({ outputCount: Number(e.target.value) as 1 | 2 })} style={inputStyle}>
+                  <option value={1}>1</option>
+                  <option value={2}>2</option>
+                </select>
+              </div>
+              <div className="property-row">
+                <label>Styl</label>
+                <select value={switched.command.style} onChange={e => patchSwitchedCommand({ style: e.target.value as SwitchedOwnFields['command']['style'] })} style={inputStyle}>
+                  <option value="MAINTAINED">MAINTAINED</option>
+                  <option value="PULSE">PULSE</option>
+                </select>
+              </div>
+              <div style={hintStyle}>{outputHint}</div>
+              <div className="property-row">
+                <label>doClose</label>
+                <ChannelAddressPicker value={switched.command.doClose} onChange={addr => patchSwitchedCommand({ doClose: addr ?? '' })} expectedKind="DO" cards={cards} occupied={occupied} />
+                <FieldErrors messages={fieldErrors.get('command.doClose')} />
+              </div>
+              {switched.command.outputCount === 2 && (
+                <div className="property-row">
+                  <label>doOpen</label>
+                  <ChannelAddressPicker value={switched.command.doOpen} onChange={addr => patchSwitchedCommand({ doOpen: addr })} expectedKind="DO" cards={cards} occupied={occupied} />
+                  <FieldErrors messages={fieldErrors.get('command.doOpen')} />
+                </div>
+              )}
+              {switched.command.style === 'PULSE' && (
+                <div className="property-row">
+                  <label>Czas impulsu (ms)</label>
+                  <input type="number" value={switched.command.pulseMs ?? ''} onChange={e => patchSwitchedCommand({ pulseMs: Number(e.target.value) })} style={inputStyle} />
+                  <FieldErrors messages={fieldErrors.get('command.pulseMs')} />
+                </div>
+              )}
+
+              <div style={sectionTitleStyle}>Nadzor (supervision)</div>
+              <div className="property-row">
+                <label>Timeout potwierdzenia (ms)</label>
+                <input type="number" value={switched.supervision.confirmTimeoutMs} onChange={e => patchSwitchedSupervision({ confirmTimeoutMs: Number(e.target.value) })} style={inputStyle} />
+                <FieldErrors messages={fieldErrors.get('supervision.confirmTimeoutMs')} />
+              </div>
+              <div style={hintStyle}>Czas na potwierdzenie zmiany stanu przez wejscie zwrotne, zanim zglaszany jest alarm rozbieznosci (min. 100 ms).</div>
+              <div className="property-row">
+                <label>Alarm rozbieznosci</label>
+                <input type="checkbox" checked={switched.supervision.discrepancyAlarm} onChange={e => patchSwitchedSupervision({ discrepancyAlarm: e.target.checked })} />
+              </div>
+
+              <div style={sectionTitleStyle}>Stan bezpieczny (safeState)</div>
+              <div className="property-row">
+                <label>Przy starcie</label>
+                <select value={switched.safeState.onStartup} onChange={e => patchSwitchedSafeState({ onStartup: e.target.value as SwitchedOwnFields['safeState']['onStartup'] })} style={inputStyle}>
+                  <option value="NO_CHANGE">NO_CHANGE</option>
+                  <option value="OPEN">OPEN</option>
+                  <option value="CLOSE">CLOSE</option>
+                </select>
+              </div>
+              <div className="property-row">
+                <label>Przy utracie lacznosci</label>
+                <select value={switched.safeState.onLinkLoss} onChange={e => patchSwitchedSafeState({ onLinkLoss: e.target.value as SwitchedOwnFields['safeState']['onLinkLoss'] })} style={inputStyle}>
+                  <option value="NO_CHANGE">NO_CHANGE</option>
+                  <option value="OPEN">OPEN</option>
+                  <option value="CLOSE">CLOSE</option>
+                </select>
+              </div>
+
+              <div className="property-row">
+                <label>Licznik przelaczen</label>
+                <input type="checkbox" checked={switched.switchCounter} onChange={e => patchSwitched({ switchCounter: e.target.checked })} />
+              </div>
+              <div style={hintStyle}>Zlicza przelaczenia aparatu (sygnal .COUNTER) - prog ostrzegawczy definiuje sie w Logic Studio, nie tutaj.</div>
             </div>
           )}
+
+          {signal && (
+            <div className="property-group">
+              <div style={sectionTitleStyle}>Wejscie (feedback)</div>
+              <div className="property-row">
+                <label>di</label>
+                <ChannelAddressPicker value={signal.feedback.di} onChange={addr => patchSignalFeedback({ di: addr ?? '' })} expectedKind="DI" cards={cards} occupied={occupied} />
+                <FieldErrors messages={fieldErrors.get('feedback.di')} />
+              </div>
+              <div className="property-row">
+                <label>Neguj (invert)</label>
+                <input type="checkbox" checked={signal.feedback.invert} onChange={e => patchSignalFeedback({ invert: e.target.checked })} />
+              </div>
+              <div className="property-row">
+                <label>Stan alarmowy</label>
+                <select value={signal.alarmState} onChange={e => patchSignal({ alarmState: e.target.value as SignalOwnFields['alarmState'] })} style={inputStyle}>
+                  <option value="HIGH">HIGH</option>
+                  <option value="LOW">LOW</option>
+                </select>
+              </div>
+              <div className="property-row">
+                <label>Debounce (ms)</label>
+                <input type="number" value={signal.debounceMs} onChange={e => patchSignal({ debounceMs: Number(e.target.value) })} style={inputStyle} />
+                <FieldErrors messages={fieldErrors.get('debounceMs')} />
+              </div>
+            </div>
+          )}
+
+          {!hasFullForm && (
+            <div style={{ padding: '8px 12px', fontSize: `${FONT_SIZE_SMALL}px` }}>
+              Szczegolowa konfiguracja zachowania {behavior} zostanie udostepniona w kolejnym kroku prac
+              (formularz MEASURED/MODULATED). Aparat zapisany teraz uzywa wartosci domyslnych i moze
+              byc oznaczony jako niepoprawny do czasu uzupelnienia.
+            </div>
+          )}
+
+          <FieldErrors messages={fieldErrors.get('_general')} />
         </div>
 
         <div style={footerStyle}>
@@ -173,7 +368,7 @@ const backdropStyle: React.CSSProperties = {
 
 const dialogStyle: React.CSSProperties = {
   position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-  zIndex: 1002, width: '480px', maxHeight: '80vh', display: 'flex', flexDirection: 'column',
+  zIndex: 1002, width: '520px', maxHeight: '82vh', display: 'flex', flexDirection: 'column',
   background: 'var(--scada-panel)', border: '2px solid var(--scada-outline)', color: 'var(--scada-outline)',
   fontFamily: 'var(--scada-font-ui)', fontSize: 'var(--scada-font-size-base)'
 };
@@ -187,6 +382,9 @@ const closeButtonStyle: React.CSSProperties = { background: 'transparent', borde
 const bodyStyle: React.CSSProperties = { overflowY: 'auto', flex: 1 };
 const inputStyle: React.CSSProperties = { width: '100%', fontSize: 'var(--scada-font-size-base)' };
 const errorStyle: React.CSSProperties = { color: COLOR_ALARM, fontSize: `${FONT_SIZE_SMALL}px` };
+const sectionTitleStyle: React.CSSProperties = { fontWeight: 'bold', padding: '6px 12px 2px' };
+const warningStyle: React.CSSProperties = { padding: '0 12px 4px', fontSize: `${FONT_SIZE_SMALL}px` };
+const hintStyle: React.CSSProperties = { padding: '0 12px 4px', fontSize: `${FONT_SIZE_SMALL}px`, fontStyle: 'italic' };
 
 const footerStyle: React.CSSProperties = {
   display: 'flex', justifyContent: 'flex-end', gap: '8px', padding: '8px 12px', borderTop: '1px solid var(--scada-outline)'
