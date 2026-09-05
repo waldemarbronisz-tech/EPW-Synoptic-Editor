@@ -21,6 +21,7 @@ import type { IsoPlacedObject } from '../iso/IsoRenderer';
 import { getSprite, getSpriteState } from '../iso/SpriteManifest';
 import { getPlanObjectFootprint } from '../iso/PlanObject';
 import { hitTestSprite } from '../iso/SpriteHitTest';
+import { resolveSpriteView } from '../iso/SpriteRotation';
 
 // A generous, fixed reference grid drawn around the origin - a PLAN
 // project has no separate "canvas width/height" concept the way a
@@ -42,10 +43,15 @@ function hitTestPlacedObjects(worldX: number, worldY: number, objects: IsoPlaced
   for (const obj of nearestFirst) {
     const resolved = getSpriteState(obj.spriteId, obj.state);
     if (!resolved) continue;
-    const image = getCachedSpriteImage(resolved.entry.file);
+    // fix/iso-tiles-and-rotation commit 3: the view actually ON SCREEN
+    // for this object's own rotation - front/rear file, and the flip-
+    // corrected anchor resolveSpriteView already applies - not the raw
+    // manifest entry, which is only ever the FRONT view's own numbers.
+    const view = resolveSpriteView(resolved.entry, obj.rotation ?? 0);
+    const image = getCachedSpriteImage(view.file);
     if (!image) continue; // not loaded yet - cannot be reliably hit-tested; falls through to whatever is behind it
-    const pos = getSpriteDrawPosition(obj.gx, obj.gy, resolved.entry.anchorX, resolved.entry.anchorY);
-    if (hitTestSprite(worldX, worldY, pos.x, pos.y, resolved.entry.width, resolved.entry.height, image)) {
+    const pos = getSpriteDrawPosition(obj.gx, obj.gy, view.anchorX, view.anchorY);
+    if (hitTestSprite(worldX, worldY, pos.x, pos.y, view.width, view.height, image, view.mirrored)) {
       return obj.id;
     }
   }
@@ -59,7 +65,7 @@ export const PlanCanvas: React.FC = () => {
 
   const { canvasState, setCanvasState } = useStore();
   const { terrainTiles, paintTerrainTile, commitTerrainStroke, terrainPaintTool } = useStore();
-  const { planObjects, selectedPlanObjectIds, selectPlanObjects, clearPlanSelection, movePlanObjectTo, deletePlanObjects, addPlanObject } = useStore();
+  const { planObjects, selectedPlanObjectIds, selectPlanObjects, clearPlanSelection, movePlanObjectTo, deletePlanObjects, addPlanObject, rotatePlanObjects } = useStore();
 
   const isPanningRef = useRef(false);
   const lastPanPosRef = useRef({ x: 0, y: 0 });
@@ -96,6 +102,16 @@ export const PlanCanvas: React.FC = () => {
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
         deletePlanObjects(useStore.getState().selectedPlanObjectIds);
+      } else if (e.key.toLowerCase() === 'r') {
+        // fix/iso-tiles-and-rotation commit 3: R rotates the whole
+        // current selection 90 degrees clockwise, Shift+R counter-
+        // clockwise - one undo entry for the batch (rotatePlanObjects's
+        // own saveHistory call), reading the CURRENT selection from the
+        // store rather than this closure's own render-scope value, the
+        // same reasoning every other handler in this effect already
+        // follows.
+        e.preventDefault();
+        rotatePlanObjects(useStore.getState().selectedPlanObjectIds, e.shiftKey ? 'ccw' : 'cw');
       } else if (e.key === ' ') {
         setSpaceKeyDown(true);
         if (containerRef.current && !isPanningRef.current) containerRef.current.style.cursor = 'grab';
@@ -158,7 +174,7 @@ export const PlanCanvas: React.FC = () => {
       return;
     }
 
-    const resolvedObjects: IsoPlacedObject[] = planObjects.map(o => ({ id: o.id, spriteId: o.spriteId, state: o.state, gx: o.gx, gy: o.gy, footprint: getPlanObjectFootprint(o) }));
+    const resolvedObjects: IsoPlacedObject[] = planObjects.map(o => ({ id: o.id, spriteId: o.spriteId, state: o.state, gx: o.gx, gy: o.gy, rotation: o.rotation, footprint: getPlanObjectFootprint(o) }));
     const hitId = hitTestPlacedObjects(world.x, world.y, resolvedObjects);
 
     if (hitId) {
@@ -263,7 +279,7 @@ export const PlanCanvas: React.FC = () => {
 
   const renderObjects: IsoPlacedObject[] = planObjects.map(o => {
     const live = dragPreview && dragPreview.id === o.id ? dragPreview : o;
-    return { id: o.id, spriteId: o.spriteId, state: o.state, gx: live.gx, gy: live.gy, footprint: getPlanObjectFootprint(o) };
+    return { id: o.id, spriteId: o.spriteId, state: o.state, gx: live.gx, gy: live.gy, rotation: o.rotation, footprint: getPlanObjectFootprint(o) };
   });
 
   return (
@@ -302,14 +318,19 @@ export const PlanCanvas: React.FC = () => {
             if (!obj) return null;
             const resolved = getSpriteState(obj.spriteId, obj.state);
             if (!resolved) return null;
-            const pos = getSpriteDrawPosition(obj.gx, obj.gy, resolved.entry.anchorX, resolved.entry.anchorY);
+            // The view actually on screen for this object's own rotation
+            // - matching IsoSpriteNode's own resolveSpriteView call
+            // exactly, so the outline is never drawn around the wrong
+            // (front-view, unmirrored) bounding box for a rotated object.
+            const view = resolveSpriteView(resolved.entry, obj.rotation ?? 0);
+            const pos = getSpriteDrawPosition(obj.gx, obj.gy, view.anchorX, view.anchorY);
             return (
               <Rect
                 key={`sel-${id}`}
                 x={pos.x}
                 y={pos.y}
-                width={resolved.entry.width}
-                height={resolved.entry.height}
+                width={view.width}
+                height={view.height}
                 stroke={COLOR_WHITE}
                 strokeWidth={1.5}
                 dash={[6, 4]}

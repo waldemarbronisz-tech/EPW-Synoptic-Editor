@@ -1,5 +1,7 @@
 import type { StateCreator } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
+import { getSpriteState } from '../iso/SpriteManifest';
+import { getAvailableRotations, getNextRotation } from '../iso/SpriteRotation';
 import type { AppState } from './appState';
 
 // PLAN screen state (feat/isometric-engine commit 5): which of the two
@@ -19,6 +21,7 @@ export type PlanSlice = Pick<AppState,
   | 'selectPlanObjects' | 'clearPlanSelection' | 'movePlanObjectTo'
   | 'terrainPaintTool' | 'setTerrainPaintTool'
   | 'manifestVersion' | 'bumpManifestVersion'
+  | 'rotatePlanObjects'
 >;
 
 export const createPlanSlice: StateCreator<AppState, [], [], PlanSlice> = (set, get) => ({
@@ -99,4 +102,27 @@ export const createPlanSlice: StateCreator<AppState, [], [], PlanSlice> = (set, 
   // themselves, purely to be notified a re-read is worthwhile.
   manifestVersion: 0,
   bumpManifestVersion: () => set((state) => ({ manifestVersion: state.manifestVersion + 1 })),
+
+  // fix/iso-tiles-and-rotation commit 3: R (cw) / Shift+R (ccw) in
+  // PlanCanvas.tsx, applied to every selected object at once as ONE undo
+  // entry - the same "batch the whole gesture, one saveHistory call"
+  // convention moveSelectionBy already uses for the schematic canvas's
+  // own arrow-key movement. Which rotations exist to cycle through is
+  // read fresh from that object's OWN sprite state entry each time
+  // (getAvailableRotations - never a fixed [0,90,180,270] assumed up
+  // front), so an object whose sprite has no rear view simply cycles
+  // between 0 and 90 forever, exactly as the task requires.
+  rotatePlanObjects: (ids, direction) => {
+    if (ids.length === 0) return;
+    set((state) => ({
+      planObjects: state.planObjects.map(o => {
+        if (!ids.includes(o.id)) return o;
+        const resolved = getSpriteState(o.spriteId, o.state);
+        const available = resolved ? getAvailableRotations(resolved.entry) : [0 as const, 90 as const];
+        const current = o.rotation ?? 0;
+        return { ...o, rotation: getNextRotation(available, current, direction) };
+      })
+    }));
+    get().saveHistory();
+  },
 });

@@ -206,4 +206,8 @@ export interface AppState {
   setTerrainPaintTool: (type: TerrainTileType | null) => void;
   manifestVersion: number;
   bumpManifestVersion: () => void;
+  // fix/iso-tiles-and-rotation commit 3: rotates every object in `ids`
+  // together as one undo entry - see planSlice.ts's own comment for why
+  // available rotations are re-read per object rather than assumed.
+  rotatePlanObjects: (ids: string[], direction: 'cw' | 'ccw') => void;
 }

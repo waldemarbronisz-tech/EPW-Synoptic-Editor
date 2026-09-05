@@ -27,9 +27,23 @@ export function isLocalPointOnOpaquePixel(
   return sampleAlpha(Math.floor(localX), Math.floor(localY)) > 0;
 }
 
-/** World point, converted into a sprite's own local pixel space (its draw position subtracted out). */
-export function toSpriteLocalPoint(worldX: number, worldY: number, drawX: number, drawY: number): { x: number; y: number } {
-  return { x: worldX - drawX, y: worldY - drawY };
+/**
+ * World point, converted into a sprite's own local pixel space (its draw
+ * position subtracted out). `mirror`, when given, accounts for a
+ * fix/iso-tiles-and-rotation commit 3 rotation drawn horizontally
+ * mirrored (Konva flips a shape around its own local x=0, i.e. the
+ * sprite's own RIGHT edge once mirrored) - the pixel actually shown at
+ * a given screen offset from the bounding box's left edge is the
+ * ORIGINAL image's pixel at `width` minus that same offset. Omitted (or
+ * every existing, non-rotation call site that never passes it) leaves
+ * this exactly the plain subtraction it always was.
+ */
+export function toSpriteLocalPoint(
+  worldX: number, worldY: number, drawX: number, drawY: number,
+  mirror?: { width: number }
+): { x: number; y: number } {
+  const rawX = worldX - drawX;
+  return { x: mirror ? mirror.width - rawX : rawX, y: worldY - drawY };
 }
 
 // ---- real pixel sampling (Konva/canvas-touching, kept minimal) --------
@@ -79,13 +93,20 @@ export function sampleSpriteAlpha(image: HTMLImageElement, px: number, py: numbe
   }
 }
 
-/** Full test: does clicking (worldX, worldY) actually hit this sprite's own opaque pixels? */
+/**
+ * Full test: does clicking (worldX, worldY) actually hit this sprite's
+ * own opaque pixels? `drawX`/`drawY` are always the bounding box's own
+ * LEFT/top edge in world space, whether or not `mirrored` is set - see
+ * IsoRenderer.tsx's own IsoSpriteNode for why the anchor-corrected
+ * getSpriteDrawPosition result already is that edge in both cases.
+ */
 export function hitTestSprite(
   worldX: number, worldY: number,
   drawX: number, drawY: number,
   width: number, height: number,
-  image: HTMLImageElement
+  image: HTMLImageElement,
+  mirrored: boolean = false
 ): boolean {
-  const local = toSpriteLocalPoint(worldX, worldY, drawX, drawY);
+  const local = toSpriteLocalPoint(worldX, worldY, drawX, drawY, mirrored ? { width } : undefined);
   return isLocalPointOnOpaquePixel(local.x, local.y, width, height, (px, py) => sampleSpriteAlpha(image, px, py));
 }

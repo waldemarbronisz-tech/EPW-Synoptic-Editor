@@ -85,12 +85,56 @@ describe('PropertyInspector - plan object', () => {
     expect(useStore.getState().planObjects[0].name).toBe('Main gate');
   });
 
-  it('has no Fill, Border, Font, Rotation or Scale field - none of them apply to a plan object', () => {
+  // fix/iso-tiles-and-rotation commit 3: Rotation is the one deliberate
+  // exception now - it DOES apply to a plan object, so it moved out of
+  // this negative list into its own assertion below. Everything else
+  // here is exactly as before, unmodified.
+  it('has no Fill, Border, Font or Scale field - none of them apply to a plan object', () => {
     useStore.setState({ planObjects: [makePlanObject()], selectedPlanObjectIds: ['P1'] });
     render(<PropertyInspector />);
-    for (const label of ['Fill', 'Border', 'Font', 'Rotation', 'Scale']) {
+    for (const label of ['Fill', 'Border', 'Font', 'Scale']) {
       expect(screen.queryByText(label)).toBeNull();
     }
+  });
+
+  // fix/iso-tiles-and-rotation commit 3: point 5 of the completion
+  // report - the Rotation dropdown's own options come from the
+  // manifest's fileBack, never a hardcoded four-item list.
+  it('the Rotation dropdown offers only 0 and 90 for a sprite state with no rear view', () => {
+    useStore.setState({ planObjects: [makePlanObject()], selectedPlanObjectIds: ['P1'] });
+    render(<PropertyInspector />);
+    const rotationSelect = screen.getByText('Rotation', { selector: 'label' }).closest('.property-row')!.querySelector('select')!;
+    const options = Array.from(rotationSelect.options).map(o => o.value);
+    expect(options).toEqual(['0', '90']);
+  });
+
+  it('the Rotation dropdown offers all four rotations once the manifest gives this state a rear view', () => {
+    const manifestWithRearView: SpriteManifestData = {
+      ...manifest,
+      sprites: [{
+        ...manifest.sprites[0],
+        states: {
+          CLOSED: {
+            ...manifest.sprites[0].states.CLOSED,
+            fileBack: 'gate_sliding_CLOSED_back.png', backWidth: 96, backHeight: 62, backAnchorX: 48, backAnchorY: 62,
+          },
+        },
+      }],
+    };
+    setSpriteManifestForTesting(manifestWithRearView);
+    useStore.setState({ planObjects: [makePlanObject()], selectedPlanObjectIds: ['P1'] });
+    render(<PropertyInspector />);
+    const rotationSelect = screen.getByText('Rotation', { selector: 'label' }).closest('.property-row')!.querySelector('select')!;
+    const options = Array.from(rotationSelect.options).map(o => o.value);
+    expect(options).toEqual(['0', '90', '180', '270']);
+  });
+
+  it('changing the Rotation dropdown updates the store immediately', () => {
+    useStore.setState({ planObjects: [makePlanObject()], selectedPlanObjectIds: ['P1'] });
+    render(<PropertyInspector />);
+    const rotationSelect = screen.getByText('Rotation', { selector: 'label' }).closest('.property-row')!.querySelector('select')!;
+    fireEvent.change(rotationSelect, { target: { value: '90' } });
+    expect(useStore.getState().planObjects[0].rotation).toBe(90);
   });
 
   it('has no Bindings section - a plan object has no terminals or connections', () => {
