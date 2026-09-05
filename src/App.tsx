@@ -18,9 +18,16 @@ const ScadaStylePreview = lazy(() =>
   import('./components/ScadaStylePreview').then(m => ({ default: m.ScadaStylePreview }))
 );
 
+// feat/device-list-ui commit 1: same lazy-on-first-open convention as
+// ScadaStylePreview above.
+const DeviceRegistriesDialog = lazy(() =>
+  import('./components/DeviceRegistriesDialog').then(m => ({ default: m.DeviceRegistriesDialog }))
+);
+
 function App() {
   const { projectName, fileName, isDirty, screenKind } = useStore();
   const [showScadaPreview, setShowScadaPreview] = useState(false);
+  const [showDeviceRegistries, setShowDeviceRegistries] = useState(false);
 
   useEffect(() => {
     const titleName = fileName || `${projectName}.epwsyn`;
@@ -56,10 +63,18 @@ function App() {
 
   return (
     <div className="app-container">
-      <MenuBar onOpenScadaPreview={() => setShowScadaPreview(true)} />
+      <MenuBar
+        onOpenScadaPreview={() => setShowScadaPreview(true)}
+        onOpenDeviceRegistries={() => setShowDeviceRegistries(true)}
+      />
       {showScadaPreview && (
         <Suspense fallback={null}>
           <ScadaStylePreview onClose={() => setShowScadaPreview(false)} />
+        </Suspense>
+      )}
+      {showDeviceRegistries && (
+        <Suspense fallback={null}>
+          <DeviceRegistriesDialog onClose={() => setShowDeviceRegistries(false)} />
         </Suspense>
       )}
       <Toolbar />

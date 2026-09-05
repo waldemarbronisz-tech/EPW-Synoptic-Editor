@@ -2,7 +2,7 @@ import type { SynopticObject, SynopticConnection } from '../store';
 import type { MeterElement } from '../meter/MeterElement';
 import type { SignalPanelElement } from '../elements/SignalPanelElement';
 import type { FrameElement } from '../elements/FrameElement';
-import type { Device } from './DeviceSchema';
+import type { Device, LocationEntry, CardEntry } from './DeviceSchema';
 import type { TerrainTileType } from '../iso/TerrainTile';
 import type { PlanObject } from '../iso/PlanObject';
 import type { ScreenKind } from '../store';
@@ -54,6 +54,12 @@ export interface EPWProjectSchema {
   // unused would be dead weight. Optional and additive for the same
   // reason meters is - no schema version bump.
   devices?: Device[];
+  // feat/device-list-ui commit 1: the other two thirds of DeviceSchema.ts's
+  // DeviceRegistry shape, now that this editor actually manages them - same
+  // optional/additive treatment as devices above (an older file simply has
+  // no locations/cards, not an invalid one). No schema version bump.
+  locations?: LocationEntry[];
+  cards?: CardEntry[];
   // feat/isometric-engine commit 3: the PLAN screen's painted terrain -
   // same treatment as meters/signalPanels/frames/devices above: optional
   // and additive, keyed by "gx,gy" (TerrainTile.ts's own terrainKey), one
