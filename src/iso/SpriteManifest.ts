@@ -25,6 +25,23 @@ export interface SpriteStateEntry {
   height: number;
   anchorX: number;
   anchorY: number;
+  // fix/iso-tiles-and-rotation commit 2: the rear view, needed for a
+  // 180-degree rotation - a mirror flip alone cannot produce it (a
+  // building's back has its own windows, door and chimney position, not
+  // a reflection of the front). Optional as a GROUP: either all five of
+  // these are present (this state supports 180/270 rotation) or none of
+  // them are (0/90 only) - see validateStateShape's own enforcement of
+  // that rule and hasRearView below.
+  fileBack?: string;
+  backWidth?: number;
+  backHeight?: number;
+  backAnchorX?: number;
+  backAnchorY?: number;
+}
+
+/** Whether this state's own entry carries a rear view at all - the single source of truth commit 3's rotation feature reads, never a hardcoded per-sprite list. */
+export function hasRearView(entry: SpriteStateEntry): boolean {
+  return entry.fileBack !== undefined;
 }
 
 export interface SpriteDefinition {
@@ -95,6 +112,28 @@ function validateStateShape(raw: unknown, spriteId: string, stateKey: string, is
   if (!isNonNegativeInt(raw.anchorX)) problems.push('anchorX must be a non-negative integer');
   if (!isNonNegativeInt(raw.anchorY)) problems.push('anchorY must be a non-negative integer');
 
+  // fix/iso-tiles-and-rotation commit 2: fileBack and its four back-
+  // prefixed siblings are optional as a GROUP, never individually - a
+  // state either supports 180/270 rotation (all five rear-view fields
+  // present and valid) or it does not (none of them present at all).
+  // fileBack itself is what the rest of this group's presence hinges on;
+  // note its presence is a raw type check, not isString - a wrong-typed
+  // fileBack (e.g. a stray number) must still be caught below, not
+  // silently treated as "no rear view".
+  const hasFileBack = raw.fileBack !== undefined;
+  if (hasFileBack) {
+    if (!isString(raw.fileBack) || raw.fileBack.length === 0) problems.push('fileBack must be a non-empty string');
+    if (!isNonNegativeInt(raw.backWidth)) problems.push('backWidth must be a non-negative integer');
+    if (!isNonNegativeInt(raw.backHeight)) problems.push('backHeight must be a non-negative integer');
+    if (!isNonNegativeInt(raw.backAnchorX)) problems.push('backAnchorX must be a non-negative integer');
+    if (!isNonNegativeInt(raw.backAnchorY)) problems.push('backAnchorY must be a non-negative integer');
+  } else {
+    const orphaned = (['backWidth', 'backHeight', 'backAnchorX', 'backAnchorY'] as const).filter(key => raw[key] !== undefined);
+    if (orphaned.length > 0) {
+      problems.push(`fileBack is not set, so ${orphaned.join(', ')} must not be present either`);
+    }
+  }
+
   if (problems.length > 0) {
     issues.push({ severity: 'ERROR', code: 'SPRITE_STATE_INVALID_SHAPE', message: `Sprite '${spriteId}' state '${stateKey}': ${problems.join('; ')}`, spriteId });
     return null;
@@ -107,15 +146,31 @@ function validateStateShape(raw: unknown, spriteId: string, stateKey: string, is
     anchorX: raw.anchorX as number,
     anchorY: raw.anchorY as number,
   };
+  if (hasFileBack) {
+    state.fileBack = raw.fileBack as string;
+    state.backWidth = raw.backWidth as number;
+    state.backHeight = raw.backHeight as number;
+    state.backAnchorX = raw.backAnchorX as number;
+    state.backAnchorY = raw.backAnchorY as number;
+  }
 
   // Business rule, not shape: an anchor is a point WITHIN the sprite's own
   // bounding box (it is where the sprite touches the ground), so it can
-  // never exceed the sprite's own width/height.
+  // never exceed the sprite's own width/height. Same rule for the rear
+  // view's own anchor against its own (independent) width/height.
   if (state.anchorX > state.width) {
     issues.push({ severity: 'ERROR', code: 'SPRITE_STATE_ANCHOR_X_OUT_OF_BOUNDS', message: `Sprite '${spriteId}' state '${stateKey}': anchorX (${state.anchorX}) must not exceed width (${state.width})`, spriteId });
   }
   if (state.anchorY > state.height) {
     issues.push({ severity: 'ERROR', code: 'SPRITE_STATE_ANCHOR_Y_OUT_OF_BOUNDS', message: `Sprite '${spriteId}' state '${stateKey}': anchorY (${state.anchorY}) must not exceed height (${state.height})`, spriteId });
+  }
+  if (hasFileBack) {
+    if (state.backAnchorX! > state.backWidth!) {
+      issues.push({ severity: 'ERROR', code: 'SPRITE_STATE_BACK_ANCHOR_X_OUT_OF_BOUNDS', message: `Sprite '${spriteId}' state '${stateKey}': backAnchorX (${state.backAnchorX}) must not exceed backWidth (${state.backWidth})`, spriteId });
+    }
+    if (state.backAnchorY! > state.backHeight!) {
+      issues.push({ severity: 'ERROR', code: 'SPRITE_STATE_BACK_ANCHOR_Y_OUT_OF_BOUNDS', message: `Sprite '${spriteId}' state '${stateKey}': backAnchorY (${state.backAnchorY}) must not exceed backHeight (${state.backHeight})`, spriteId });
+    }
   }
 
   return state;
