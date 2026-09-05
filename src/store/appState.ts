@@ -8,7 +8,9 @@ import type { MeterElement } from '../meter/MeterElement';
 import type { SignalPanelElement } from '../elements/SignalPanelElement';
 import type { FrameElement } from '../elements/FrameElement';
 import type { Device } from '../project/DeviceSchema';
-import type { CanvasState, HistorySnapshot, Message, SynopticConnection, SynopticObject } from './types';
+import type { CanvasState, HistorySnapshot, Message, ScreenKind, SynopticConnection, SynopticObject } from './types';
+import type { TerrainTileType } from '../iso/TerrainTile';
+import type { PlanObject } from '../iso/PlanObject';
 
 export interface AppState {
   projectMetadata: {
@@ -170,4 +172,38 @@ export interface AppState {
 
   // Rotation
   rotateSelected: (direction: 'cw' | 'ccw') => void;
+
+  // PLAN screen terrain (feat/isometric-engine commit 3): a sparse map,
+  // one entry per PAINTED tile only - an unpainted tile is simply absent,
+  // not stored with some "empty" type, so the canvas shows the plot as
+  // an island on the background, not a rectangle filling the screen.
+  terrainTiles: Record<string, TerrainTileType>;
+  // Sets/overwrites one tile - called for every tile the paint tool's
+  // drag crosses. Deliberately does NOT call saveHistory itself (a drag
+  // can cross many tiles); commitTerrainStroke below does that once, so
+  // one whole mousedown-to-mouseup drag is one undo entry, never one per
+  // tile painted.
+  paintTerrainTile: (gx: number, gy: number, type: TerrainTileType) => void;
+  commitTerrainStroke: () => void;
+
+  // Screen mode (feat/isometric-engine commit 5): SCHEMATIC (default) is
+  // every screen this editor already knew how to draw, completely
+  // unchanged; PLAN is the new isometric mode. See planSlice.ts's own
+  // header for why PLAN objects get their own separate selection/CRUD
+  // rather than joining the schematic one.
+  screenKind: ScreenKind;
+  setScreenKind: (kind: ScreenKind) => void;
+
+  planObjects: PlanObject[];
+  selectedPlanObjectIds: string[];
+  addPlanObject: (obj: Omit<PlanObject, 'id'>) => void;
+  updatePlanObject: (id: string, updates: Partial<PlanObject>) => void;
+  deletePlanObjects: (ids: string[]) => void;
+  selectPlanObjects: (ids: string[], multi?: boolean) => void;
+  clearPlanSelection: () => void;
+  movePlanObjectTo: (id: string, gx: number, gy: number) => void;
+  terrainPaintTool: TerrainTileType | null;
+  setTerrainPaintTool: (type: TerrainTileType | null) => void;
+  manifestVersion: number;
+  bumpManifestVersion: () => void;
 }

@@ -3,10 +3,12 @@ import { MenuBar } from './components/MenuBar';
 import { Toolbar } from './components/Toolbar';
 import { Toolbox } from './components/Toolbox';
 import { Canvas } from './components/Canvas';
+import { PlanCanvas } from './components/PlanCanvas';
 import { PropertyInspector } from './components/PropertyInspector';
 import { MessagesPanel } from './components/MessagesPanel';
 import { StatusBar } from './components/StatusBar';
 import { useStore } from './store';
+import { loadSpriteManifest } from './iso/SpriteManifest';
 import { Suspense, lazy, useEffect, useState } from 'react';
 
 // Internal-audit fix: a full-screen preview only ever mounted from the
@@ -17,7 +19,7 @@ const ScadaStylePreview = lazy(() =>
 );
 
 function App() {
-  const { projectName, fileName, isDirty } = useStore();
+  const { projectName, fileName, isDirty, screenKind } = useStore();
   const [showScadaPreview, setShowScadaPreview] = useState(false);
 
   useEffect(() => {
@@ -25,6 +27,17 @@ function App() {
     const dirtyMark = isDirty ? ' *' : '';
     document.title = `EPW Synoptic Editor — ${titleName}${dirtyMark}`;
   }, [projectName, fileName, isDirty]);
+
+  // Loaded once, regardless of screenKind: a SCHEMATIC session never
+  // reads anything this populates, and the fetch/validation itself never
+  // touches schematic state, so this is safe to always run - a PLAN
+  // screen (or a "New Plan..." created later in the same session) then
+  // never has to wait for it.
+  useEffect(() => {
+    loadSpriteManifest().then(() => {
+      useStore.getState().bumpManifestVersion();
+    });
+  }, []);
 
   // Internal-audit fix: isDirty was already tracked in the store (for the
   // title-bar "*" above) but nothing warned before closing the tab/window,
@@ -62,7 +75,7 @@ function App() {
           <Panel defaultSize={60} minSize={30} className="panel-container">
             <PanelGroup direction="vertical" autoSaveId="epw-layout-center">
               <Panel defaultSize={80} minSize={30} className="panel-container">
-                <Canvas />
+                {screenKind === 'PLAN' ? <PlanCanvas /> : <Canvas />}
               </Panel>
 
               <PanelResizeHandle className="resize-handle-horizontal" />

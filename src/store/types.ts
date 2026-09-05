@@ -8,6 +8,15 @@ import type { MeterRow } from '../symbols/scada/MeterSymbol';
 import type { MeterElement } from '../meter/MeterElement';
 import type { SignalPanelElement } from '../elements/SignalPanelElement';
 import type { FrameElement } from '../elements/FrameElement';
+import type { TerrainTileType } from '../iso/TerrainTile';
+import type { PlanObject } from '../iso/PlanObject';
+
+// feat/isometric-engine commit 5: which of the two screen kinds a
+// project is - SCHEMATIC (default, every existing screen) or PLAN (the
+// new isometric mode). Lives here, not in planSlice.ts, so appState.ts
+// can import it from the same leaf module it already reads every other
+// field type from, rather than reaching into a sibling slice file.
+export type ScreenKind = 'SCHEMATIC' | 'PLAN';
 
 export interface SynopticObject {
   zIndex?: number;
@@ -123,4 +132,14 @@ export interface HistorySnapshot {
   meters: MeterElement[];
   signalPanels: SignalPanelElement[];
   frames: FrameElement[];
+  // feat/isometric-engine commit 3: the PLAN screen's painted terrain,
+  // same treatment as every element kind above - optional so every
+  // snapshot taken before this field existed (and every schematic-mode
+  // snapshot, which never touches it) still satisfies this interface;
+  // historySlice.ts's own undo/redo fall back to {} for it exactly the
+  // way it already falls back to [] for meters/signalPanels/frames.
+  terrainTiles?: Record<string, TerrainTileType>;
+  // feat/isometric-engine commit 5: the PLAN screen's placed objects -
+  // same optional/additive treatment as terrainTiles above.
+  planObjects?: PlanObject[];
 }

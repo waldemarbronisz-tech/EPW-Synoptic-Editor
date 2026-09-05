@@ -6,6 +6,8 @@ import { createSelectionSlice } from './store/selectionSlice';
 import { createClipboardSlice } from './store/clipboardSlice';
 import { createHistorySlice } from './store/historySlice';
 import { createLayoutSlice } from './store/layoutSlice';
+import { createTerrainSlice } from './store/terrainSlice';
+import { createPlanSlice } from './store/planSlice';
 import type { AppState } from './store/appState';
 
 // Internal-audit fix (god-file breakup): this file used to hold the
@@ -26,6 +28,7 @@ export type {
   CanvasState,
   HistorySnapshot,
   Message,
+  ScreenKind,
   SynopticConnection,
   SynopticObject,
   WirePoint,
@@ -39,4 +42,6 @@ export const useStore = create<AppState>()((...a) => ({
   ...createClipboardSlice(...a),
   ...createHistorySlice(...a),
   ...createLayoutSlice(...a),
+  ...createTerrainSlice(...a),
+  ...createPlanSlice(...a),
 }));

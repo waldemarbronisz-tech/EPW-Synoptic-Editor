@@ -9,6 +9,8 @@ import type { SignalPanelRow } from '../elements/SignalPanelElement';
 import { INDICATOR_DIODE_STATES } from '../symbols/scada/IndicatorDiodeSymbol';
 import { FONT_SIZE_BASE, FONT_SIZE_SMALL } from '../theme/ScadaTheme';
 import type { SynopticConnection, SynopticObject } from '../store';
+import { getSprite } from '../iso/SpriteManifest';
+import { getPlanObjectFootprint } from '../iso/PlanObject';
 
 // Internal-audit fix: these two wizards are only ever mounted after an
 // explicit "+ Wizard" click (see showMeterWizard/showSignalPanelWizard
@@ -33,6 +35,7 @@ export const PropertyInspector: React.FC = () => {
   const { meters, selectedMeterIds, updateMeter, devices } = useStore();
   const { signalPanels, selectedSignalPanelIds, updateSignalPanel } = useStore();
   const { frames, selectedFrameIds, updateFrame } = useStore();
+  const { planObjects, selectedPlanObjectIds, updatePlanObject } = useStore();
   // Hooks must run unconditionally on every render (this component is
   // otherwise a chain of early returns depending on what is selected),
   // so this lives up here rather than inside the selectedMeter/
@@ -40,6 +43,125 @@ export const PropertyInspector: React.FC = () => {
   // read by its own branch.
   const [showMeterWizard, setShowMeterWizard] = useState(false);
   const [showSignalPanelWizard, setShowSignalPanelWizard] = useState(false);
+
+  // feat/isometric-engine commit 6: PLAN mode has its own, completely
+  // separate selection (planSlice.ts) - checked first and independently
+  // of the five SCHEMATIC arrays below. This is safe rather than
+  // ambiguous because a PLAN-kind project's schematic arrays (objects,
+  // connections, meters...) are always empty by construction (nothing
+  // in planSlice.ts ever touches them, and a PLAN project is never
+  // loaded with any of them populated either), and vice versa for a
+  // SCHEMATIC project's planObjects/selectedPlanObjectIds.
+  if (selectedPlanObjectIds.length > 0) {
+    if (selectedPlanObjectIds.length > 1) {
+      return (
+        <div className="property-inspector">
+          <div className="inspector-header">Properties</div>
+          <div className="inspector-empty">Multiple objects selected</div>
+        </div>
+      );
+    }
+
+    const selectedPlanObject = planObjects.find(o => o.id === selectedPlanObjectIds[0]);
+    if (!selectedPlanObject) return null;
+
+    // A plan object's sprite id and current state are what the manifest
+    // (SpriteManifest.ts, commit 2) actually knows about it - its
+    // footprint (read-only here) and the list of states the dropdown
+    // below offers both come from there, never hand-written. If the
+    // sprite id somehow no longer resolves (a manifest that shrank since
+    // this object was placed), the state dropdown falls back to just the
+    // object's own currently-stored state so the field never renders
+    // empty.
+    const spriteDef = getSprite(selectedPlanObject.spriteId);
+    const footprint = getPlanObjectFootprint(selectedPlanObject);
+    const stateNames = spriteDef ? Object.keys(spriteDef.states) : [selectedPlanObject.state];
+
+    // Deliberately NOT here, unlike the SCHEMATIC object branch below:
+    // terminals, connections/bindings, Fill, Border, Font, Rotation,
+    // Scale - none of them mean anything for a plan object (this task's
+    // own explicit list), so this branch simply never renders a field
+    // for any of them, the same "hide the whole section" treatment
+    // already given to scada.meter's Height/Bindings/Text fields.
+    return (
+      <div className="property-inspector">
+        <div className="inspector-header">Plan Object Properties</div>
+        <div className="inspector-content">
+          <div className="property-group">
+            <div className="property-group-title">General</div>
+            <div className="property-row">
+              <label>Sprite</label>
+              <input type="text" value={selectedPlanObject.spriteId} disabled />
+            </div>
+            <div className="property-row">
+              <label>Designation</label>
+              <input
+                type="text"
+                value={selectedPlanObject.designation || ''}
+                onChange={(e) => updatePlanObject(selectedPlanObject.id, { designation: e.target.value })}
+                onBlur={() => useStore.getState().saveHistory()}
+              />
+            </div>
+            <div className="property-row">
+              <label>Name</label>
+              <input
+                type="text"
+                value={selectedPlanObject.name || ''}
+                onChange={(e) => updatePlanObject(selectedPlanObject.id, { name: e.target.value })}
+                onBlur={() => useStore.getState().saveHistory()}
+              />
+            </div>
+          </div>
+
+          <div className="property-group">
+            <div className="property-group-title">Position</div>
+            <div className="property-row">
+              <label>Tile X</label>
+              <input
+                type="number"
+                value={selectedPlanObject.gx}
+                onChange={(e) => updatePlanObject(selectedPlanObject.id, { gx: Math.round(parseFloat(e.target.value) || 0) })}
+                onBlur={() => useStore.getState().saveHistory()}
+              />
+            </div>
+            <div className="property-row">
+              <label>Tile Y</label>
+              <input
+                type="number"
+                value={selectedPlanObject.gy}
+                onChange={(e) => updatePlanObject(selectedPlanObject.id, { gy: Math.round(parseFloat(e.target.value) || 0) })}
+                onBlur={() => useStore.getState().saveHistory()}
+              />
+            </div>
+          </div>
+
+          <div className="property-group">
+            <div className="property-group-title">State</div>
+            <div className="property-row">
+              <label>State</label>
+              <select
+                value={selectedPlanObject.state}
+                onChange={(e) => {
+                  updatePlanObject(selectedPlanObject.id, { state: e.target.value });
+                  useStore.getState().saveHistory();
+                }}
+              >
+                {stateNames.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="property-group">
+            <div className="property-group-title">Footprint</div>
+            <div className="property-row">
+              <label>Tiles</label>
+              <input type="text" value={`${footprint.x} x ${footprint.y}`} disabled />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (selectedIds.length === 0 && selectedConnectionIds.length === 0 && selectedMeterIds.length === 0 && selectedSignalPanelIds.length === 0 && selectedFrameIds.length === 0) {
     return (

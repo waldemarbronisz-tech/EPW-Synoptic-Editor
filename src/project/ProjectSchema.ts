@@ -3,6 +3,9 @@ import type { MeterElement } from '../meter/MeterElement';
 import type { SignalPanelElement } from '../elements/SignalPanelElement';
 import type { FrameElement } from '../elements/FrameElement';
 import type { Device } from './DeviceSchema';
+import type { TerrainTileType } from '../iso/TerrainTile';
+import type { PlanObject } from '../iso/PlanObject';
+import type { ScreenKind } from '../store';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 import { COLOR_CANVAS_BACKGROUND, GRID_SIZE } from '../theme/ScadaTheme';
 
@@ -51,6 +54,22 @@ export interface EPWProjectSchema {
   // unused would be dead weight. Optional and additive for the same
   // reason meters is - no schema version bump.
   devices?: Device[];
+  // feat/isometric-engine commit 3: the PLAN screen's painted terrain -
+  // same treatment as meters/signalPanels/frames/devices above: optional
+  // and additive, keyed by "gx,gy" (TerrainTile.ts's own terrainKey), one
+  // entry per painted tile only. An older project file simply has no
+  // terrain (loads as an empty map), not an invalid one - no schema
+  // version bump.
+  terrain?: Record<string, TerrainTileType>;
+  // feat/isometric-engine commit 5: which screen kind this project is.
+  // Optional and additive: a file with no `kind` field at all - every
+  // file saved before this commit existed - is SCHEMATIC, exactly as it
+  // already behaved with no such concept in the format at all. No schema
+  // version bump (same reasoning as every other optional field above).
+  kind?: ScreenKind;
+  // feat/isometric-engine commit 5: the PLAN screen's placed objects -
+  // same optional/additive treatment as terrain above.
+  planObjects?: PlanObject[];
 }
 
 // v2: node-based wiring. A connection is a freehand orthogonal polyline
@@ -59,7 +78,11 @@ export interface EPWProjectSchema {
 export const CURRENT_SCHEMA_VERSION = 2;
 export const FORMAT_NAME = "EPW_SYNOPTIC";
 
-export function createEmptyProject(name: string = "New Project"): EPWProjectSchema {
+// feat/isometric-engine commit 5: `kind` defaults to SCHEMATIC - every
+// existing call site (and every existing test) that calls
+// createEmptyProject(name) with one argument keeps creating exactly the
+// screen it always did.
+export function createEmptyProject(name: string = "New Project", kind: ScreenKind = 'SCHEMATIC'): EPWProjectSchema {
   return {
     format: FORMAT_NAME,
     schema_version: CURRENT_SCHEMA_VERSION,
@@ -76,7 +99,8 @@ export function createEmptyProject(name: string = "New Project"): EPWProjectSche
       gridSize: GRID_SIZE
     },
     objects: [],
-    connections: []
+    connections: [],
+    kind
   };
 }
 
