@@ -18,18 +18,20 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../store';
-import type { Device, DeviceBehavior, DeviceCommon, ChannelAddress } from '../project/DeviceSchema';
+import type { Device, DeviceBehavior, DeviceCommon, ChannelAddress, MeasuredDevice } from '../project/DeviceSchema';
 import { defaultFieldsForBehavior, assembleDevice } from '../project/DeviceFormDefaults';
-import type { DeviceOwnFields, SwitchedOwnFields, SignalOwnFields } from '../project/DeviceFormDefaults';
+import type { DeviceOwnFields, SwitchedOwnFields, SignalOwnFields, MeasuredOwnFields, ModulatedOwnFields } from '../project/DeviceFormDefaults';
 import { getDeviceOwnIssues, mapDeviceIssuesToFields } from '../project/DeviceFormFieldErrors';
 import { getOccupiedChannels } from '../project/DeviceRegistryQueries';
+import { getMeasuredPreviewValue, formatMeasuredValue } from '../meter/MeterResolver';
 import { ChannelAddressPicker } from './ChannelAddressPicker';
 import { FONT_SIZE_SMALL, COLOR_ALARM } from '../theme/ScadaTheme';
 
 const BEHAVIORS: DeviceBehavior[] = ['SWITCHED', 'SIGNAL', 'MEASURED', 'MODULATED'];
-// Commit 3 gives these two behaviors a real, field-level-validated form;
-// MEASURED/MODULATED still use the commit-2 placeholder until commit 4.
-const BEHAVIORS_WITH_FULL_FORM: DeviceBehavior[] = ['SWITCHED', 'SIGNAL'];
+// Commit 3 gave SWITCHED/SIGNAL a real, field-level-validated form;
+// commit 4 (this version) does the same for MEASURED/MODULATED - every
+// behavior now blocks Save on error, no placeholder left.
+const BEHAVIORS_WITH_FULL_FORM: DeviceBehavior[] = ['SWITCHED', 'SIGNAL', 'MEASURED', 'MODULATED'];
 
 function splitId(id: string): { code: string; suffix: string } {
   const idx = id.indexOf('_');
@@ -127,6 +129,12 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
   const patchSignal = (patch: Partial<SignalOwnFields>) => setOwnFields(prev => ({ ...(prev as SignalOwnFields), ...patch }));
   const patchSignalFeedback = (patch: Partial<SignalOwnFields['feedback']>) =>
     setOwnFields(prev => ({ ...(prev as SignalOwnFields), feedback: { ...(prev as SignalOwnFields).feedback, ...patch } }));
+
+  const measured = behavior === 'MEASURED' ? (ownFields as MeasuredOwnFields) : null;
+  const patchMeasured = (patch: Partial<MeasuredOwnFields>) => setOwnFields(prev => ({ ...(prev as MeasuredOwnFields), ...patch }));
+
+  const modulated = behavior === 'MODULATED' ? (ownFields as ModulatedOwnFields) : null;
+  const patchModulated = (patch: Partial<ModulatedOwnFields>) => setOwnFields(prev => ({ ...(prev as ModulatedOwnFields), ...patch }));
 
   const outputHint = switched ? {
     '1-MAINTAINED': 'Jedno wyjscie utrzymywane - typowy stycznik/zawor z jedna cewka trzymana pod napieciem w stanie zalaczonym.',
@@ -342,11 +350,86 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
             </div>
           )}
 
-          {!hasFullForm && (
-            <div style={{ padding: '8px 12px', fontSize: `${FONT_SIZE_SMALL}px` }}>
-              Szczegolowa konfiguracja zachowania {behavior} zostanie udostepniona w kolejnym kroku prac
-              (formularz MEASURED/MODULATED). Aparat zapisany teraz uzywa wartosci domyslnych i moze
-              byc oznaczony jako niepoprawny do czasu uzupelnienia.
+          {measured && (
+            <div className="property-group">
+              <div style={sectionTitleStyle}>Pomiar</div>
+              <div className="property-row">
+                <label>input</label>
+                <ChannelAddressPicker value={measured.input} onChange={addr => patchMeasured({ input: addr ?? '' })} expectedKind="AI" cards={cards} occupied={occupied} />
+                <FieldErrors messages={fieldErrors.get('input')} />
+              </div>
+              <div className="property-row">
+                <label>Jednostka</label>
+                <input value={measured.unit} onChange={e => patchMeasured({ unit: e.target.value })} style={inputStyle} placeholder="°C" />
+                <FieldErrors messages={fieldErrors.get('unit')} />
+              </div>
+              <div className="property-row">
+                <label>Zakres min</label>
+                <input type="number" value={measured.rangeMin} onChange={e => patchMeasured({ rangeMin: Number(e.target.value) })} style={inputStyle} />
+                <FieldErrors messages={fieldErrors.get('rangeMin')} />
+              </div>
+              <div className="property-row">
+                <label>Zakres max</label>
+                <input type="number" value={measured.rangeMax} onChange={e => patchMeasured({ rangeMax: Number(e.target.value) })} style={inputStyle} />
+                <FieldErrors messages={fieldErrors.get('rangeMax')} />
+              </div>
+              <div className="property-row">
+                <label>Format</label>
+                <input value={measured.format} onChange={e => patchMeasured({ format: e.target.value })} style={inputStyle} placeholder="0.0" />
+              </div>
+              <div className="property-row">
+                <label>Strefa martwa (deadband)</label>
+                <input type="number" value={measured.deadband} onChange={e => patchMeasured({ deadband: Number(e.target.value) })} style={inputStyle} />
+                <FieldErrors messages={fieldErrors.get('deadband')} />
+              </div>
+              <div style={hintStyle}>
+                {/* getMeasuredPreviewValue only ever reads rangeMin/rangeMax
+                    (MeterResolver.ts's own contract) - the cast below stays
+                    scoped to that, not a claim that this draft is otherwise
+                    a complete MeasuredDevice yet. */}
+                Podglad (srodek zakresu, edytor nie ma zywych danych): {formatMeasuredValue(getMeasuredPreviewValue({ rangeMin: measured.rangeMin, rangeMax: measured.rangeMax } as MeasuredDevice), measured.format)} {measured.unit}
+              </div>
+            </div>
+          )}
+
+          {modulated && (
+            <div className="property-group">
+              <div style={sectionTitleStyle}>Modulacja</div>
+              <div className="property-row">
+                <label>setpointOutput</label>
+                <ChannelAddressPicker value={modulated.setpointOutput} onChange={addr => patchModulated({ setpointOutput: addr ?? '' })} expectedKind="AO" cards={cards} occupied={occupied} />
+                <FieldErrors messages={fieldErrors.get('setpointOutput')} />
+              </div>
+              <div className="property-row">
+                <label>feedbackInput</label>
+                <ChannelAddressPicker value={modulated.feedbackInput} onChange={addr => patchModulated({ feedbackInput: addr })} expectedKind="AI" cards={cards} occupied={occupied} allowEmpty />
+                <FieldErrors messages={fieldErrors.get('feedbackInput')} />
+              </div>
+              <div className="property-row">
+                <label>Jednostka</label>
+                <input value={modulated.unit} onChange={e => patchModulated({ unit: e.target.value })} style={inputStyle} placeholder="%" />
+                <FieldErrors messages={fieldErrors.get('unit')} />
+              </div>
+              <div className="property-row">
+                <label>Zakres min</label>
+                <input type="number" value={modulated.rangeMin} onChange={e => patchModulated({ rangeMin: Number(e.target.value) })} style={inputStyle} />
+                <FieldErrors messages={fieldErrors.get('rangeMin')} />
+              </div>
+              <div className="property-row">
+                <label>Zakres max</label>
+                <input type="number" value={modulated.rangeMax} onChange={e => patchModulated({ rangeMax: Number(e.target.value) })} style={inputStyle} />
+                <FieldErrors messages={fieldErrors.get('rangeMax')} />
+              </div>
+              <div className="property-row">
+                <label>Wartosc startowa</label>
+                <input type="number" value={modulated.startupValue} onChange={e => patchModulated({ startupValue: Number(e.target.value) })} style={inputStyle} />
+                <FieldErrors messages={fieldErrors.get('startupValue')} />
+              </div>
+              <div className="property-row">
+                <label>Wartosc bezpieczna</label>
+                <input type="number" value={modulated.safeValue} onChange={e => patchModulated({ safeValue: Number(e.target.value) })} style={inputStyle} />
+                <FieldErrors messages={fieldErrors.get('safeValue')} />
+              </div>
             </div>
           )}
 
