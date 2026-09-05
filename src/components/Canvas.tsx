@@ -5,7 +5,7 @@ import type { SynopticConnection, WirePoint } from '../store';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 import { pathFromPoints, getConductorCoreColor } from './ConnectionLine';
 import { ObjectLabelRenderer } from './ObjectLabelRenderer';
-import { COLOR_CANVAS_BACKGROUND, COLOR_OUTLINE, COLOR_WATER, COLOR_WHITE, CONDUCTOR_WIDTH, FONT_SIZE_BASE, FONT_UI } from '../theme/ScadaTheme';
+import { COLOR_ALARM, COLOR_CANVAS_BACKGROUND, COLOR_OUTLINE, COLOR_WATER, COLOR_WHITE, CONDUCTOR_WIDTH, FONT_SIZE_BASE, FONT_UI } from '../theme/ScadaTheme';
 import { snapValue } from '../utils/GridSnap';
 import {
   snapPointToGrid, appendWirePoint, removeLastWirePoint,
@@ -13,6 +13,7 @@ import {
 } from '../utils/WireDrawing';
 import { resolveNets, getJunctionPoints } from '../project/NetResolver';
 import { describeObject } from '../utils/ObjectDisplay';
+import { isSymbolDeviceMissing } from '../project/DeviceBindingValidation';
 import { WireNodeSymbol } from '../symbols/scada/WireNodeSymbol';
 import { MeterElementNode } from './MeterElementNode';
 import { computeMeterHeight } from '../meter/MeterElement';
@@ -967,6 +968,29 @@ export const Canvas: React.FC = () => {
               visible={obj.visible !== false}
             >
               <ObjectLabelRenderer obj={obj} onChange={(newAttrs) => updateObject(obj.id, newAttrs)} />
+            </Group>
+          ))}
+          {/* feat/device-list-ui commit 5: a symbol whose Aparat points
+              at a device id no longer in the registry still renders
+              completely normally (its own symbol/label above is
+              unaffected) - this only adds a dashed alarm-colored outline
+              on top, the same "problem, not a crash" treatment
+              validateDeviceRegistry itself uses for a bad file. */}
+          {objects.filter(obj => isSymbolDeviceMissing(obj, devices)).map(obj => (
+            // Same Group transform ObjectNode's own shape uses (x/y is
+            // the object's top-left, rotation pivots there too - see
+            // utils/Terminals.ts's own getTerminalWorldPosition comment)
+            // so this outline always tracks the real symbol exactly,
+            // rotated/scaled or not.
+            <Group key={`device-missing-${obj.id}`} x={obj.x} y={obj.y} rotation={obj.rotation || 0} scaleX={obj.scaleX || 1} scaleY={obj.scaleY || 1} listening={false}>
+              <Rect
+                width={obj.width}
+                height={obj.height}
+                stroke={COLOR_ALARM}
+                strokeWidth={2}
+                dash={[6, 4]}
+                fill="transparent"
+              />
             </Group>
           ))}
           {/* Layer 7, selection and handles - always topmost. The

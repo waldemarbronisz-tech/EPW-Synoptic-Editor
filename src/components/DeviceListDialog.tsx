@@ -30,6 +30,8 @@ export const DeviceListDialog: React.FC<DeviceListDialogProps> = ({ onClose }) =
   const locations = useStore(s => s.locations);
   const cards = useStore(s => s.cards);
   const devices = useStore(s => s.devices);
+  const objects = useStore(s => s.objects);
+  const selectObjects = useStore(s => s.selectObjects);
   const addDevice = useStore(s => s.addDevice);
   const updateDevice = useStore(s => s.updateDevice);
   const deleteDevice = useStore(s => s.deleteDevice);
@@ -102,6 +104,28 @@ export const DeviceListDialog: React.FC<DeviceListDialogProps> = ({ onClose }) =
     setForm(null);
   };
 
+  // feat/device-list-ui commit 5: how many placed screen symbols
+  // (SynopticObject.deviceId - see PropertyInspector.tsx's Aparat
+  // dropdown) currently reference each device. Purely a screen-side
+  // lookup, unrelated to anything DeviceValidation.ts checks - the same
+  // device used by several symbols is normal, not an error, per this
+  // task's own architecture, so this only counts, it never flags.
+  const usageCountByDevice = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const obj of objects) {
+      if (!obj.deviceId) continue;
+      map.set(obj.deviceId, (map.get(obj.deviceId) ?? 0) + 1);
+    }
+    return map;
+  }, [objects]);
+
+  const handleNavigateToUsage = (deviceId: string) => {
+    const first = objects.find(o => o.deviceId === deviceId);
+    if (!first) return;
+    selectObjects([first.id]);
+    onClose();
+  };
+
   const usedChannels = getUsedChannelCount(devices);
   const totalChannels = getTotalChannelCount(cards);
   const errorDeviceCount = issuesByDevice.size;
@@ -149,6 +173,7 @@ export const DeviceListDialog: React.FC<DeviceListDialogProps> = ({ onClose }) =
                 <th style={thStyle} onClick={() => handleSort('kind')}>Rodzaj{sortIndicator('kind')}</th>
                 <th style={thStyle}>Wejscia</th>
                 <th style={thStyle}>Wyjscia</th>
+                <th style={thStyle}>Uzycia</th>
               </tr>
             </thead>
             <tbody>
@@ -156,6 +181,7 @@ export const DeviceListDialog: React.FC<DeviceListDialogProps> = ({ onClose }) =
                 const issues = issuesByDevice.get(device.id) ?? [];
                 const invalid = issues.length > 0;
                 const { inputs, outputs } = getDeviceIOFields(device);
+                const usageCount = usageCountByDevice.get(device.id) ?? 0;
                 return (
                   <tr
                     key={device.id}
@@ -174,11 +200,18 @@ export const DeviceListDialog: React.FC<DeviceListDialogProps> = ({ onClose }) =
                     <td style={tdStyle}>{device.kind}</td>
                     <td style={tdStyle}>{inputs.map(f => f.addr).join(', ')}</td>
                     <td style={tdStyle}>{outputs.map(f => f.addr).join(', ')}</td>
+                    <td style={tdStyle}>
+                      {usageCount > 0 ? (
+                        <button onClick={(e) => { e.stopPropagation(); handleNavigateToUsage(device.id); }} title="Przejdz do pierwszego wystapienia na ekranie">
+                          {usageCount}
+                        </button>
+                      ) : 0}
+                    </td>
                   </tr>
                 );
               })}
               {sorted.length === 0 && (
-                <tr><td style={tdStyle} colSpan={7}>Brak aparatow spelniajacych kryteria.</td></tr>
+                <tr><td style={tdStyle} colSpan={8}>Brak aparatow spelniajacych kryteria.</td></tr>
               )}
             </tbody>
           </table>

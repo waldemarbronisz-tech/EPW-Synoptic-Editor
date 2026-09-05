@@ -233,6 +233,25 @@ export const PropertyInspector: React.FC = () => {
     }
   };
 
+  // feat/device-list-ui commit 5: the Aparat dropdown's own handler,
+  // separate from the generic handleChange above because assigning a
+  // device carries one extra rule ("auto-fills the symbol's label from
+  // the device's designation when the symbol's own designation is
+  // empty") that no other property on this object has. Only ever fills
+  // designation IN - a device is never removed from the label once
+  // filled, and an already-set designation is never overwritten.
+  const handleDeviceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    if (!selectedObj) return;
+    const deviceId = e.target.value || undefined;
+    const device = deviceId ? devices.find(d => d.id === deviceId) : undefined;
+    const patch: Partial<SynopticObject> = { deviceId };
+    if (device && !selectedObj.designation) {
+      patch.designation = device.designation;
+    }
+    updateObject(selectedObj.id, patch);
+    useStore.getState().saveHistory();
+  };
+
   const handleConnChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     if (!selectedConn) return;
     const { name, value } = e.target;
@@ -686,6 +705,34 @@ export const PropertyInspector: React.FC = () => {
             <label>Name</label>
             <input type="text" name="name" value={selectedObj.name || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
           </div>
+          {/* feat/device-list-ui commit 5: same exclusion as
+              ObjectLabelRenderer.tsx's own isLine and graphics/
+              measurements type-prefix check - a pure graphic or a wire
+              has nothing to bind to a device. Every device is offered
+              regardless of the symbol's own type: nothing in
+              SymbolRegistry.ts's SymbolDefinition currently says which
+              DeviceBehavior a symbol implies, so there is no
+              unambiguous case to narrow the list by (a documented
+              judgment call, not a missing feature). */}
+          {(() => {
+            const def = getSymbolDefinition(selectedObj.type);
+            if (!def || def.isLine || selectedObj.type.startsWith('graphics.') || selectedObj.type.startsWith('measurements.')) return null;
+            const deviceMissing = !!selectedObj.deviceId && !devices.some(d => d.id === selectedObj.deviceId);
+            return (
+              <div className="property-row">
+                <label>Aparat</label>
+                <select
+                  value={selectedObj.deviceId || ''}
+                  onChange={handleDeviceChange}
+                  style={deviceMissing ? { color: 'var(--scada-alarm)' } : undefined}
+                >
+                  <option value="">(brak)</option>
+                  {deviceMissing && <option value={selectedObj.deviceId}>{selectedObj.deviceId} (nie istnieje)</option>}
+                  {devices.map(d => <option key={d.id} value={d.id}>{d.id} - {d.designation}</option>)}
+                </select>
+              </div>
+            );
+          })()}
           <div className="property-row">
             <label>Description</label>
             <input type="text" name="description" value={selectedObj.description || ''} onChange={handleChange} onBlur={() => useStore.getState().saveHistory()} />
