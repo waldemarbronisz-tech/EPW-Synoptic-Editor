@@ -126,6 +126,19 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
     setOwnFields(prev => ({ ...(prev as SwitchedOwnFields), safeState: { ...(prev as SwitchedOwnFields).safeState, ...patch } }));
   const patchSwitchedExtraInput = (addr: ChannelAddress | undefined) =>
     setOwnFields(prev => ({ ...(prev as SwitchedOwnFields), extraInputs: addr ? { diFault: addr } : undefined }));
+  // feat/control-elements commit 3: interlock is pure documentation
+  // (DeviceSchema.ts's own SwitchedDevice comment) - both fields are
+  // optional strings, so once BOTH are blank there is nothing left to
+  // keep: the whole object collapses back to undefined rather than
+  // persisting as {closeDescription: '', openDescription: ''}, the
+  // same "an empty optional is absent, not a saved empty" convention
+  // extraInputs above already follows.
+  const patchSwitchedInterlock = (patch: Partial<NonNullable<SwitchedOwnFields['interlock']>>) =>
+    setOwnFields(prev => {
+      const next = { ...(prev as SwitchedOwnFields).interlock, ...patch };
+      const isEmpty = !next.closeDescription?.trim() && !next.openDescription?.trim();
+      return { ...(prev as SwitchedOwnFields), interlock: isEmpty ? undefined : next };
+    });
 
   const patchSignal = (patch: Partial<SignalOwnFields>) => setOwnFields(prev => ({ ...(prev as SignalOwnFields), ...patch }));
   const patchSignalFeedback = (patch: Partial<SignalOwnFields['feedback']>) =>
@@ -333,6 +346,31 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
                 <input type="checkbox" checked={switched.switchCounter} onChange={e => patchSwitched({ switchCounter: e.target.checked })} />
               </div>
               <div style={hintStyle}>Zlicza przelaczenia aparatu (sygnal .COUNTER) - prog ostrzegawczy definiuje sie w Logic Studio, nie tutaj.</div>
+
+              <div style={sectionTitleStyle}>Blokady (interlock)</div>
+              <div style={warningStyle}>
+                Wylacznie opis dla operatora/inzyniera - nie definiuje tu zadnej logiki. Rzeczywista
+                wartosc blokady (.INHIBIT_CLOSE/.INHIBIT_OPEN) jest zapisywana przez logike w
+                EPW-Logic-Studio; ten opis tylko wyjasnia, DLACZEGO polecenie moze zostac odrzucone.
+              </div>
+              <div className="property-row">
+                <label>Opis blokady ZAMKNIJ</label>
+                <input
+                  value={switched.interlock?.closeDescription ?? ''}
+                  onChange={e => patchSwitchedInterlock({ closeDescription: e.target.value })}
+                  style={inputStyle}
+                  placeholder="np. Zablokowane, gdy drzwi rozdzielnicy sa otwarte"
+                />
+              </div>
+              <div className="property-row">
+                <label>Opis blokady OTWORZ</label>
+                <input
+                  value={switched.interlock?.openDescription ?? ''}
+                  onChange={e => patchSwitchedInterlock({ openDescription: e.target.value })}
+                  style={inputStyle}
+                  placeholder="np. Zablokowane podczas biegu pompy rezerwowej"
+                />
+              </div>
             </div>
           )}
 

@@ -1,11 +1,11 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Stage, Layer, Rect, Circle, Group, Path } from 'react-konva';
+import { Stage, Layer, Rect, Circle, Group, Path, Text } from 'react-konva';
 import { useStore } from '../store';
 import type { SynopticConnection, WirePoint } from '../store';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 import { pathFromPoints, getConductorCoreColor } from './ConnectionLine';
 import { ObjectLabelRenderer } from './ObjectLabelRenderer';
-import { COLOR_ALARM, COLOR_CANVAS_BACKGROUND, COLOR_OUTLINE, COLOR_WATER, COLOR_WHITE, CONDUCTOR_WIDTH, FONT_SIZE_BASE, FONT_UI } from '../theme/ScadaTheme';
+import { COLOR_ALARM, COLOR_CANVAS_BACKGROUND, COLOR_LAMP_LIT, COLOR_OUTLINE, COLOR_WATER, COLOR_WHITE, CONDUCTOR_WIDTH, FONT_SIZE_BASE, FONT_SIZE_SMALL, FONT_UI } from '../theme/ScadaTheme';
 import { snapValue } from '../utils/GridSnap';
 import {
   snapPointToGrid, appendWirePoint, removeLastWirePoint,
@@ -14,6 +14,7 @@ import {
 import { resolveNets, getJunctionPoints } from '../project/NetResolver';
 import { describeObject } from '../utils/ObjectDisplay';
 import { isSymbolDeviceMissing } from '../project/DeviceBindingValidation';
+import { isSymbolInterlocked } from '../project/InterlockIndicator';
 import { WireNodeSymbol } from '../symbols/scada/WireNodeSymbol';
 import { MeterElementNode } from './MeterElementNode';
 import { computeMeterHeight } from '../meter/MeterElement';
@@ -1031,6 +1032,40 @@ export const Canvas: React.FC = () => {
                 strokeWidth={2}
                 dash={[6, 4]}
                 fill="transparent"
+              />
+            </Group>
+          ))}
+          {/* feat/control-elements commit 3: a symbol bound to a
+              SWITCHED device with a configured interlock description
+              gets a small badge at its own top-right corner - purely a
+              "this command can be refused, see the device form for why"
+              flag, never live logic (see InterlockIndicator.ts's own
+              header). Same Group transform as the device-missing
+              outline above, so it always tracks the real symbol. A
+              filled circle + "!" glyph rather than a borrowed icon
+              font's path data - crisp at any zoom, no external asset. */}
+          {objects.filter(obj => isSymbolInterlocked(obj, devices)).map(obj => (
+            <Group key={`interlock-${obj.id}`} x={obj.x} y={obj.y} rotation={obj.rotation || 0} scaleX={obj.scaleX || 1} scaleY={obj.scaleY || 1} listening={false}>
+              <Circle
+                x={obj.width - 7}
+                y={7}
+                radius={7}
+                fill={COLOR_LAMP_LIT}
+                stroke={COLOR_OUTLINE}
+                strokeWidth={1}
+              />
+              <Text
+                x={obj.width - 11}
+                y={0}
+                width={8}
+                height={14}
+                text="!"
+                fontSize={FONT_SIZE_SMALL}
+                fontFamily={FONT_UI}
+                fontStyle="bold"
+                fill={COLOR_OUTLINE}
+                align="center"
+                verticalAlign="middle"
               />
             </Group>
           ))}
