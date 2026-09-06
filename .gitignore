@@ -24,3 +24,8 @@ coverage
 *.sln
 *.sw?
 node_modules/
+
+# Python (main.py's native-window launcher)
+__pycache__/
+*.pyc
+.venv/
