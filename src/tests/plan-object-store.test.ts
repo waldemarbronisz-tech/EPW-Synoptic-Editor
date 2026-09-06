@@ -116,4 +116,58 @@ describe('Plan object store slice', () => {
     expect(useStore.getState().planObjects).toHaveLength(1);
     expect(useStore.getState().history.length).toBe(historyLengthBefore);
   });
+
+  // fix/iso-tiles-and-rotation commit 3
+  it('17. rotatePlanObjects rotates and is exactly ONE undo entry, even for a batch', () => {
+    useStore.getState().addPlanObject({ spriteId: 'a', state: 'DEFAULT', gx: 0, gy: 0 });
+    useStore.getState().addPlanObject({ spriteId: 'b', state: 'DEFAULT', gx: 1, gy: 1 });
+    const [idA, idB] = useStore.getState().planObjects.map(o => o.id);
+    const historyLengthBefore = useStore.getState().history.length;
+
+    // Neither 'a' nor 'b' resolves against any loaded manifest in this
+    // test file - rotatePlanObjects falls back to [0, 90] for an
+    // unresolvable sprite, exactly as it would for a real one with no
+    // rear view (see sprite-rotation.test.ts for the manifest-driven
+    // half of this same rule).
+    useStore.getState().rotatePlanObjects([idA, idB], 'cw');
+
+    const objects = useStore.getState().planObjects;
+    expect(objects.find(o => o.id === idA)?.rotation).toBe(90);
+    expect(objects.find(o => o.id === idB)?.rotation).toBe(90);
+    expect(useStore.getState().history.length).toBe(historyLengthBefore + 1);
+  });
+
+  it('rotatePlanObjects with an empty id list is a no-op (no history entry)', () => {
+    useStore.getState().addPlanObject({ spriteId: 'a', state: 'DEFAULT', gx: 0, gy: 0 });
+    const historyLengthBefore = useStore.getState().history.length;
+    useStore.getState().rotatePlanObjects([], 'cw');
+    expect(useStore.getState().planObjects[0].rotation).toBeUndefined();
+    expect(useStore.getState().history.length).toBe(historyLengthBefore);
+  });
+
+  it('rotatePlanObjects cycles 0 -> 90 -> 0 for an object whose sprite cannot be resolved (no rear view available)', () => {
+    useStore.getState().addPlanObject({ spriteId: 'unresolvable', state: 'DEFAULT', gx: 0, gy: 0 });
+    const id = useStore.getState().planObjects[0].id;
+
+    useStore.getState().rotatePlanObjects([id], 'cw');
+    expect(useStore.getState().planObjects[0].rotation).toBe(90);
+
+    useStore.getState().rotatePlanObjects([id], 'cw');
+    expect(useStore.getState().planObjects[0].rotation).toBe(0);
+
+    useStore.getState().rotatePlanObjects([id], 'ccw');
+    expect(useStore.getState().planObjects[0].rotation).toBe(90);
+  });
+
+  it('undo after rotatePlanObjects restores the previous rotation for the whole batch', () => {
+    useStore.getState().addPlanObject({ spriteId: 'a', state: 'DEFAULT', gx: 0, gy: 0 });
+    useStore.getState().addPlanObject({ spriteId: 'b', state: 'DEFAULT', gx: 1, gy: 1 });
+    const [idA, idB] = useStore.getState().planObjects.map(o => o.id);
+
+    useStore.getState().rotatePlanObjects([idA, idB], 'cw');
+    expect(useStore.getState().planObjects.map(o => o.rotation)).toEqual([90, 90]);
+
+    useStore.getState().undo();
+    expect(useStore.getState().planObjects.map(o => o.rotation ?? 0)).toEqual([0, 0]);
+  });
 });

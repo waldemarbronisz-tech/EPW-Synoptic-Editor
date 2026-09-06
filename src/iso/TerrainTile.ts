@@ -79,6 +79,63 @@ export function getTileTopFacePoints(gx: number, gy: number): ScreenPoint[] {
   ];
 }
 
+// ---- Slab seams (fix/iso-tiles-and-rotation commit 1) --------------------
+// A painted plot must read as ONE continuous slab of ground, not a pile
+// of separately-outlined tiles stacked on top of each other. The fix is
+// entirely about visibility, computed fresh from the CURRENT terrain map
+// every time - never decided once at paint time and cached - so the
+// final picture only ever depends on which tiles are painted NOW, not
+// the order a user happened to paint them in.
+//
+// Only two of a tile's four sides are ever walls at all (see this file's
+// own header: the camera's fixed angle hides the other two entirely),
+// so only two neighbors matter for wall visibility - the same two
+// neighbors also gate the STRONG outline on the top face's own bottom-
+// left/bottom-right edges (see getTerrainEdgeVisibility below). The
+// other two edges (top-left, top-right) never carry a wall, but still
+// need the same outer/inner distinction for the top face's own outline.
+
+/** True unless a tile is already painted at (gx, gy+1) - that neighbor's own top face and wall would otherwise cover this one, per the depth sort (it draws after, being closer to the camera). */
+export function hasLeftWall(terrainTiles: Record<string, TerrainTileType>, gx: number, gy: number): boolean {
+  return !(terrainKey(gx, gy + 1) in terrainTiles);
+}
+
+/** True unless a tile is already painted at (gx+1, gy) - same reasoning as hasLeftWall, mirrored. */
+export function hasRightWall(terrainTiles: Record<string, TerrainTileType>, gx: number, gy: number): boolean {
+  return !(terrainKey(gx + 1, gy) in terrainTiles);
+}
+
+/**
+ * Per-edge outline treatment for tile (gx,gy)'s own top face - true means
+ * "outer boundary of the whole slab, draw the strong COLOR_OUTLINE";
+ * false means "another painted tile continues past this edge, draw the
+ * weak TERRAIN_TILE_DIVIDER instead". Each edge corresponds to exactly
+ * one of the tile's four grid neighbors:
+ *   topLeft     borders (gx-1, gy)
+ *   topRight    borders (gx, gy-1)
+ *   bottomLeft  borders (gx, gy+1) - the same edge hasLeftWall checks
+ *   bottomRight borders (gx+1, gy) - the same edge hasRightWall checks
+ * Grass next to paving is treated exactly like grass next to grass: only
+ * whether the neighboring cell is PAINTED matters here, never what type
+ * it is painted with - two different surfaces sharing one level of
+ * ground still share a plain division line, not a wall.
+ */
+export interface TerrainEdgeVisibility {
+  topLeft: boolean;
+  topRight: boolean;
+  bottomLeft: boolean;
+  bottomRight: boolean;
+}
+
+export function getTerrainEdgeVisibility(terrainTiles: Record<string, TerrainTileType>, gx: number, gy: number): TerrainEdgeVisibility {
+  return {
+    topLeft: !(terrainKey(gx - 1, gy) in terrainTiles),
+    topRight: !(terrainKey(gx, gy - 1) in terrainTiles),
+    bottomLeft: hasLeftWall(terrainTiles, gx, gy),
+    bottomRight: hasRightWall(terrainTiles, gx, gy),
+  };
+}
+
 /** The left-facing side wall: the diamond's own left-to-bottom edge, extruded straight down. Lighter tone - catches the upper-left light source. */
 export function getTileLeftWallPoints(gx: number, gy: number): ScreenPoint[] {
   const [, , bottom, left] = getTileTopFacePoints(gx, gy);

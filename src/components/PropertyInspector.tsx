@@ -9,8 +9,9 @@ import type { SignalPanelRow } from '../elements/SignalPanelElement';
 import { INDICATOR_DIODE_STATES } from '../symbols/scada/IndicatorDiodeSymbol';
 import { FONT_SIZE_BASE, FONT_SIZE_SMALL } from '../theme/ScadaTheme';
 import type { SynopticConnection, SynopticObject } from '../store';
-import { getSprite } from '../iso/SpriteManifest';
+import { getSprite, getSpriteState } from '../iso/SpriteManifest';
 import { getPlanObjectFootprint } from '../iso/PlanObject';
+import { getAvailableRotations } from '../iso/SpriteRotation';
 
 // Internal-audit fix: these two wizards are only ever mounted after an
 // explicit "+ Wizard" click (see showMeterWizard/showSignalPanelWizard
@@ -77,12 +78,25 @@ export const PropertyInspector: React.FC = () => {
     const footprint = getPlanObjectFootprint(selectedPlanObject);
     const stateNames = spriteDef ? Object.keys(spriteDef.states) : [selectedPlanObject.state];
 
+    // fix/iso-tiles-and-rotation commit 3: which rotations even show up
+    // in the dropdown below comes from the manifest, never a fixed
+    // [0,90,180,270] - a sprite whose current state has no rear view
+    // offers only 0/90, and the 180/270 options are simply ABSENT from
+    // the list, not present-but-disabled (this task's own explicit
+    // requirement). Falls back to just the object's own current value if
+    // the sprite/state cannot be resolved at all, same convention as
+    // stateNames above.
+    const resolvedForRotation = getSpriteState(selectedPlanObject.spriteId, selectedPlanObject.state);
+    const currentRotation = selectedPlanObject.rotation ?? 0;
+    const availableRotations = resolvedForRotation ? getAvailableRotations(resolvedForRotation.entry) : [currentRotation];
+
     // Deliberately NOT here, unlike the SCHEMATIC object branch below:
-    // terminals, connections/bindings, Fill, Border, Font, Rotation,
-    // Scale - none of them mean anything for a plan object (this task's
-    // own explicit list), so this branch simply never renders a field
-    // for any of them, the same "hide the whole section" treatment
-    // already given to scada.meter's Height/Bindings/Text fields.
+    // terminals, connections/bindings, Fill, Border, Font, Scale - none
+    // of them mean anything for a plan object (this task's own explicit
+    // list), so this branch simply never renders a field for any of
+    // them, the same "hide the whole section" treatment already given
+    // to scada.meter's Height/Bindings/Text fields. Rotation, added in
+    // fix/iso-tiles-and-rotation, is the one exception - it DOES apply.
     return (
       <div className="property-inspector">
         <div className="inspector-header">Plan Object Properties</div>
@@ -147,6 +161,22 @@ export const PropertyInspector: React.FC = () => {
                 }}
               >
                 {stateNames.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="property-group">
+            <div className="property-group-title">Rotation</div>
+            <div className="property-row">
+              <label>Rotation</label>
+              <select
+                value={currentRotation}
+                onChange={(e) => {
+                  updatePlanObject(selectedPlanObject.id, { rotation: Number(e.target.value) as 0 | 90 | 180 | 270 });
+                  useStore.getState().saveHistory();
+                }}
+              >
+                {availableRotations.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
           </div>

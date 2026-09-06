@@ -59,6 +59,17 @@ export const TERRAIN_WATER_TOP = '#2E76C8';       // woda (oczko wodne na dzialc
 export const TERRAIN_WATER_LEFT = '#4F94E0';      // deliberately its own set, not
 export const TERRAIN_WATER_RIGHT = '#1E5494';     // COLOR_WATER, which means the WATER medium's conductor on the schematic canvas, a different screen entirely
 
+// fix/iso-tiles-and-rotation commit 1: the line between two adjacent
+// painted tiles - grass next to paving, or two grass tiles side by side,
+// it makes no difference - is never the strong black COLOR_OUTLINE the
+// whole SLAB's own outer edge gets; a shared interior edge is still one
+// continuous piece of ground, not a seam. One neutral color for every
+// terrain type (this is a structural grid line, not a material
+// property, so it does not vary with what is painted on either side of
+// it) - clearly darker than every terrain TOP fill above (all of them
+// read lighter than this in practice), but far lighter than pure black.
+export const TERRAIN_TILE_DIVIDER = '#3C3C3C';
+
 // ---- Geometry ----
 
 // Conductor/symbol proportions derived directly from the grid (feat/

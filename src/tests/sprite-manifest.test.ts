@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  validateSpriteManifest, getSprite, getSpriteState, listSprites, setSpriteManifestForTesting
+  validateSpriteManifest, getSprite, getSpriteState, listSprites, setSpriteManifestForTesting, hasRearView
 } from '../iso/SpriteManifest';
 import type { SpriteManifestData } from '../iso/SpriteManifest';
 import { useStore } from '../store';
@@ -173,5 +173,68 @@ describe('SpriteManifest - getSprite / getSpriteState / listSprites', () => {
     expect(result?.stateName).toBe('CLOSED');
     const messages = useStore.getState().messages;
     expect(messages.some(m => m.type === 'warning' && m.text.includes('OPEN') && m.text.includes('CLOSED'))).toBe(true);
+  });
+});
+
+// fix/iso-tiles-and-rotation commit 2: fileBack and its four back-
+// prefixed siblings are optional as a GROUP - either all five rear-view
+// fields are present and valid (this state supports 180/270 rotation)
+// or none of them are present at all (0/90 only). No sprite in the real
+// manifest has a rear view today, and that stays a valid, fully
+// supported state - see the "REAL manifest" test above, unchanged and
+// still green.
+function manifestWithBackView(overrides: Record<string, unknown> = {}) {
+  const manifest = validManifest();
+  manifest.sprites[0].states.CLOSED = {
+    file: 'gate_sliding_CLOSED.png', width: 96, height: 62, anchorX: 48, anchorY: 62,
+    fileBack: 'gate_sliding_CLOSED_back.png', backWidth: 96, backHeight: 62, backAnchorX: 48, backAnchorY: 62,
+    ...overrides,
+  } as never;
+  return manifest;
+}
+
+describe('SpriteManifest - rear view (fileBack) validation', () => {
+  it('accepts a state with a complete, valid rear view', () => {
+    const result = validateSpriteManifest(manifestWithBackView());
+    expect(result.valid).toBe(true);
+    expect(result.issues).toEqual([]);
+  });
+
+  it('rejects fileBack present but missing one of the four back-prefixed fields', () => {
+    const manifest = manifestWithBackView();
+    delete (manifest.sprites[0].states.CLOSED as unknown as Record<string, unknown>).backHeight;
+    const result = validateSpriteManifest(manifest);
+    expect(result.valid).toBe(false);
+    expect(result.issues.some(i => i.message.includes('backHeight'))).toBe(true);
+  });
+
+  it('rejects a back-prefixed field present WITHOUT fileBack (orphaned)', () => {
+    const manifest = validManifest();
+    (manifest.sprites[0].states.CLOSED as unknown as Record<string, unknown>).backWidth = 96;
+    const result = validateSpriteManifest(manifest);
+    expect(result.valid).toBe(false);
+    expect(result.issues.some(i => i.message.includes('backWidth') && i.message.includes('fileBack is not set'))).toBe(true);
+  });
+
+  it('rejects backAnchorX greater than backWidth', () => {
+    const manifest = manifestWithBackView({ backAnchorX: 999 });
+    const result = validateSpriteManifest(manifest);
+    expect(result.valid).toBe(false);
+    expect(result.issues.some(i => i.code === 'SPRITE_STATE_BACK_ANCHOR_X_OUT_OF_BOUNDS')).toBe(true);
+  });
+
+  it('rejects backAnchorY greater than backHeight', () => {
+    const manifest = manifestWithBackView({ backAnchorY: 999 });
+    const result = validateSpriteManifest(manifest);
+    expect(result.valid).toBe(false);
+    expect(result.issues.some(i => i.code === 'SPRITE_STATE_BACK_ANCHOR_Y_OUT_OF_BOUNDS')).toBe(true);
+  });
+
+  it('hasRearView is true for a state with fileBack, false for one without', () => {
+    setSpriteManifestForTesting(manifestWithBackView());
+    expect(hasRearView(getSpriteState('gate.sliding', 'CLOSED')!.entry)).toBe(true);
+
+    setSpriteManifestForTesting(validManifest());
+    expect(hasRearView(getSpriteState('gate.sliding', 'CLOSED')!.entry)).toBe(false);
   });
 });
