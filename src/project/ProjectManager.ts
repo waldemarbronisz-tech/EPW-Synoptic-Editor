@@ -4,6 +4,7 @@ import type { EPWProjectSchema } from './ProjectSchema';
 import { useStore } from '../store';
 import type { ScreenKind } from '../store';
 import { GRID_SIZE } from '../theme/ScadaTheme';
+import { HELP_DEFAULT_LANGUAGE } from '../i18n/HelpLanguage';
 
 export class ProjectManager {
   // feat/isometric-engine commit 5: kind defaults to SCHEMATIC, same as
@@ -65,7 +66,8 @@ export class ProjectManager {
       cards: state.cards || [],
       terrain: state.terrainTiles || {},
       kind: state.screenKind,
-      planObjects: state.planObjects || []
+      planObjects: state.planObjects || [],
+      helpLanguage: state.helpLanguage
     };
     const validation = validateProjectSchema(proj);
     if (!validation.valid) {
@@ -92,6 +94,7 @@ export class ProjectManager {
       // SCHEMATIC - the task's own explicit default.
       screenKind: project.kind || 'SCHEMATIC',
       planObjects: project.planObjects || [],
+      helpLanguage: project.helpLanguage || HELP_DEFAULT_LANGUAGE,
       projectName: project.project.name,
       projectMetadata: {
         description: project.project.description || "",

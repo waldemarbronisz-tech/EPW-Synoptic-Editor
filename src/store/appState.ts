@@ -11,6 +11,7 @@ import type { Device, LocationEntry, CardEntry } from '../project/DeviceSchema';
 import type { CanvasState, HistorySnapshot, Message, ScreenKind, SynopticConnection, SynopticObject } from './types';
 import type { TerrainTileType } from '../iso/TerrainTile';
 import type { PlanObject } from '../iso/PlanObject';
+import type { HelpLanguage } from '../i18n/HelpLanguage';
 
 export interface AppState {
   projectMetadata: {
@@ -224,4 +225,12 @@ export interface AppState {
   setTerrainPaintTool: (type: TerrainTileType | null) => void;
   manifestVersion: number;
   bumpManifestVersion: () => void;
+
+  // feat/help-system commit 1: which language the Help window's own
+  // content shows in - see helpSlice.ts's own header for why this lives
+  // in the project file (the only cross-reload persistence this app has)
+  // rather than localStorage/sessionStorage (forbidden by this task's
+  // GRANICE).
+  helpLanguage: HelpLanguage;
+  setHelpLanguage: (language: HelpLanguage) => void;
 }
