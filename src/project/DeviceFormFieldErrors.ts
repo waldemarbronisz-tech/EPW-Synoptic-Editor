@@ -81,6 +81,10 @@ const FIXED_FIELD_BY_CODE: Record<string, string | string[]> = {
   MODULATED_STARTUP_OUT_OF_RANGE: 'startupValue',
   MODULATED_SAFE_OUT_OF_RANGE: 'safeValue',
   MODULATED_EMPTY_UNIT: 'unit',
+
+  SELECTOR_TOO_FEW_POSITIONS: 'positions',
+  SELECTOR_EMPTY_POSITION_NAME: 'positions',
+  SELECTOR_DUPLICATE_POSITION_NAME: 'positions',
 };
 
 const FIELD_LABEL_RE = /field '([^']+)'/;

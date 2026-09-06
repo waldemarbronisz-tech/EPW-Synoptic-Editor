@@ -18,20 +18,21 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../store';
-import type { Device, DeviceBehavior, DeviceCommon, ChannelAddress, MeasuredDevice } from '../project/DeviceSchema';
+import type { Device, DeviceBehavior, DeviceCommon, ChannelAddress, MeasuredDevice, SelectorPosition } from '../project/DeviceSchema';
 import { defaultFieldsForBehavior, assembleDevice } from '../project/DeviceFormDefaults';
-import type { DeviceOwnFields, SwitchedOwnFields, SignalOwnFields, MeasuredOwnFields, ModulatedOwnFields } from '../project/DeviceFormDefaults';
+import type { DeviceOwnFields, SwitchedOwnFields, SignalOwnFields, MeasuredOwnFields, ModulatedOwnFields, SelectorOwnFields } from '../project/DeviceFormDefaults';
 import { getDeviceOwnIssues, mapDeviceIssuesToFields } from '../project/DeviceFormFieldErrors';
 import { getOccupiedChannels } from '../project/DeviceRegistryQueries';
 import { getMeasuredPreviewValue, formatMeasuredValue } from '../meter/MeterResolver';
 import { ChannelAddressPicker } from './ChannelAddressPicker';
 import { FONT_SIZE_SMALL, COLOR_ALARM } from '../theme/ScadaTheme';
 
-const BEHAVIORS: DeviceBehavior[] = ['SWITCHED', 'SIGNAL', 'MEASURED', 'MODULATED'];
+const BEHAVIORS: DeviceBehavior[] = ['SWITCHED', 'SIGNAL', 'MEASURED', 'MODULATED', 'SELECTOR'];
 // Commit 3 gave SWITCHED/SIGNAL a real, field-level-validated form;
-// commit 4 (this version) does the same for MEASURED/MODULATED - every
-// behavior now blocks Save on error, no placeholder left.
-const BEHAVIORS_WITH_FULL_FORM: DeviceBehavior[] = ['SWITCHED', 'SIGNAL', 'MEASURED', 'MODULATED'];
+// commit 4 did the same for MEASURED/MODULATED; feat/control-elements
+// commit 1 does the same for SELECTOR - every behavior now blocks Save
+// on error, no placeholder left.
+const BEHAVIORS_WITH_FULL_FORM: DeviceBehavior[] = ['SWITCHED', 'SIGNAL', 'MEASURED', 'MODULATED', 'SELECTOR'];
 
 function splitId(id: string): { code: string; suffix: string } {
   const idx = id.indexOf('_');
@@ -135,6 +136,18 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
 
   const modulated = behavior === 'MODULATED' ? (ownFields as ModulatedOwnFields) : null;
   const patchModulated = (patch: Partial<ModulatedOwnFields>) => setOwnFields(prev => ({ ...(prev as ModulatedOwnFields), ...patch }));
+
+  const selector = behavior === 'SELECTOR' ? (ownFields as SelectorOwnFields) : null;
+  const patchSelectorPosition = (index: number, patch: Partial<SelectorPosition>) =>
+    setOwnFields(prev => {
+      const positions = (prev as SelectorOwnFields).positions.slice();
+      positions[index] = { ...positions[index], ...patch };
+      return { ...(prev as SelectorOwnFields), positions };
+    });
+  const addSelectorPosition = () =>
+    setOwnFields(prev => ({ ...(prev as SelectorOwnFields), positions: [...(prev as SelectorOwnFields).positions, { name: '' }] }));
+  const removeSelectorPosition = (index: number) =>
+    setOwnFields(prev => ({ ...(prev as SelectorOwnFields), positions: (prev as SelectorOwnFields).positions.filter((_, i) => i !== index) }));
 
   const outputHint = switched ? {
     '1-MAINTAINED': 'Jedno wyjscie utrzymywane - typowy stycznik/zawor z jedna cewka trzymana pod napieciem w stanie zalaczonym.',
@@ -429,6 +442,41 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
                 <label>Wartosc bezpieczna</label>
                 <input type="number" value={modulated.safeValue} onChange={e => patchModulated({ safeValue: Number(e.target.value) })} style={inputStyle} />
                 <FieldErrors messages={fieldErrors.get('safeValue')} />
+              </div>
+            </div>
+          )}
+
+          {selector && (
+            <div className="property-group">
+              <div style={sectionTitleStyle}>Polozenia (positions)</div>
+              <div style={warningStyle}>
+                Przelacznik jest odczytywany, nigdy sterowany zdalnie - obraca sie go recznie
+                na szafie. Musza byc co najmniej 2 polozenia; wejscie zwrotne (DI) jest
+                opcjonalne dla kazdego z nich.
+              </div>
+              <FieldErrors messages={fieldErrors.get('positions')} />
+              {selector.positions.map((position, i) => (
+                <div key={i} className="property-row">
+                  <input
+                    value={position.name}
+                    onChange={e => patchSelectorPosition(i, { name: e.target.value })}
+                    style={inputStyle}
+                    placeholder="RECZNIE"
+                  />
+                  <ChannelAddressPicker
+                    value={position.feedback}
+                    onChange={addr => patchSelectorPosition(i, { feedback: addr })}
+                    expectedKind="DI"
+                    cards={cards}
+                    occupied={occupied}
+                    allowEmpty
+                  />
+                  <button onClick={() => removeSelectorPosition(i)} disabled={selector.positions.length <= 2} title={selector.positions.length <= 2 ? 'Wymagane co najmniej 2 polozenia' : 'Usun to polozenie'}>x</button>
+                  <FieldErrors messages={fieldErrors.get(`positions[${i}].feedback`)} />
+                </div>
+              ))}
+              <div className="property-row">
+                <button onClick={addSelectorPosition}>+ Dodaj polozenie</button>
               </div>
             </div>
           )}

@@ -37,6 +37,11 @@ export function getDeviceChannelAddressFields(device: Device): DeviceAddressFiel
       result.push({ field: 'setpointOutput', addr: device.setpointOutput });
       if (device.feedbackInput) result.push({ field: 'feedbackInput', addr: device.feedbackInput });
       break;
+    case 'SELECTOR':
+      device.positions.forEach((position, i) => {
+        if (position.feedback) result.push({ field: `positions[${i}].feedback`, addr: position.feedback });
+      });
+      break;
   }
   return result;
 }

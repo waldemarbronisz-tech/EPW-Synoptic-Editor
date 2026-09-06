@@ -22,6 +22,8 @@ export function getDeviceSignals(device: Device): string[] {
       return ['.VALUE', '.QUALITY'];
     case 'MODULATED':
       return ['.SETPOINT', '.FEEDBACK'];
+    case 'SELECTOR':
+      return ['.POSITION'];
   }
 }
 
@@ -54,6 +56,12 @@ export function getDeviceCommands(device: Device): string[] {
       return [];
     case 'MODULATED':
       return ['.SET', '.INHIBIT_SET'];
+    // A selector switch is turned by hand at the panel - there is
+    // nothing for logic or an operator to command remotely, unlike
+    // SWITCHED/MODULATED. See DeviceSchema.ts's own SelectorDevice
+    // comment for why this is deliberate, not an oversight.
+    case 'SELECTOR':
+      return [];
   }
 }
 

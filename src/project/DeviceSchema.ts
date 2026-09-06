@@ -3,12 +3,12 @@
 // (see DeviceValidation.ts) and no signal enumeration (see DeviceSignals.ts).
 //
 // Devices are classified by BEHAVIOR, not by device kind. There are exactly
-// four behaviors. `kind` (e.g. 'contactor', 'valve') is a display label with
+// five behaviors. `kind` (e.g. 'contactor', 'valve') is a display label with
 // no functional meaning - the behavior is what determines which fields,
 // signals and commands a device has.
 
-/** The four device behaviors. Nothing else exists, and nothing else may be added silently. */
-export type DeviceBehavior = 'SWITCHED' | 'SIGNAL' | 'MEASURED' | 'MODULATED';
+/** The five device behaviors. Nothing else exists, and nothing else may be added silently. */
+export type DeviceBehavior = 'SWITCHED' | 'SIGNAL' | 'MEASURED' | 'MODULATED' | 'SELECTOR';
 
 /**
  * Channel address, textual format: CARD.KIND.CHANNEL
@@ -76,6 +76,40 @@ export interface SwitchedDevice extends DeviceCommon {
   // the .COUNTER signal. A threshold baked into the device config would be
   // hidden logic inside a hardware description. Do not add one, ever.
   switchCounter: boolean;
+  // Pure documentation of what an INHIBIT_CLOSE/INHIBIT_OPEN condition
+  // means for this device, e.g. "Zablokowane, gdy drzwi rozdzielnicy sa
+  // otwarte". The actual inhibit VALUE is live runtime logic written by
+  // EPW-Logic-Studio (see DeviceSignals.ts's own header comment on why) -
+  // this field never wires to anything and is never read by any command
+  // path. It exists so an engineer reading the device form or the
+  // diagram can see WHY a command might be refused, without that reason
+  // being hidden logic baked into the hardware description. Optional:
+  // most devices have no interlock at all.
+  interlock?: {
+    closeDescription?: string; // shown next to .INHIBIT_CLOSE
+    openDescription?: string;  // shown next to .INHIBIT_OPEN
+  };
+}
+
+/**
+ * SELECTOR: a physical multi-position selector switch (Hand-Off-Auto,
+ * Local-Remote, a multi-speed selector...). Deliberately READ-ONLY, with
+ * no command of any kind - a real selector switch is turned by hand at
+ * the panel, not driven remotely, so there is nothing for logic or an
+ * operator to command here, unlike SWITCHED. `positions` must have at
+ * least two entries; each position's own `feedback` is optional (some
+ * installations only wire a contact for the non-default positions and
+ * infer the rest), but at most one position may be selected at a time -
+ * that is a runtime fact this editor cannot check without live data.
+ */
+export interface SelectorDevice extends DeviceCommon {
+  behavior: 'SELECTOR';
+  positions: SelectorPosition[];
+}
+
+export interface SelectorPosition {
+  name: string;               // 'RECZNIE', '0', 'AUTOMAT' - shown to the operator, exactly as typed
+  feedback?: ChannelAddress;  // DI that reads true when this position is selected
 }
 
 /** SIGNAL: read-only signalling input (a lamp/status contact, not controllable). */
@@ -117,7 +151,7 @@ export interface ModulatedDevice extends DeviceCommon {
   safeValue: number;
 }
 
-export type Device = SwitchedDevice | SignalDevice | MeasuredDevice | ModulatedDevice;
+export type Device = SwitchedDevice | SignalDevice | MeasuredDevice | ModulatedDevice | SelectorDevice;
 
 /** The device list container: locations, cards and devices. */
 export interface DeviceRegistry {

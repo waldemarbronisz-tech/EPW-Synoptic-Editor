@@ -11,15 +11,16 @@
 
 import type {
   Device, DeviceBehavior, DeviceCommon,
-  SwitchedDevice, SignalDevice, MeasuredDevice, ModulatedDevice
+  SwitchedDevice, SignalDevice, MeasuredDevice, ModulatedDevice, SelectorDevice
 } from './DeviceSchema';
 
 export type SwitchedOwnFields = Omit<SwitchedDevice, keyof DeviceCommon | 'behavior'>;
 export type SignalOwnFields = Omit<SignalDevice, keyof DeviceCommon | 'behavior'>;
 export type MeasuredOwnFields = Omit<MeasuredDevice, keyof DeviceCommon | 'behavior'>;
 export type ModulatedOwnFields = Omit<ModulatedDevice, keyof DeviceCommon | 'behavior'>;
+export type SelectorOwnFields = Omit<SelectorDevice, keyof DeviceCommon | 'behavior'>;
 
-export type DeviceOwnFields = SwitchedOwnFields | SignalOwnFields | MeasuredOwnFields | ModulatedOwnFields;
+export type DeviceOwnFields = SwitchedOwnFields | SignalOwnFields | MeasuredOwnFields | ModulatedOwnFields | SelectorOwnFields;
 
 export function defaultSwitchedFields(): SwitchedOwnFields {
   return {
@@ -43,12 +44,18 @@ export function defaultModulatedFields(): ModulatedOwnFields {
   return { setpointOutput: '', unit: '', rangeMin: 0, rangeMax: 100, startupValue: 0, safeValue: 0 };
 }
 
+/** Defaults to the classic three-position Hand-Off-Auto layout - the single most common real selector switch, and a recognizable starting point to edit from (rename/add/remove positions freely afterward). */
+export function defaultSelectorFields(): SelectorOwnFields {
+  return { positions: [{ name: 'RECZNIE' }, { name: '0' }, { name: 'AUTOMAT' }] };
+}
+
 export function defaultFieldsForBehavior(behavior: DeviceBehavior): DeviceOwnFields {
   switch (behavior) {
     case 'SWITCHED': return defaultSwitchedFields();
     case 'SIGNAL': return defaultSignalFields();
     case 'MEASURED': return defaultMeasuredFields();
     case 'MODULATED': return defaultModulatedFields();
+    case 'SELECTOR': return defaultSelectorFields();
   }
 }
 

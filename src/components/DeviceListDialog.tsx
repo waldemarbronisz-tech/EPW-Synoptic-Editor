@@ -17,7 +17,7 @@ import { getDeviceLocationCode, getTotalChannelCount, getUsedChannelCount } from
 import { DeviceFormDialog } from './DeviceFormDialog';
 import { FONT_SIZE_BASE, FONT_SIZE_SMALL, COLOR_ALARM } from '../theme/ScadaTheme';
 
-const BEHAVIORS: DeviceBehavior[] = ['SWITCHED', 'SIGNAL', 'MEASURED', 'MODULATED'];
+const BEHAVIORS: DeviceBehavior[] = ['SWITCHED', 'SIGNAL', 'MEASURED', 'MODULATED', 'SELECTOR'];
 
 type SortColumn = 'id' | 'designation' | 'name' | 'behavior' | 'kind';
 type FormState = { mode: 'add' | 'edit'; initialDevice?: Device } | null;
