@@ -140,8 +140,11 @@ describe('Keyboard shortcuts vs. the actual code (mandatory test 10)', () => {
   it('F1 (open help) is handled in App.tsx', () => {
     expect(app).toMatch(/e\.key === 'F1'/);
   });
-  it('Escape (close help) is handled in HelpWindow.tsx', () => {
-    expect(helpWindow).toMatch(/e\.key === 'Escape'/);
+  it('Escape (close help) is handled in App.tsx (the same global listener as F1 - see that file\'s own comment for why it does not live in HelpWindow.tsx)', () => {
+    expect(app).toMatch(/e\.key === 'Escape'/);
+  });
+  it('HelpWindow.tsx itself renders a close control wired to onClose', () => {
+    expect(helpWindow).toContain('onClick={onClose}');
   });
 
   it('Ctrl/Cmd+Z (undo) is NOT bound to a keyboard shortcut anywhere - confirms the help text is honest about this', () => {

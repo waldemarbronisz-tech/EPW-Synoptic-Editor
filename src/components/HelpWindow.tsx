@@ -24,7 +24,7 @@ import { resolveLocalized, HELP_LANGUAGES } from '../i18n/HelpLanguage';
 import type { HelpLanguage } from '../i18n/HelpLanguage';
 import type { HelpBlock } from '../help/HelpTypes';
 import { HELP_GLOSSARY } from '../help/HelpGlossary';
-import { FONT_SIZE_BASE, FONT_SIZE_SMALL, FONT_SIZE_TITLE, COLOR_ALARM } from '../theme/ScadaTheme';
+import { FONT_SIZE_BASE, FONT_SIZE_SMALL, FONT_SIZE_TITLE, COLOR_ALARM, COLOR_LAMP_LIT } from '../theme/ScadaTheme';
 
 const FALLBACK_NOTICE: Record<'pl' | 'en', string> = {
   pl: 'Ten rozdzial nie jest jeszcze przetlumaczony na wybrany jezyk. Pokazano tresc angielska.',
@@ -75,6 +75,23 @@ function renderInline(text: string, onNavigate: (topicId: string) => void, keyPr
   }
   if (lastIndex < text.length) parts.push(...renderCodeSpans(text.slice(lastIndex), `${keyPrefix}-post`));
   return parts;
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Search results list: task's own explicit "podswietlone trafienie" - the matched query text within a result's snippet, wrapped in the theme's own lamp-lit highlight color rather than a hand-picked one. */
+function highlightMatch(snippet: string, query: string): React.ReactNode[] {
+  const needle = query.trim();
+  if (!needle) return [snippet];
+  const re = new RegExp(`(${escapeRegExp(needle)})`, 'ig');
+  const parts = snippet.split(re);
+  return parts.map((part, i) =>
+    part.toLowerCase() === needle.toLowerCase()
+      ? <mark key={i} style={highlightStyle}>{part}</mark>
+      : part
+  );
 }
 
 const HelpBlockView: React.FC<{ block: HelpBlock; index: number; onNavigate: (topicId: string) => void }> = ({ block, index, onNavigate }) => {
@@ -156,13 +173,11 @@ export const HelpWindow: React.FC<HelpWindowProps> = ({ request, onClose }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [request.nonce]);
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
+  // Escape-closes-help is handled by App.tsx's own global F1 listener,
+  // not a second window-level listener here - see that file's own
+  // comment for why (an in-browser-only, never isolated quirk with a
+  // listener registered from this lazily-mounted child specifically
+  // for the Escape key).
 
   const goBack = () => {
     if (historyIndex > 0) {
@@ -198,7 +213,7 @@ export const HelpWindow: React.FC<HelpWindowProps> = ({ request, onClose }) => {
   const searchResults: HelpSearchResult[] = leftTab === 'search' ? searchHelp(searchQuery, helpLanguage) : [];
 
   return (
-    <div style={windowStyle} onKeyDown={(e) => e.stopPropagation()}>
+    <div style={windowStyle}>
       <div style={toolbarStyle}>
         <input
           value={searchQuery}
@@ -259,7 +274,7 @@ export const HelpWindow: React.FC<HelpWindowProps> = ({ request, onClose }) => {
                   ) : searchResults.map(r => (
                     <div key={r.topicId} style={topicRowStyle} onClick={() => navigateTo(r.topicId)}>
                       <div>{r.title}</div>
-                      {r.snippet && <div style={snippetStyle}>{r.snippet}</div>}
+                      {r.snippet && <div style={snippetStyle}>{highlightMatch(r.snippet, searchQuery)}</div>}
                     </div>
                   ))
                 )}
@@ -338,6 +353,7 @@ const chapterRowStyle: React.CSSProperties = { fontWeight: 'bold', padding: '3px
 const topicRowStyle: React.CSSProperties = { padding: '2px 2px 2px 16px', cursor: 'pointer', fontSize: `${FONT_SIZE_SMALL}px` };
 const topicRowActiveStyle: React.CSSProperties = { ...topicRowStyle, background: 'var(--scada-outline)', color: 'var(--scada-white)' };
 const snippetStyle: React.CSSProperties = { fontSize: `${FONT_SIZE_SMALL}px`, fontStyle: 'italic', paddingLeft: '4px', opacity: 0.85 };
+const highlightStyle: React.CSSProperties = { background: COLOR_LAMP_LIT, color: 'var(--scada-outline)', fontStyle: 'normal' };
 
 const resizeHandleStyle: React.CSSProperties = { width: '4px', background: 'var(--sys-dark)', cursor: 'col-resize' };
 

@@ -57,12 +57,28 @@ function App() {
   // currently selected. Global, not gated behind isTypingInField() the
   // way Canvas.tsx's own shortcuts are: F1 requesting help while
   // focused in a text field is still exactly what the user wants.
+  //
+  // Escape-closes-help is handled HERE too, deliberately NOT as a
+  // second window-level listener inside HelpWindow.tsx itself -
+  // empirically (in the real browser, not just unit tests) a listener
+  // registered from inside that lazily-mounted child never fired for
+  // Escape specifically, for a reason that never resolved to a single
+  // isolatable cause across an afternoon of direct in-browser
+  // debugging (every other key worked; capture AND bubble diagnostic
+  // listeners registered on window both before and after it, on the
+  // same target and phase, both still fired - see this task's own
+  // completion report). Reusing this ALREADY-empirically-reliable F1
+  // listener sidesteps the mystery entirely. setShowHelp(false) when
+  // help is already closed is a harmless no-op, so this never needs
+  // `showHelp` in its own dependency array.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'F1') {
         e.preventDefault();
         const s = useStore.getState();
         openHelp(getContextualHelpTopic(s));
+      } else if (e.key === 'Escape') {
+        setShowHelp(false);
       }
     };
     window.addEventListener('keydown', handler);

@@ -101,13 +101,26 @@ describe('HelpWindow', () => {
     expect(screen.getByRole('heading', { name: '1.1 Czym jest EPW-Synoptic-Editor' })).toBeTruthy();
   });
 
-  it('Escape closes the window', () => {
+  it('the x button calls onClose', () => {
     const onClose = () => { closed = true; };
     let closed = false;
     render(<HelpWindow request={{ topicId: 'intro-what', nonce: 0 }} onClose={onClose} />);
-    fireEvent.keyDown(window, { key: 'Escape' });
+    fireEvent.click(screen.getByTitle('Esc'));
     expect(closed).toBe(true);
   });
+
+  // Escape-closes-help is NOT this component's own responsibility - it
+  // is handled by App.tsx's global F1/Escape listener (see that file's
+  // own comment for why: an in-browser-only quirk meant a second
+  // window-level listener registered from inside this lazily-mounted
+  // component never actually fired for the Escape key specifically,
+  // despite firing correctly for every other key and despite direct
+  // capture/bubble diagnostics on the same target proving nothing else
+  // stopped propagation - reusing the already-proven-reliable F1
+  // listener sidesteps it entirely). App.tsx itself has no render
+  // test in this codebase (react-konva's Canvas does not render in
+  // jsdom) - Escape-closes-help is verified empirically in the real
+  // browser instead, per this task's own completion report.
 });
 
 describe('searchHelp (mandatory test 6)', () => {
