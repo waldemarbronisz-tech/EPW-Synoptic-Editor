@@ -11,9 +11,12 @@ export interface MenuBarProps {
   onOpenDeviceRegistries?: () => void;
   // feat/device-list-ui commit 2: opens the "Lista aparatow" window.
   onOpenDeviceList?: () => void;
+  // feat/help-system commit 2: opens the Help window on whatever
+  // getContextualHelpTopic resolves right now - same as pressing F1.
+  onOpenHelp?: () => void;
 }
 
-export const MenuBar: React.FC<MenuBarProps> = ({ onOpenScadaPreview, onOpenDeviceRegistries, onOpenDeviceList }) => {
+export const MenuBar: React.FC<MenuBarProps> = ({ onOpenScadaPreview, onOpenDeviceRegistries, onOpenDeviceList, onOpenHelp }) => {
   const { undo, redo, copySelected, paste, deleteObjects, selectedIds, isDirty, snapToGridEnabled, toggleSnapToGrid } = useStore();
 
   const handleMenuClick = (action: () => void) => {
@@ -111,6 +114,12 @@ export const MenuBar: React.FC<MenuBarProps> = ({ onOpenScadaPreview, onOpenDevi
         <div className="dropdown">
           <div className="dropdown-item" onClick={() => onOpenDeviceRegistries?.()}>Rejestry projektu...</div>
           <div className="dropdown-item" onClick={() => onOpenDeviceList?.()}>Lista aparatow...</div>
+        </div>
+      </div>
+      <div className="menu-item">
+        <span>Pomoc</span>
+        <div className="dropdown">
+          <div className="dropdown-item" onClick={() => onOpenHelp?.()}>Tematy pomocy...  F1</div>
         </div>
       </div>
     </div>
