@@ -36,7 +36,7 @@ export interface HelpChapterMeta {
 }
 
 export interface HelpGlossaryEntry {
-  term: string;
+  term: Partial<Record<HelpLanguage, string>>;
   definition: Partial<Record<HelpLanguage, string>>;
   /** The topic where this concept is covered in depth - the glossary entry links there. */
   topicId: string;

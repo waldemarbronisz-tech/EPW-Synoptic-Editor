@@ -23,6 +23,7 @@ import type { HelpSearchResult } from '../help/HelpSearch';
 import { resolveLocalized, HELP_LANGUAGES } from '../i18n/HelpLanguage';
 import type { HelpLanguage } from '../i18n/HelpLanguage';
 import type { HelpBlock } from '../help/HelpTypes';
+import { HELP_GLOSSARY } from '../help/HelpGlossary';
 import { FONT_SIZE_BASE, FONT_SIZE_SMALL, FONT_SIZE_TITLE, COLOR_ALARM } from '../theme/ScadaTheme';
 
 const FALLBACK_NOTICE: Record<'pl' | 'en', string> = {
@@ -274,6 +275,27 @@ export const HelpWindow: React.FC<HelpWindowProps> = ({ request, onClose }) => {
               </div>
               {showFallbackNotice && <div style={noteStyle}>{fallbackNoticeText(helpLanguage)}</div>}
               {body.map((block, i) => <HelpBlockView key={i} block={block} index={i} onNavigate={navigateTo} />)}
+              {activeTopicId === 'glossary-all' && (
+                <dl style={glossaryListStyle}>
+                  {[...HELP_GLOSSARY]
+                    .sort((a, b) => (resolveLocalized(a.term, helpLanguage)?.value ?? '').localeCompare(resolveLocalized(b.term, helpLanguage)?.value ?? ''))
+                    .map((entry, i) => {
+                      const term = resolveLocalized(entry.term, helpLanguage)?.value ?? '';
+                      const definition = resolveLocalized(entry.definition, helpLanguage)?.value ?? '';
+                      return (
+                        <React.Fragment key={i}>
+                          <dt style={glossaryTermStyle}>{term}</dt>
+                          <dd style={glossaryDefStyle}>
+                            {definition}{' '}
+                            <a href="#" onClick={(e) => { e.preventDefault(); navigateTo(entry.topicId); }} style={linkStyle}>
+                              {'→'}
+                            </a>
+                          </dd>
+                        </React.Fragment>
+                      );
+                    })}
+                </dl>
+              )}
             </div>
           </Panel>
         </PanelGroup>
@@ -335,3 +357,7 @@ const noteStyle: React.CSSProperties = {
 const tableStyle: React.CSSProperties = { borderCollapse: 'collapse', margin: '0 0 10px', fontSize: `${FONT_SIZE_SMALL}px`, minWidth: '100%' };
 const thStyle: React.CSSProperties = { textAlign: 'left', border: '1px solid var(--sys-dark)', padding: '3px 6px', background: 'var(--scada-panel)' };
 const tdStyle: React.CSSProperties = { border: '1px solid var(--sys-dark)', padding: '3px 6px' };
+
+const glossaryListStyle: React.CSSProperties = { margin: '4px 0 0' };
+const glossaryTermStyle: React.CSSProperties = { fontWeight: 'bold', marginTop: '8px' };
+const glossaryDefStyle: React.CSSProperties = { margin: '2px 0 0 0', lineHeight: 1.4 };

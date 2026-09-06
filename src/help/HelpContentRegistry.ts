@@ -16,6 +16,7 @@ import type { HelpLanguage } from '../i18n/HelpLanguage';
 import { HELP_CONTENT_CORE } from './HelpContentCore';
 import { HELP_CONTENT_DRAWING } from './HelpContentDrawing';
 import { HELP_CONTENT_OPERATIONS } from './HelpContentOperations';
+import { HELP_CONTENT_GLOSSARY } from './HelpContentGlossary';
 
 export type HelpContentMap = Record<string, Partial<Record<HelpLanguage, HelpBlock[]>>>;
 
@@ -23,7 +24,7 @@ const CONTENT_SOURCES: HelpContentMap[] = [
   HELP_CONTENT_CORE,       // commit 3: chapters 1-4
   HELP_CONTENT_DRAWING,    // commit 4: chapters 5-7
   HELP_CONTENT_OPERATIONS, // commit 5: chapters 8-12
-  // commit 6: HELP_CONTENT_GLOSSARY (chapter 13)
+  HELP_CONTENT_GLOSSARY,   // commit 6: chapter 13
 ];
 
 export function getTopicBody(topicId: string): Partial<Record<HelpLanguage, HelpBlock[]>> {
