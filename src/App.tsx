@@ -9,7 +9,8 @@ import { MessagesPanel } from './components/MessagesPanel';
 import { StatusBar } from './components/StatusBar';
 import { useStore } from './store';
 import { loadSpriteManifest } from './iso/SpriteManifest';
-import { Suspense, lazy, useEffect, useState } from 'react';
+import { validateDeviceBindings } from './project/DeviceBindingValidation';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 
 // Internal-audit fix: a full-screen preview only ever mounted from the
 // menu bar's "Style Preview" action - lazy so its code isn't part of the
@@ -18,9 +19,42 @@ const ScadaStylePreview = lazy(() =>
   import('./components/ScadaStylePreview').then(m => ({ default: m.ScadaStylePreview }))
 );
 
+// feat/device-list-ui commit 1: same lazy-on-first-open convention as
+// ScadaStylePreview above.
+const DeviceRegistriesDialog = lazy(() =>
+  import('./components/DeviceRegistriesDialog').then(m => ({ default: m.DeviceRegistriesDialog }))
+);
+
+// feat/device-list-ui commit 2: same lazy convention.
+const DeviceListDialog = lazy(() =>
+  import('./components/DeviceListDialog').then(m => ({ default: m.DeviceListDialog }))
+);
+
 function App() {
-  const { projectName, fileName, isDirty, screenKind } = useStore();
+  const { projectName, fileName, isDirty, screenKind, objects, devices } = useStore();
   const [showScadaPreview, setShowScadaPreview] = useState(false);
+  const [showDeviceRegistries, setShowDeviceRegistries] = useState(false);
+  const [showDeviceList, setShowDeviceList] = useState(false);
+
+  // feat/device-list-ui commit 5: a symbol's Aparat can go dangling
+  // (the device it pointed at got deleted from the registry elsewhere -
+  // Rejestry projektu, or Lista aparatow) without the symbol itself ever
+  // being touched. Reported to Messages once per object per time it
+  // BECOMES dangling, not on every render - alreadyReportedRef tracks
+  // which object ids already have a standing message so fixing then
+  // re-breaking the same symbol reports it again, but simply re-opening
+  // a menu does not spam the panel.
+  const reportedDanglingRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const issues = validateDeviceBindings(objects, devices);
+    const currentIds = new Set(issues.map(i => i.objectId));
+    for (const issue of issues) {
+      if (!reportedDanglingRef.current.has(issue.objectId)) {
+        useStore.getState().addMessage(`[WARNING] ${issue.message}`);
+      }
+    }
+    reportedDanglingRef.current = currentIds;
+  }, [objects, devices]);
 
   useEffect(() => {
     const titleName = fileName || `${projectName}.epwsyn`;
@@ -56,10 +90,24 @@ function App() {
 
   return (
     <div className="app-container">
-      <MenuBar onOpenScadaPreview={() => setShowScadaPreview(true)} />
+      <MenuBar
+        onOpenScadaPreview={() => setShowScadaPreview(true)}
+        onOpenDeviceRegistries={() => setShowDeviceRegistries(true)}
+        onOpenDeviceList={() => setShowDeviceList(true)}
+      />
       {showScadaPreview && (
         <Suspense fallback={null}>
           <ScadaStylePreview onClose={() => setShowScadaPreview(false)} />
+        </Suspense>
+      )}
+      {showDeviceRegistries && (
+        <Suspense fallback={null}>
+          <DeviceRegistriesDialog onClose={() => setShowDeviceRegistries(false)} />
+        </Suspense>
+      )}
+      {showDeviceList && (
+        <Suspense fallback={null}>
+          <DeviceListDialog onClose={() => setShowDeviceList(false)} />
         </Suspense>
       )}
       <Toolbar />

@@ -61,6 +61,8 @@ export class ProjectManager {
       signalPanels: state.signalPanels || [],
       frames: state.frames || [],
       devices: state.devices || [],
+      locations: state.locations || [],
+      cards: state.cards || [],
       terrain: state.terrainTiles || {},
       kind: state.screenKind,
       planObjects: state.planObjects || []
@@ -82,6 +84,8 @@ export class ProjectManager {
       signalPanels: project.signalPanels || [],
       frames: project.frames || [],
       devices: project.devices || [],
+      locations: project.locations || [],
+      cards: project.cards || [],
       terrainTiles: project.terrain || {},
       // feat/isometric-engine commit 5: a file with no `kind` field at
       // all (every file saved before this commit existed) loads as
