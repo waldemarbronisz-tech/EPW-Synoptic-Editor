@@ -2,19 +2,20 @@ import type { StateCreator } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import type { AppState } from './appState';
 
-// The six drawing-surface collections (objects/connections/meters/
-// signalPanels/frames/groupCommands) and their CRUD actions - this is
-// the data an .epwsyn file actually persists. Selection, clipboard, and
-// undo/redo over these same arrays each live in their own slice
-// instead.
+// The seven drawing-surface collections (objects/connections/meters/
+// signalPanels/frames/groupCommands/setpointPanels) and their CRUD
+// actions - this is the data an .epwsyn file actually persists.
+// Selection, clipboard, and undo/redo over these same arrays each live
+// in their own slice instead.
 export type ElementsSlice = Pick<AppState,
-  | 'objects' | 'connections' | 'meters' | 'signalPanels' | 'frames' | 'groupCommands'
+  | 'objects' | 'connections' | 'meters' | 'signalPanels' | 'frames' | 'groupCommands' | 'setpointPanels'
   | 'addObject' | 'updateObject' | 'updateObjects'
   | 'addConnection' | 'updateConnection'
   | 'addMeter' | 'updateMeter'
   | 'addSignalPanel' | 'updateSignalPanel'
   | 'addFrame' | 'updateFrame'
   | 'addGroupCommand' | 'updateGroupCommand'
+  | 'addSetpointPanel' | 'updateSetpointPanel'
   | 'deleteObjects'
 >;
 
@@ -25,6 +26,7 @@ export const createElementsSlice: StateCreator<AppState, [], [], ElementsSlice> 
   signalPanels: [],
   frames: [],
   groupCommands: [],
+  setpointPanels: [],
 
   addObject: (obj) => {
     set((state) => ({
@@ -123,6 +125,20 @@ export const createElementsSlice: StateCreator<AppState, [], [], ElementsSlice> 
     }));
   },
 
+  addSetpointPanel: (panel) => {
+    set((state) => ({
+      setpointPanels: [...state.setpointPanels, { ...panel, id: uuidv4() }]
+    }));
+    get().saveHistory();
+  },
+
+  updateSetpointPanel: (id, updates) => {
+    set((state) => ({
+      setpointPanels: state.setpointPanels.map(p => p.id === id ? { ...p, ...updates } : p),
+      isDirty: true
+    }));
+  },
+
   // Bug fix (node-based wiring rewrite): deleting an object used to
   // cascade-delete every connection whose fromId/toId pointed at it. A
   // connection no longer references any object id at all - it is a free
@@ -130,8 +146,8 @@ export const createElementsSlice: StateCreator<AppState, [], [], ElementsSlice> 
   // needs to cascade any more. A wire left dangling by a deleted object
   // simply stops being part of any net; it stays on the canvas exactly
   // like drawing a wire into empty space always could.
-  deleteObjects: (ids, connIds = [], meterIds = [], signalPanelIds = [], frameIds = [], groupCommandIds = []) => {
-    if (ids.length === 0 && connIds.length === 0 && meterIds.length === 0 && signalPanelIds.length === 0 && frameIds.length === 0 && groupCommandIds.length === 0) return;
+  deleteObjects: (ids, connIds = [], meterIds = [], signalPanelIds = [], frameIds = [], groupCommandIds = [], setpointPanelIds = []) => {
+    if (ids.length === 0 && connIds.length === 0 && meterIds.length === 0 && signalPanelIds.length === 0 && frameIds.length === 0 && groupCommandIds.length === 0 && setpointPanelIds.length === 0) return;
     set((state) => ({
       objects: state.objects.filter(obj => !ids.includes(obj.id)),
       selectedIds: state.selectedIds.filter(id => !ids.includes(id)),
@@ -144,7 +160,9 @@ export const createElementsSlice: StateCreator<AppState, [], [], ElementsSlice> 
       frames: state.frames.filter(f => !frameIds.includes(f.id)),
       selectedFrameIds: state.selectedFrameIds.filter(id => !frameIds.includes(id)),
       groupCommands: state.groupCommands.filter(g => !groupCommandIds.includes(g.id)),
-      selectedGroupCommandIds: state.selectedGroupCommandIds.filter(id => !groupCommandIds.includes(id))
+      selectedGroupCommandIds: state.selectedGroupCommandIds.filter(id => !groupCommandIds.includes(id)),
+      setpointPanels: state.setpointPanels.filter(p => !setpointPanelIds.includes(p.id)),
+      selectedSetpointPanelIds: state.selectedSetpointPanelIds.filter(id => !setpointPanelIds.includes(id))
     }));
     get().saveHistory();
   },

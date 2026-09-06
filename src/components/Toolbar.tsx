@@ -6,12 +6,13 @@ import {
   BringToFront, SendToBack, AlignLeft, AlignCenter, AlignRight,
   AlignVerticalSpaceAround, AlignHorizontalSpaceAround,
   Lock, Unlock, RotateCcw, RotateCw, PenLine, Zap, Droplet, Wind, Gauge, CircleDot,
-  Square, Home, MousePointer2, Power
+  Square, Home, MousePointer2, Power, SlidersHorizontal
 } from 'lucide-react';
 import { COLOR_ENERGIZED, COLOR_WATER, VENTILATION_ACTIVE, COLOR_WHITE, COLOR_RUN, COLOR_OUTLINE } from '../theme/ScadaTheme';
 import { METER_DEFAULT_FONT_SIZE } from '../meter/MeterElement';
 import { SIGNAL_PANEL_DEFAULT_FONT_SIZE } from '../elements/SignalPanelElement';
 import { GROUP_COMMAND_DEFAULT_WIDTH } from '../elements/GroupCommandElement';
+import { SETPOINT_DEFAULT_FONT_SIZE } from '../elements/SetpointElement';
 import { TERRAIN_TILE_TYPES, getTerrainTileColors } from '../iso/TerrainTile';
 
 // One icon/color pair per medium - reused by both the toolbar buttons
@@ -34,6 +35,7 @@ export const Toolbar: React.FC = () => {
     addSignalPanel, selectedSignalPanelIds, selectSignalPanels,
     selectedFrameIds, isDrawingFrame, drawingFrameVariant, setDrawingFrameMode,
     addGroupCommand, selectedGroupCommandIds, selectGroupCommands,
+    addSetpointPanel, selectedSetpointPanelIds, selectSetpointPanels,
     screenKind, terrainPaintTool, setTerrainPaintTool, selectedPlanObjectIds, deletePlanObjects
   } = useStore();
 
@@ -112,7 +114,7 @@ export const Toolbar: React.FC = () => {
       <div className="toolbar-group">
         <button title="Copy" onClick={copySelected}><Copy size={16} /></button>
         <button title="Paste" onClick={paste}><ClipboardPaste size={16} /></button>
-        <button title="Delete" onClick={() => deleteObjects(selectedIds, selectedConnectionIds, selectedMeterIds, selectedSignalPanelIds, selectedFrameIds, selectedGroupCommandIds)}><Trash2 size={16} /></button>
+        <button title="Delete" onClick={() => deleteObjects(selectedIds, selectedConnectionIds, selectedMeterIds, selectedSignalPanelIds, selectedFrameIds, selectedGroupCommandIds, selectedSetpointPanelIds)}><Trash2 size={16} /></button>
       </div>
 
       <div className="toolbar-divider" />
@@ -164,6 +166,22 @@ export const Toolbar: React.FC = () => {
           }}
         >
           <Power size={16} />
+        </button>
+      </div>
+
+      {/* The setpoint panel element (feat/selector-symbol-setpoint-alarm):
+          same mechanism, for MODULATED devices instead of MEASURED ones -
+          see elements/SetpointElement.ts. */}
+      <div className="toolbar-group">
+        <button
+          title="Dodaj Panel Nastaw"
+          onClick={() => {
+            addSetpointPanel({ x: 160, y: 160, width: 200, fontSize: SETPOINT_DEFAULT_FONT_SIZE, rows: [] });
+            const newest = useStore.getState().setpointPanels[useStore.getState().setpointPanels.length - 1];
+            if (newest) selectSetpointPanels([newest.id], false);
+          }}
+        >
+          <SlidersHorizontal size={16} />
         </button>
       </div>
 

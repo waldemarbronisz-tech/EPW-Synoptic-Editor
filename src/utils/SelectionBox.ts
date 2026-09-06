@@ -34,6 +34,7 @@ export interface MixedSelection {
   signalPanelIds: string[];
   frameIds: string[];
   groupCommandIds: string[];
+  setpointPanelIds: string[];
 }
 
 /**
@@ -53,6 +54,7 @@ export function mergeSelectionAdditive(existing: MixedSelection, found: Partial<
     meterIds: [...new Set([...existing.meterIds, ...(found.meterIds || [])])],
     signalPanelIds: [...new Set([...existing.signalPanelIds, ...(found.signalPanelIds || [])])],
     frameIds: [...new Set([...existing.frameIds, ...(found.frameIds || [])])],
-    groupCommandIds: [...new Set([...existing.groupCommandIds, ...(found.groupCommandIds || [])])]
+    groupCommandIds: [...new Set([...existing.groupCommandIds, ...(found.groupCommandIds || [])])],
+    setpointPanelIds: [...new Set([...existing.setpointPanelIds, ...(found.setpointPanelIds || [])])]
   };
 }
