@@ -62,8 +62,8 @@ describe('Internal links from chapters 8-12 (partial mandatory test 4)', () => {
 });
 
 describe('searchHelp over chapters 8-12 body text', () => {
-  it('finds the plan-rotation discrepancy note by a body phrase', () => {
-    const results = searchHelp('feat/iso-tiles-and-rotation', 'pl');
+  it('finds the plan-rotation topic by a body phrase about the rear-view requirement', () => {
+    const results = searchHelp('widok tylny', 'pl');
     expect(results.some(r => r.topicId === 'plan-rotation')).toBe(true);
   });
 

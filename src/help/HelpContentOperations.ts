@@ -4,15 +4,17 @@
 // Canvas.tsx/PlanCanvas.tsx's own keydown handlers, and ProjectSchema.ts/
 // Migrations.ts/ProjectV2Schema.ts.
 //
-// Chapter 8.5 in particular documents a real discrepancy found while
-// writing this: the task's own brief assumes plan objects can be
-// rotated. They cannot, on this branch - PlanObject.ts has no rotation
-// field at all, and PlanCanvas.tsx's own comment says so directly
-// ("PLAN has no wires, no rotation/scale"). That work exists only on
-// an unrelated, unmerged branch (feat/iso-tiles-and-rotation) that
-// predates this task and was never merged into main. 8.5 describes
-// what the code actually does today, not what the brief assumed -
-// flagged again in this task's own completion report.
+// 8.3 and 8.5 were updated after feat/iso-tiles-and-rotation was merged
+// into main (a branch-inventory follow-up task): at the time this file
+// was first written, that branch was still unmerged, so plan objects
+// had no rotation field at all and terrain tiles always drew their own
+// walls regardless of neighbors - both chapters said so directly. Now
+// that the merge landed, they describe the real mechanism instead: a
+// four-way Rotation field whose 180/270 values only appear once a
+// sprite's manifest entry has its own rear view (none do yet, so every
+// object today still only rotates between 0 and 90 in practice), and
+// terrain walls that only draw at an actually-painted edge, not between
+// two painted neighbors.
 
 import type { HelpContentMap } from './HelpContentRegistry';
 
@@ -41,13 +43,11 @@ export const HELP_CONTENT_OPERATIONS: HelpContentMap = {
   'plan-terrain-painting': {
     pl: [
       { kind: 'p', text: 'Teren maluje sie narzedziem pedzla z toolbara, wybierajac jeden z pieciu typow (trawa, kostka brukowa, ziemia, zwir, woda) i przeciagajac po kaflach. Mapa terenu jest RZADKA - kafel niepomalowany po prostu nie istnieje w danych (nie jest zapisany jako "pusty typ"), wiec dzialka pokazuje sie jako wyspa na tle, a nie jako wypelniajacy caly ekran prostokat.' },
-      { kind: 'p', text: 'Kazdy pomalowany kafel jest rysowany jako diament plus dwie sciany boczne wytloczone w dol o stala wysokosc - kazdy kafel ZAWSZE rysuje swoje wlasne sciany, niezaleznie od typu sasiednich kafli. Oznacza to, ze dwa sasiadujace kafle tego samego typu nadal pokazuja miedzy soba widoczna krawedz/scianke, a nie jedna ciagla plyte.' },
-      { kind: 'note', text: 'To pierwszy przypadek, gdzie warto sprawdzic w kodzie zamiast zakladac: mechanizm "jedna ciagla plyta terenu bez szwow miedzy tym samym typem" NIE istnieje w tej wersji edytora - zobacz raport ukonczenia tego zadania po szczegoly.' },
+      { kind: 'p', text: 'Kazdy pomalowany kafel jest rysowany jako diament plus dwie sciany boczne wytloczone w dol o stala wysokosc - ale sciana rysuje sie TYLKO wtedy, gdy sasiedni kafel w tym kierunku NIE jest pomalowany (liczy sie sama OBECNOSC sasiada, nie jego typ). Dzieki temu dwa sasiadujace kafle, niezaleznie od typu, tworza jedna ciagla plyte bez szwu miedzy nimi - sciana pojawia sie tylko na FAKTYCZNEJ krawedzi pomalowanego obszaru.' },
     ],
     en: [
       { kind: 'p', text: 'Terrain is painted with the toolbar\'s brush tool, choosing one of five types (grass, paving, soil, gravel, water) and dragging across tiles. The terrain map is SPARSE - an unpainted tile simply does not exist in the data (it is not stored as an "empty type"), so the plot shows as an island on the background, not a rectangle filling the whole screen.' },
-      { kind: 'p', text: 'Every painted tile is drawn as a diamond plus two side walls extruded downward by a fixed height - every tile ALWAYS draws its own walls, regardless of its neighbors\' type. This means two adjacent tiles of the same type still show a visible edge/wall between them, not one continuous slab.' },
-      { kind: 'note', text: 'This is the first case worth checking in the code rather than assuming: a "one continuous terrain slab with no seams between the same type" mechanism does NOT exist in this build - see this task\'s own completion report for details.' },
+      { kind: 'p', text: 'Every painted tile is drawn as a diamond plus two side walls extruded downward by a fixed height - but a wall is drawn ONLY when the neighboring tile in that direction is NOT painted (what matters is the neighbor\'s mere PRESENCE, not its type). Two adjacent tiles, regardless of type, therefore form one continuous slab with no seam between them - a wall only ever appears at the actual edge of the painted area.' },
     ],
   },
   'plan-placing-objects': {
@@ -62,14 +62,14 @@ export const HELP_CONTENT_OPERATIONS: HelpContentMap = {
   },
   'plan-rotation': {
     pl: [
-      { kind: 'p', text: 'W TEJ WERSJI EDYTORA obiekty planu NIE MAJA zadnej kontrolki obrotu. Model danych obiektu planu (`PlanObject`) celowo nie ma pola rotacji ani skali - komentarz we wlasnym kodzie tego pliku mowi to wprost: "PLAN has no wires, no rotation/scale". Nic we Properties obiektu planu nie pozwala go obrocic.' },
-      { kind: 'p', text: 'To, co WYGLADA jak inna orientacja tego samego obiektu, w praktyce oznaczaloby inny SPRITE albo inny STAN tego samego sprite\'a w manifescie ([[plan-object-states|8.6]]) - ale zaden sprite w aktualnym manifescie (`public/sprites/iso/manifest.json`) nie definiuje wariantow kierunkowych (kazdy ma jeden stan `DEFAULT`, albo stany funkcjonalne jak ON/OFF czy OPEN/CLOSED - nigdy warianty "obrocony o 90 stopni").' },
-      { kind: 'note', text: 'Rozbieznosc miedzy trescia tego zadania a stanem kodu: tresc zadania zaklada istnienie obrotow obiektow planu. W tym repozytorium taka funkcja nie istnieje - powstala na osobnej, NIGDY niescalonej z main galezi (feat/iso-tiles-and-rotation) z wczesniejszego zadania. Ten rozdzial opisuje kod takim, jaki faktycznie jest w tej galezi.' },
+      { kind: 'p', text: 'Zaznaczony obiekt planu ma we Properties pole Rotation z czterema mozliwymi wartosciami: 0, 90, 180, 270 stopni. Obroty 0 i 90 rysuja PRZEDNI widok sprite\'a (90 stopni to ten sam obrazek odbity poziomo w lustrze - odwrocenie lewo-prawo wystarcza, zeby pokazac cwiartke obrotu plaskiego, jednowidokowego obiektu).' },
+      { kind: 'p', text: 'Obroty 180 i 270 wymagaja natomiast TYLNEGO widoku sprite\'a (270 to ten tylny widok odbity w lustrze) - zadne lustrzane odbicie nie potrafi wyliczyc tylu budynku z jego frontu, skoro tyl ma wlasny uklad okien/drzwi/komina. Dlatego 180/270 sa dostepne w rozwijanym polu Rotation WYLACZNIE wtedy, gdy wpis danego stanu sprite\'a w manifescie ma wlasny widok tylny (`fileBack`) - lista dostepnych obrotow jest wiec wprost zalezna od danych w manifescie, nigdy sztywna.' },
+      { kind: 'note', text: 'Stan biezacy manifestu (`public/sprites/iso/manifest.json`): ZADEN z dostarczonych sprite\'ow nie ma jeszcze zdefiniowanego widoku tylnego - w praktyce kazdy obiekt na planie oferuje dzis tylko dwa obroty (0 i 90), mimo ze mechanizm obslugujacy wszystkie cztery jest juz w pelni gotowy. Czwarty i trzeci obrot pojawia sie automatycznie, gdy tylko ktorys sprite dostanie wlasny plik widoku tylnego w manifescie - bez zadnej zmiany w kodzie.' },
     ],
     en: [
-      { kind: 'p', text: 'IN THIS VERSION of the editor, plan objects have NO rotation control at all. The plan object data model (`PlanObject`) deliberately has no rotation or scale field - that file\'s own code comment says so directly: "PLAN has no wires, no rotation/scale". Nothing in a plan object\'s Properties lets it be rotated.' },
-      { kind: 'p', text: 'What WOULD look like a different orientation of the same object would in practice mean a different SPRITE, or a different STATE of the same sprite in the manifest ([[plan-object-states|8.6]]) - but no sprite in the current manifest (`public/sprites/iso/manifest.json`) defines directional variants (each one has a single `DEFAULT` state, or functional states like ON/OFF or OPEN/CLOSED - never a "rotated 90 degrees" variant).' },
-      { kind: 'note', text: 'A discrepancy between this task\'s own brief and the actual code: the brief assumes plan-object rotation exists. It does not exist in this repository - it was built on a separate branch (feat/iso-tiles-and-rotation) from an earlier task that was NEVER merged into main. This chapter describes the code as it actually stands on this branch.' },
+      { kind: 'p', text: 'A selected plan object has a Rotation field in Properties with four possible values: 0, 90, 180, 270 degrees. Rotations 0 and 90 both draw the sprite\'s FRONT view (90 is that same image mirrored horizontally - a left/right flip is enough to show a quarter turn of a flat, single-view object).' },
+      { kind: 'p', text: 'Rotations 180 and 270 instead need the sprite\'s REAR view (270 is that rear view mirrored) - no mirror flip can derive a building\'s back from its front, since the back has its own window/door/chimney layout. So 180/270 only appear in the Rotation dropdown when that sprite state\'s own manifest entry has its own rear view (fileBack) - the list of available rotations is directly data-driven from the manifest, never fixed.' },
+      { kind: 'note', text: 'Current state of the manifest (public/sprites/iso/manifest.json): NONE of the shipped sprites has a rear view defined yet - in practice every plan object today only offers two rotations (0 and 90), even though the mechanism supporting all four is fully built. The third and fourth rotation appear automatically the moment any sprite gets its own rear-view file in the manifest - with no code change needed.' },
     ],
   },
   'plan-object-states': {
