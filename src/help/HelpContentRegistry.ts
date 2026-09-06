@@ -14,12 +14,13 @@
 import type { HelpBlock } from './HelpTypes';
 import type { HelpLanguage } from '../i18n/HelpLanguage';
 import { HELP_CONTENT_CORE } from './HelpContentCore';
+import { HELP_CONTENT_DRAWING } from './HelpContentDrawing';
 
 export type HelpContentMap = Record<string, Partial<Record<HelpLanguage, HelpBlock[]>>>;
 
 const CONTENT_SOURCES: HelpContentMap[] = [
-  HELP_CONTENT_CORE, // commit 3: chapters 1-4
-  // commit 4: HELP_CONTENT_DRAWING (chapters 5-7)
+  HELP_CONTENT_CORE,    // commit 3: chapters 1-4
+  HELP_CONTENT_DRAWING, // commit 4: chapters 5-7
   // commit 5: HELP_CONTENT_OPERATIONS (chapters 8-12)
   // commit 6: HELP_CONTENT_GLOSSARY (chapter 13)
 ];
