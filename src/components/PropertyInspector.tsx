@@ -6,6 +6,8 @@ import { clampMeterWidth, METER_MIN_WIDTH, METER_MAX_WIDTH, METER_DEFAULT_FONT_S
 import type { MeterElementRow } from '../meter/MeterElement';
 import { clampSignalPanelWidth, SIGNAL_PANEL_MIN_WIDTH, SIGNAL_PANEL_MAX_WIDTH, SIGNAL_PANEL_DEFAULT_FONT_SIZE } from '../elements/SignalPanelElement';
 import type { SignalPanelRow } from '../elements/SignalPanelElement';
+import { clampGroupCommandWidth, GROUP_COMMAND_MIN_WIDTH, GROUP_COMMAND_MAX_WIDTH } from '../elements/GroupCommandElement';
+import { getCommandableDevices, resolveGroupCommandMembers, getGroupCommandTargetNames } from '../elements/GroupCommandResolver';
 import { INDICATOR_DIODE_STATES } from '../symbols/scada/IndicatorDiodeSymbol';
 import { FONT_SIZE_BASE, FONT_SIZE_SMALL } from '../theme/ScadaTheme';
 import type { SynopticConnection, SynopticObject } from '../store';
@@ -36,6 +38,7 @@ export const PropertyInspector: React.FC = () => {
   const { meters, selectedMeterIds, updateMeter, devices } = useStore();
   const { signalPanels, selectedSignalPanelIds, updateSignalPanel } = useStore();
   const { frames, selectedFrameIds, updateFrame } = useStore();
+  const { groupCommands, selectedGroupCommandIds, updateGroupCommand } = useStore();
   const { planObjects, selectedPlanObjectIds, updatePlanObject } = useStore();
   // Hooks must run unconditionally on every render (this component is
   // otherwise a chain of early returns depending on what is selected),
@@ -193,7 +196,7 @@ export const PropertyInspector: React.FC = () => {
     );
   }
 
-  if (selectedIds.length === 0 && selectedConnectionIds.length === 0 && selectedMeterIds.length === 0 && selectedSignalPanelIds.length === 0 && selectedFrameIds.length === 0) {
+  if (selectedIds.length === 0 && selectedConnectionIds.length === 0 && selectedMeterIds.length === 0 && selectedSignalPanelIds.length === 0 && selectedFrameIds.length === 0 && selectedGroupCommandIds.length === 0) {
     return (
       <div className="property-inspector">
         <div className="inspector-header">Properties</div>
@@ -202,8 +205,8 @@ export const PropertyInspector: React.FC = () => {
     );
   }
 
-  const selectionKindCount = (selectedIds.length > 0 ? 1 : 0) + (selectedConnectionIds.length > 0 ? 1 : 0) + (selectedMeterIds.length > 0 ? 1 : 0) + (selectedSignalPanelIds.length > 0 ? 1 : 0) + (selectedFrameIds.length > 0 ? 1 : 0);
-  if (selectedIds.length > 1 || selectedConnectionIds.length > 1 || selectedMeterIds.length > 1 || selectedSignalPanelIds.length > 1 || selectedFrameIds.length > 1 || selectionKindCount > 1) {
+  const selectionKindCount = (selectedIds.length > 0 ? 1 : 0) + (selectedConnectionIds.length > 0 ? 1 : 0) + (selectedMeterIds.length > 0 ? 1 : 0) + (selectedSignalPanelIds.length > 0 ? 1 : 0) + (selectedFrameIds.length > 0 ? 1 : 0) + (selectedGroupCommandIds.length > 0 ? 1 : 0);
+  if (selectedIds.length > 1 || selectedConnectionIds.length > 1 || selectedMeterIds.length > 1 || selectedSignalPanelIds.length > 1 || selectedFrameIds.length > 1 || selectedGroupCommandIds.length > 1 || selectionKindCount > 1) {
     return (
       <div className="property-inspector">
         <div className="inspector-header">Properties</div>
@@ -216,13 +219,15 @@ export const PropertyInspector: React.FC = () => {
   const isMeterSelected = selectedMeterIds.length === 1;
   const isSignalPanelSelected = selectedSignalPanelIds.length === 1;
   const isFrameSelected = selectedFrameIds.length === 1;
-  const selectedObj = isConnectionSelected || isMeterSelected || isSignalPanelSelected || isFrameSelected ? null : objects.find(o => o.id === selectedIds[0]);
+  const isGroupCommandSelected = selectedGroupCommandIds.length === 1;
+  const selectedObj = isConnectionSelected || isMeterSelected || isSignalPanelSelected || isFrameSelected || isGroupCommandSelected ? null : objects.find(o => o.id === selectedIds[0]);
   const selectedConn = isConnectionSelected ? connections.find(c => c.id === selectedConnectionIds[0]) : null;
   const selectedMeter = isMeterSelected ? meters.find(m => m.id === selectedMeterIds[0]) : null;
   const selectedSignalPanel = isSignalPanelSelected ? signalPanels.find(p => p.id === selectedSignalPanelIds[0]) : null;
   const selectedFrame = isFrameSelected ? frames.find(f => f.id === selectedFrameIds[0]) : null;
+  const selectedGroupCommand = isGroupCommandSelected ? groupCommands.find(g => g.id === selectedGroupCommandIds[0]) : null;
 
-  if (!selectedObj && !selectedConn && !selectedMeter && !selectedSignalPanel && !selectedFrame) return null;
+  if (!selectedObj && !selectedConn && !selectedMeter && !selectedSignalPanel && !selectedFrame && !selectedGroupCommand) return null;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -680,6 +685,119 @@ export const PropertyInspector: React.FC = () => {
               <label>Height</label>
               <input type="number" value={Math.round(selectedFrame.height)} disabled />
             </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (selectedGroupCommand) {
+    // feat/control-elements commit 2: label/command/members, freely
+    // configurable per this task's own directive ("dowolnie
+    // konfigurowac" - works equally for a lighting group or a fan
+    // group, not hardcoded to either). Member picking is a plain
+    // dropdown-plus-list, not a wizard dialog like the meter/signal
+    // panel's own Kreator - a device-id list this short does not
+    // justify one. "Testuj (podglad)" never sends anything (this
+    // editor is design-time only - see GroupCommandResolver.ts's own
+    // header) - it only logs what a click WOULD command, into the
+    // existing Messages panel, same honesty convention as the meter/
+    // signal panel's own PREVIEW state.
+    const commandable = getCommandableDevices(devices);
+    const members = resolveGroupCommandMembers(selectedGroupCommand, devices);
+    const availableToAdd = commandable.filter(d => !selectedGroupCommand.deviceIds.includes(d.id));
+
+    const setDeviceIds = (deviceIds: string[]) => {
+      updateGroupCommand(selectedGroupCommand.id, { deviceIds });
+      useStore.getState().saveHistory();
+    };
+    const addMember = (deviceId: string) => {
+      if (!deviceId || selectedGroupCommand.deviceIds.includes(deviceId)) return;
+      setDeviceIds([...selectedGroupCommand.deviceIds, deviceId]);
+    };
+    const removeMember = (deviceId: string) => setDeviceIds(selectedGroupCommand.deviceIds.filter(id => id !== deviceId));
+
+    return (
+      <div className="property-inspector">
+        <div className="inspector-header">Group Command Properties</div>
+        <div className="inspector-content">
+          <div className="property-group">
+            <div className="property-group-title">Przycisk grupowy</div>
+            <div className="property-row">
+              <label>Opis (etykieta)</label>
+              <input
+                type="text"
+                value={selectedGroupCommand.label}
+                onChange={(e) => updateGroupCommand(selectedGroupCommand.id, { label: e.target.value })}
+                onBlur={() => useStore.getState().saveHistory()}
+                placeholder="np. Start wentylatorow"
+              />
+            </div>
+            <div className="property-row">
+              <label>Polecenie</label>
+              <select
+                value={selectedGroupCommand.command}
+                onChange={(e) => { updateGroupCommand(selectedGroupCommand.id, { command: e.target.value as 'CLOSE' | 'OPEN' }); useStore.getState().saveHistory(); }}
+              >
+                <option value="CLOSE">CLOSE (zalacz)</option>
+                <option value="OPEN">OPEN (wylacz)</option>
+              </select>
+            </div>
+            <div className="property-row">
+              <label>Width</label>
+              <input
+                type="number"
+                min={GROUP_COMMAND_MIN_WIDTH}
+                max={GROUP_COMMAND_MAX_WIDTH}
+                value={Math.round(selectedGroupCommand.width)}
+                onChange={(e) => {
+                  const width = parseFloat(e.target.value);
+                  if (!isNaN(width)) updateGroupCommand(selectedGroupCommand.id, { width: clampGroupCommandWidth(width) });
+                }}
+                onBlur={() => useStore.getState().saveHistory()}
+              />
+            </div>
+          </div>
+
+          <div className="property-group">
+            <div className="property-group-title">
+              Aparaty w grupie ({members.length})
+              <select
+                style={{ marginLeft: 'auto', fontSize: UI_SMALL }}
+                value=""
+                onChange={(e) => addMember(e.target.value)}
+                disabled={availableToAdd.length === 0}
+              >
+                <option value="">+ Dodaj aparat...</option>
+                {availableToAdd.map(d => <option key={d.id} value={d.id}>{d.id} ({d.designation})</option>)}
+              </select>
+            </div>
+            {members.map(m => (
+              <div className="property-row" key={m.deviceId} style={{ gap: '4px', alignItems: 'center' }}>
+                <span style={{ flex: 1, fontSize: UI_SMALL }}>
+                  {m.deviceId} {m.dangling ? <em>(brak / nie SWITCHED)</em> : `(${m.designation})`}
+                </span>
+                <button onClick={() => removeMember(m.deviceId)} style={{ fontSize: UI_SMALL }}>x</button>
+              </div>
+            ))}
+            {members.length === 0 && (
+              <div className="property-row"><em>Brak aparatow - uzyj listy powyzej, aby dodac.</em></div>
+            )}
+          </div>
+
+          <div className="property-group">
+            <button
+              onClick={() => {
+                const names = getGroupCommandTargetNames(selectedGroupCommand, devices);
+                useStore.getState().addMessage(
+                  names.length > 0
+                    ? `[INFO] "${selectedGroupCommand.label || selectedGroupCommand.id}" wyslalby: ${names.join(', ')}`
+                    : `[WARNING] "${selectedGroupCommand.label || selectedGroupCommand.id}" nie ma zadnego prawidlowego aparatu do sterowania`
+                );
+              }}
+            >
+              Testuj (podglad)
+            </button>
           </div>
         </div>
       </div>

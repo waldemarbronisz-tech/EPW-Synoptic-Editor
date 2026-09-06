@@ -61,6 +61,7 @@ export class ProjectManager {
       meters: state.meters || [],
       signalPanels: state.signalPanels || [],
       frames: state.frames || [],
+      groupCommands: state.groupCommands || [],
       devices: state.devices || [],
       locations: state.locations || [],
       cards: state.cards || [],
@@ -85,6 +86,7 @@ export class ProjectManager {
       meters: project.meters || [],
       signalPanels: project.signalPanels || [],
       frames: project.frames || [],
+      groupCommands: project.groupCommands || [],
       devices: project.devices || [],
       locations: project.locations || [],
       cards: project.cards || [],
@@ -123,7 +125,8 @@ export class ProjectManager {
         signalPanels: JSON.parse(JSON.stringify(project.signalPanels || [])),
         frames: JSON.parse(JSON.stringify(project.frames || [])),
         terrainTiles: JSON.parse(JSON.stringify(project.terrain || {})),
-        planObjects: JSON.parse(JSON.stringify(project.planObjects || []))
+        planObjects: JSON.parse(JSON.stringify(project.planObjects || [])),
+        groupCommands: JSON.parse(JSON.stringify(project.groupCommands || []))
       }],
       historyIndex: 0
     });

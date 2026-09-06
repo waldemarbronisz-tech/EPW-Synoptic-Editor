@@ -1,11 +1,11 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Stage, Layer, Rect, Circle, Group, Path } from 'react-konva';
+import { Stage, Layer, Rect, Circle, Group, Path, Text } from 'react-konva';
 import { useStore } from '../store';
 import type { SynopticConnection, WirePoint } from '../store';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 import { pathFromPoints, getConductorCoreColor } from './ConnectionLine';
 import { ObjectLabelRenderer } from './ObjectLabelRenderer';
-import { COLOR_ALARM, COLOR_CANVAS_BACKGROUND, COLOR_OUTLINE, COLOR_WATER, COLOR_WHITE, CONDUCTOR_WIDTH, FONT_SIZE_BASE, FONT_UI } from '../theme/ScadaTheme';
+import { COLOR_ALARM, COLOR_CANVAS_BACKGROUND, COLOR_LAMP_LIT, COLOR_OUTLINE, COLOR_WATER, COLOR_WHITE, CONDUCTOR_WIDTH, FONT_SIZE_BASE, FONT_SIZE_SMALL, FONT_UI } from '../theme/ScadaTheme';
 import { snapValue } from '../utils/GridSnap';
 import {
   snapPointToGrid, appendWirePoint, removeLastWirePoint,
@@ -14,11 +14,14 @@ import {
 import { resolveNets, getJunctionPoints } from '../project/NetResolver';
 import { describeObject } from '../utils/ObjectDisplay';
 import { isSymbolDeviceMissing } from '../project/DeviceBindingValidation';
+import { isSymbolInterlocked } from '../project/InterlockIndicator';
 import { WireNodeSymbol } from '../symbols/scada/WireNodeSymbol';
 import { MeterElementNode } from './MeterElementNode';
 import { computeMeterHeight } from '../meter/MeterElement';
 import { SignalPanelElementNode } from './SignalPanelElementNode';
 import { computeSignalPanelHeight } from '../elements/SignalPanelElement';
+import { GroupCommandElementNode } from './GroupCommandElementNode';
+import { computeGroupCommandHeight } from '../elements/GroupCommandElement';
 import { isObjectFullyInBox, isMeterFullyInBox, isConnectionFullyInBox, mergeSelectionAdditive } from '../utils/SelectionBox';
 import { clampZoom, computeContentBounds, computeFitView, GRID_THIN_BELOW_ZOOM } from '../utils/CanvasView';
 import { FrameElementNode } from './FrameElementNode';
@@ -67,6 +70,7 @@ export const Canvas: React.FC = () => {
   const { meters, selectedMeterIds, selectMeters, updateMeter, devices } = useStore();
   const { signalPanels, selectedSignalPanelIds, selectSignalPanels, updateSignalPanel } = useStore();
   const { frames, selectedFrameIds, selectFrames, addFrame, updateFrame, isDrawingFrame, drawingFrameVariant, frameToolContinuous, setDrawingFrameMode } = useStore();
+  const { groupCommands, selectedGroupCommandIds, selectGroupCommands, updateGroupCommand } = useStore();
   const { selectMixed } = useStore();
   const [size, setSize] = useState({ width: 800, height: 600 });
   // Mirrors `size` for the keydown handler below (registered once,
@@ -117,6 +121,7 @@ export const Canvas: React.FC = () => {
     ...selectedMeterIds.map(id => `meter:${id}`),
     ...selectedSignalPanelIds.map(id => `panel:${id}`),
     ...selectedFrameIds.map(id => `frame:${id}`),
+    ...selectedGroupCommandIds.map(id => `groupcmd:${id}`),
     ...selectedConnectionIds.map(id => `conn:${id}`)
   ];
 
@@ -148,7 +153,8 @@ export const Canvas: React.FC = () => {
         const source = key.startsWith('obj:') ? objects.find(o => o.id === id)
           : key.startsWith('meter:') ? meters.find(m => m.id === id)
           : key.startsWith('panel:') ? signalPanels.find(p => p.id === id)
-          : frames.find(f => f.id === id);
+          : key.startsWith('frame:') ? frames.find(f => f.id === id)
+          : groupCommands.find(g => g.id === id);
         if (!source) return;
         node.x(source.x + dx);
         node.y(source.y + dy);
@@ -259,7 +265,7 @@ export const Canvas: React.FC = () => {
         // already in this effect.
         e.preventDefault();
         const s = useStore.getState();
-        s.deleteObjects(s.selectedIds, s.selectedConnectionIds, s.selectedMeterIds, s.selectedSignalPanelIds, s.selectedFrameIds);
+        s.deleteObjects(s.selectedIds, s.selectedConnectionIds, s.selectedMeterIds, s.selectedSignalPanelIds, s.selectedFrameIds, s.selectedGroupCommandIds);
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
         // Select everything on the current screen - objects,
         // connections and meters together.
@@ -543,17 +549,21 @@ export const Canvas: React.FC = () => {
       const meterIds = meters.filter(m => isMeterFullyInBox(m, computeMeterHeight(m), box)).map(m => m.id);
       const signalPanelIds = signalPanels.filter(p => isMeterFullyInBox(p, computeSignalPanelHeight(p), box)).map(p => p.id);
       const frameIds = frames.filter(f => isObjectFullyInBox(f, box)).map(f => f.id);
+      // A group command button has a fixed, computed height (never a
+      // field of its own) exactly like a meter/signal panel - reuses
+      // isMeterFullyInBox's own {x,y,width}+height signature, no new helper.
+      const groupCommandIds = groupCommands.filter(g => isMeterFullyInBox(g, computeGroupCommandHeight(), box)).map(g => g.id);
       const connectionIds = connections.filter(c => isConnectionFullyInBox(c, box)).map(c => c.id);
 
-      if (objectIds.length > 0 || meterIds.length > 0 || signalPanelIds.length > 0 || frameIds.length > 0 || connectionIds.length > 0) {
+      if (objectIds.length > 0 || meterIds.length > 0 || signalPanelIds.length > 0 || frameIds.length > 0 || groupCommandIds.length > 0 || connectionIds.length > 0) {
         if (e.evt.shiftKey) {
           // Shift+drag adds to whatever was already selected, per kind.
           selectMixed(mergeSelectionAdditive(
-            { objectIds: selectedIds, connectionIds: selectedConnectionIds, meterIds: selectedMeterIds, signalPanelIds: selectedSignalPanelIds, frameIds: selectedFrameIds },
-            { objectIds, connectionIds, meterIds, signalPanelIds, frameIds }
+            { objectIds: selectedIds, connectionIds: selectedConnectionIds, meterIds: selectedMeterIds, signalPanelIds: selectedSignalPanelIds, frameIds: selectedFrameIds, groupCommandIds: selectedGroupCommandIds },
+            { objectIds, connectionIds, meterIds, signalPanelIds, frameIds, groupCommandIds }
           ));
         } else {
-          selectMixed({ objectIds, connectionIds, meterIds, signalPanelIds, frameIds });
+          selectMixed({ objectIds, connectionIds, meterIds, signalPanelIds, frameIds, groupCommandIds });
         }
       }
       // An empty box selects nothing new - a non-shift click already
@@ -708,7 +718,7 @@ export const Canvas: React.FC = () => {
   // (an axis-aligned box, not each object's own rotated bounds) - the
   // same simplification isObjectFullyInBox already makes for the
   // rubber-band box itself.
-  const selectedTotalCount = selectedIds.length + selectedMeterIds.length + selectedSignalPanelIds.length + selectedFrameIds.length + selectedConnectionIds.length;
+  const selectedTotalCount = selectedIds.length + selectedMeterIds.length + selectedSignalPanelIds.length + selectedFrameIds.length + selectedGroupCommandIds.length + selectedConnectionIds.length;
   const selectionGroupBounds = (() => {
     if (selectedTotalCount <= 1) return null;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -722,6 +732,7 @@ export const Canvas: React.FC = () => {
     meters.filter(m => selectedMeterIds.includes(m.id)).forEach(m => extend(m.x, m.y, m.x + m.width, m.y + computeMeterHeight(m)));
     signalPanels.filter(p => selectedSignalPanelIds.includes(p.id)).forEach(p => extend(p.x, p.y, p.x + p.width, p.y + computeSignalPanelHeight(p)));
     frames.filter(f => selectedFrameIds.includes(f.id)).forEach(f => extend(f.x, f.y, f.x + f.width, f.y + f.height));
+    groupCommands.filter(g => selectedGroupCommandIds.includes(g.id)).forEach(g => extend(g.x, g.y, g.x + g.width, g.y + computeGroupCommandHeight()));
     connections.filter(c => selectedConnectionIds.includes(c.id)).forEach(c => c.points.forEach(pt => extend(pt.x, pt.y, pt.x, pt.y)));
     if (!Number.isFinite(minX)) return null;
     const padding = 8;
@@ -950,6 +961,37 @@ export const Canvas: React.FC = () => {
               }}
             />
           ))}
+          {/* The group command button (feat/control-elements commit 2):
+              same mechanism as the meter/signal panel, its own array -
+              see elements/GroupCommandElement.ts. No onResize (fixed-size
+              button - see that file's own header for why). */}
+          {groupCommands.map((el) => (
+            <GroupCommandElementNode
+              key={el.id}
+              el={el}
+              devices={devices}
+              isSelected={selectedGroupCommandIds.includes(el.id)}
+              onSelect={(e: any) => selectGroupCommands([el.id], !!e?.evt?.shiftKey)}
+              onShapeRef={(node) => groupDrag.registerNode(`groupcmd:${el.id}`, node)}
+              onDragStart={() => {
+                if (isAltKeyDown()) useStore.getState().duplicateGroupCommandInPlace(el.id);
+                groupDrag.start(`groupcmd:${el.id}`);
+              }}
+              onDragMove={(x, y) => {
+                if (groupDrag.isActive()) groupDrag.follow(x - el.x, y - el.y);
+              }}
+              onDragEnd={(x, y) => {
+                const finalX = snapValue(x, gridSize, isAltKeyDown());
+                const finalY = snapValue(y, gridSize, isAltKeyDown());
+                if (groupDrag.isActive()) {
+                  groupDrag.commit(finalX - el.x, finalY - el.y);
+                } else {
+                  updateGroupCommand(el.id, { x: finalX, y: finalY });
+                  useStore.getState().saveHistory();
+                }
+              }}
+            />
+          ))}
           {/* Layer 6, labels: a SEPARATE pass over every object, drawn
               after every symbol/junction/meter so a label never falls
               under another object's own shape - each wrapped in its own
@@ -990,6 +1032,40 @@ export const Canvas: React.FC = () => {
                 strokeWidth={2}
                 dash={[6, 4]}
                 fill="transparent"
+              />
+            </Group>
+          ))}
+          {/* feat/control-elements commit 3: a symbol bound to a
+              SWITCHED device with a configured interlock description
+              gets a small badge at its own top-right corner - purely a
+              "this command can be refused, see the device form for why"
+              flag, never live logic (see InterlockIndicator.ts's own
+              header). Same Group transform as the device-missing
+              outline above, so it always tracks the real symbol. A
+              filled circle + "!" glyph rather than a borrowed icon
+              font's path data - crisp at any zoom, no external asset. */}
+          {objects.filter(obj => isSymbolInterlocked(obj, devices)).map(obj => (
+            <Group key={`interlock-${obj.id}`} x={obj.x} y={obj.y} rotation={obj.rotation || 0} scaleX={obj.scaleX || 1} scaleY={obj.scaleY || 1} listening={false}>
+              <Circle
+                x={obj.width - 7}
+                y={7}
+                radius={7}
+                fill={COLOR_LAMP_LIT}
+                stroke={COLOR_OUTLINE}
+                strokeWidth={1}
+              />
+              <Text
+                x={obj.width - 11}
+                y={0}
+                width={8}
+                height={14}
+                text="!"
+                fontSize={FONT_SIZE_SMALL}
+                fontFamily={FONT_UI}
+                fontStyle="bold"
+                fill={COLOR_OUTLINE}
+                align="center"
+                verticalAlign="middle"
               />
             </Group>
           ))}

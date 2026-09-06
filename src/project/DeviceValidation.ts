@@ -34,7 +34,7 @@ export interface ValidationResult {
 }
 
 const CHANNEL_KINDS: ChannelKind[] = ['DI', 'DO', 'AI', 'AO'];
-const DEVICE_BEHAVIORS: DeviceBehavior[] = ['SWITCHED', 'SIGNAL', 'MEASURED', 'MODULATED'];
+const DEVICE_BEHAVIORS: DeviceBehavior[] = ['SWITCHED', 'SIGNAL', 'MEASURED', 'MODULATED', 'SELECTOR'];
 
 // ---- shape primitives --------------------------------------------------
 
@@ -276,6 +276,27 @@ export function validateDeviceFields(device: Device): ValidationIssue[] {
       }
       break;
     }
+
+    case 'SELECTOR': {
+      // A selector switch with fewer than two positions is not a
+      // selector - see SelectorDevice's own comment in DeviceSchema.ts.
+      if (device.positions.length < 2) {
+        issues.push({ severity: 'ERROR', code: 'SELECTOR_TOO_FEW_POSITIONS', message: `Device '${id}': positions must have at least 2 entries`, deviceId: id });
+      }
+
+      const seenNames = new Set<string>();
+      device.positions.forEach((position, i) => {
+        if (position.name.trim().length === 0) {
+          issues.push({ severity: 'ERROR', code: 'SELECTOR_EMPTY_POSITION_NAME', message: `Device '${id}': positions[${i}].name must not be empty`, deviceId: id });
+        } else if (seenNames.has(position.name)) {
+          issues.push({ severity: 'ERROR', code: 'SELECTOR_DUPLICATE_POSITION_NAME', message: `Device '${id}': duplicate position name '${position.name}'`, deviceId: id });
+        }
+        seenNames.add(position.name);
+
+        checkChannelKind(issues, id, `positions[${i}].feedback`, position.feedback, 'DI');
+      });
+      break;
+    }
   }
 
   return issues;
@@ -348,7 +369,7 @@ function validateDeviceShape(raw: unknown, index: number, issues: ValidationIssu
     issues.push({
       severity: 'ERROR',
       code: 'DEVICE_UNKNOWN_BEHAVIOR',
-      message: `Device '${idForMessages}': unknown behavior '${String(raw.behavior)}', expected one of SWITCHED, SIGNAL, MEASURED, MODULATED`,
+      message: `Device '${idForMessages}': unknown behavior '${String(raw.behavior)}', expected one of SWITCHED, SIGNAL, MEASURED, MODULATED, SELECTOR`,
       deviceId: isString(raw.id) ? raw.id : undefined
     });
     return null;
@@ -391,6 +412,22 @@ function validateDeviceShape(raw: unknown, index: number, issues: ValidationIssu
           problems.push("safeState.onLinkLoss must be one of 'NO_CHANGE','OPEN','CLOSE'");
         }
       }
+      // interlock is optional pure documentation (see DeviceSchema.ts) -
+      // if present at all it must be an object, and its two fields, if
+      // present, must be strings; no other shape rule applies to it.
+      if (raw.interlock !== undefined) {
+        if (!isPlainObject(raw.interlock)) {
+          problems.push('interlock must be an object');
+        } else {
+          const interlock = raw.interlock as Record<string, unknown>;
+          if (interlock.closeDescription !== undefined && !isString(interlock.closeDescription)) {
+            problems.push('interlock.closeDescription must be a string');
+          }
+          if (interlock.openDescription !== undefined && !isString(interlock.openDescription)) {
+            problems.push('interlock.openDescription must be a string');
+          }
+        }
+      }
       break;
     }
 
@@ -418,6 +455,22 @@ function validateDeviceShape(raw: unknown, index: number, issues: ValidationIssu
       if (!isFiniteNumber(raw.rangeMax)) problems.push('rangeMax must be a finite number');
       if (!isFiniteNumber(raw.startupValue)) problems.push('startupValue must be a finite number');
       if (!isFiniteNumber(raw.safeValue)) problems.push('safeValue must be a finite number');
+      break;
+    }
+
+    case 'SELECTOR': {
+      if (!Array.isArray(raw.positions)) {
+        problems.push('positions must be an array');
+      } else {
+        raw.positions.forEach((pos, i) => {
+          if (!isPlainObject(pos)) {
+            problems.push(`positions[${i}] must be an object`);
+            return;
+          }
+          if (!isString(pos.name)) problems.push(`positions[${i}].name must be a string`);
+          if (pos.feedback !== undefined && !isString(pos.feedback)) problems.push(`positions[${i}].feedback must be a string`);
+        });
+      }
       break;
     }
   }
@@ -456,6 +509,11 @@ function getDeviceChannelAddresses(device: Device): { field: string; addr: Chann
     case 'MODULATED':
       result.push({ field: 'setpointOutput', addr: device.setpointOutput });
       if (device.feedbackInput) result.push({ field: 'feedbackInput', addr: device.feedbackInput });
+      break;
+    case 'SELECTOR':
+      device.positions.forEach((position, i) => {
+        if (position.feedback) result.push({ field: `positions[${i}].feedback`, addr: position.feedback });
+      });
       break;
   }
 

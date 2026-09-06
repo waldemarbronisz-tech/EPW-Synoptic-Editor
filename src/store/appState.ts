@@ -7,6 +7,7 @@
 import type { MeterElement } from '../meter/MeterElement';
 import type { SignalPanelElement } from '../elements/SignalPanelElement';
 import type { FrameElement } from '../elements/FrameElement';
+import type { GroupCommandElement } from '../elements/GroupCommandElement';
 import type { Device, LocationEntry, CardEntry } from '../project/DeviceSchema';
 import type { CanvasState, HistorySnapshot, Message, ScreenKind, SynopticConnection, SynopticObject } from './types';
 import type { TerrainTileType } from '../iso/TerrainTile';
@@ -39,16 +40,24 @@ export interface AppState {
   // pure graphic (no terminals, no state, no aparat link) drawn by
   // dragging a rectangle - see elements/FrameElement.ts.
   frames: FrameElement[];
+  // The group command button (feat/control-elements commit 2): a
+  // screen-level convenience that re-issues one existing SWITCHED
+  // command (.CLOSE/.OPEN) to a configurable list of devices at once -
+  // see elements/GroupCommandElement.ts's own header for why this is
+  // not new control logic.
+  groupCommands: GroupCommandElement[];
   selectedIds: string[];
   selectedConnectionIds: string[];
   selectedMeterIds: string[];
   selectedSignalPanelIds: string[];
   selectedFrameIds: string[];
+  selectedGroupCommandIds: string[];
   canvasState: CanvasState;
   clipboard: SynopticObject[];
   clipboardMeters: MeterElement[];
   clipboardSignalPanels: SignalPanelElement[];
   clipboardFrames: FrameElement[];
+  clipboardGroupCommands: GroupCommandElement[];
   clipboardConnections: SynopticConnection[];
   history: HistorySnapshot[];
   historyIndex: number;
@@ -140,17 +149,21 @@ export interface AppState {
   updateSignalPanel: (id: string, updates: Partial<SignalPanelElement>) => void;
   addFrame: (frame: Omit<FrameElement, 'id'>) => void;
   updateFrame: (id: string, updates: Partial<FrameElement>) => void;
-  deleteObjects: (ids: string[], connIds?: string[], meterIds?: string[], signalPanelIds?: string[], frameIds?: string[]) => void;
+  addGroupCommand: (el: Omit<GroupCommandElement, 'id'>) => void;
+  updateGroupCommand: (id: string, updates: Partial<GroupCommandElement>) => void;
+  deleteObjects: (ids: string[], connIds?: string[], meterIds?: string[], signalPanelIds?: string[], frameIds?: string[], groupCommandIds?: string[]) => void;
   selectObjects: (ids: string[], multi?: boolean) => void;
   selectConnections: (ids: string[], multi?: boolean) => void;
   selectMeters: (ids: string[], multi?: boolean) => void;
   selectSignalPanels: (ids: string[], multi?: boolean) => void;
   selectFrames: (ids: string[], multi?: boolean) => void;
+  selectGroupCommands: (ids: string[], multi?: boolean) => void;
   // commit 3 (feat/editing-and-signal-panel), extended in commit 2
-  // (feat/appearance-selection-frames) with a fifth kind: replaces the
-  // whole selection with a mix of all five kinds at once (the rubber-
-  // band's own result) - and Ctrl+A's "select everything on screen".
-  selectMixed: (selection: { objectIds?: string[]; connectionIds?: string[]; meterIds?: string[]; signalPanelIds?: string[]; frameIds?: string[] }) => void;
+  // (feat/appearance-selection-frames) with a fifth kind, and in
+  // feat/control-elements commit 2 with a sixth: replaces the whole
+  // selection with a mix of all six kinds at once (the rubber-band's
+  // own result) - and Ctrl+A's "select everything on screen".
+  selectMixed: (selection: { objectIds?: string[]; connectionIds?: string[]; meterIds?: string[]; signalPanelIds?: string[]; frameIds?: string[]; groupCommandIds?: string[] }) => void;
   selectAll: () => void;
   clearSelection: () => void;
   // Arrow keys (commit 3): every selected object/meter/signalPanel/
@@ -171,6 +184,7 @@ export interface AppState {
   duplicateMeterInPlace: (id: string) => void;
   duplicateSignalPanelInPlace: (id: string) => void;
   duplicateFrameInPlace: (id: string) => void;
+  duplicateGroupCommandInPlace: (id: string) => void;
 
   // History
   undo: () => void;

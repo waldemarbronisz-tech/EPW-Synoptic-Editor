@@ -2,6 +2,7 @@ import type { SynopticObject, SynopticConnection } from '../store';
 import type { MeterElement } from '../meter/MeterElement';
 import type { SignalPanelElement } from '../elements/SignalPanelElement';
 import type { FrameElement } from '../elements/FrameElement';
+import type { GroupCommandElement } from '../elements/GroupCommandElement';
 import type { Device, LocationEntry, CardEntry } from './DeviceSchema';
 import type { TerrainTileType } from '../iso/TerrainTile';
 import type { PlanObject } from '../iso/PlanObject';
@@ -84,6 +85,11 @@ export interface EPWProjectSchema {
   // drawing content, the same category devices/locations/cards already
   // established.
   helpLanguage?: HelpLanguage;
+  // feat/control-elements commit 2: the group command button - same
+  // optional/additive treatment as every field above (an older project
+  // file simply has no group command buttons, not an invalid one). No
+  // schema version bump.
+  groupCommands?: GroupCommandElement[];
 }
 
 // v2: node-based wiring. A connection is a freehand orthogonal polyline

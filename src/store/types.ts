@@ -8,6 +8,7 @@ import type { MeterRow } from '../symbols/scada/MeterSymbol';
 import type { MeterElement } from '../meter/MeterElement';
 import type { SignalPanelElement } from '../elements/SignalPanelElement';
 import type { FrameElement } from '../elements/FrameElement';
+import type { GroupCommandElement } from '../elements/GroupCommandElement';
 import type { TerrainTileType } from '../iso/TerrainTile';
 import type { PlanObject } from '../iso/PlanObject';
 
@@ -150,4 +151,10 @@ export interface HistorySnapshot {
   // feat/isometric-engine commit 5: the PLAN screen's placed objects -
   // same optional/additive treatment as terrainTiles above.
   planObjects?: PlanObject[];
+  // feat/control-elements commit 2: the group command button - same
+  // optional/additive treatment as terrainTiles/planObjects above
+  // (added well after meters/signalPanels/frames became mandatory
+  // fields here, so it follows their later, optional convention
+  // instead of joining them as a required one).
+  groupCommands?: GroupCommandElement[];
 }
