@@ -7,10 +7,11 @@
 import type { MeterElement } from '../meter/MeterElement';
 import type { SignalPanelElement } from '../elements/SignalPanelElement';
 import type { FrameElement } from '../elements/FrameElement';
-import type { Device } from '../project/DeviceSchema';
+import type { Device, LocationEntry, CardEntry } from '../project/DeviceSchema';
 import type { CanvasState, HistorySnapshot, Message, ScreenKind, SynopticConnection, SynopticObject } from './types';
 import type { TerrainTileType } from '../iso/TerrainTile';
 import type { PlanObject } from '../iso/PlanObject';
+import type { HelpLanguage } from '../i18n/HelpLanguage';
 
 export interface AppState {
   projectMetadata: {
@@ -66,6 +67,24 @@ export interface AppState {
   // device - see ProjectManager.ts for how this round-trips with a
   // project file, and raport.md for the full path description.
   devices: Device[];
+
+  // feat/device-list-ui commit 1: the other two thirds of DeviceSchema.ts's
+  // own DeviceRegistry shape (locations, cards) - devices themselves stay
+  // declared above (they predate this slice); these two plus every CRUD
+  // action across all three live in deviceRegistrySlice.ts. A device's own
+  // config lives ONLY here, once - a screen element (Commit 5's "Aparat"
+  // property) never stores anything but the id it points at.
+  locations: LocationEntry[];
+  cards: CardEntry[];
+  addLocation: (entry: LocationEntry) => void;
+  updateLocation: (code: string, entry: LocationEntry) => void;
+  deleteLocation: (code: string) => void;
+  addCard: (entry: CardEntry) => void;
+  updateCard: (id: string, entry: CardEntry) => void;
+  deleteCard: (id: string) => void;
+  addDevice: (device: Device) => void;
+  updateDevice: (id: string, device: Device) => void;
+  deleteDevice: (id: string) => void;
 
   // Connection Drawing Mode
   isDrawingConnection: boolean;
@@ -210,4 +229,12 @@ export interface AppState {
   // together as one undo entry - see planSlice.ts's own comment for why
   // available rotations are re-read per object rather than assumed.
   rotatePlanObjects: (ids: string[], direction: 'cw' | 'ccw') => void;
+
+  // feat/help-system commit 1: which language the Help window's own
+  // content shows in - see helpSlice.ts's own header for why this lives
+  // in the project file (the only cross-reload persistence this app has)
+  // rather than localStorage/sessionStorage (forbidden by this task's
+  // GRANICE).
+  helpLanguage: HelpLanguage;
+  setHelpLanguage: (language: HelpLanguage) => void;
 }

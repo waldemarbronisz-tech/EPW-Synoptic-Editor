@@ -4,6 +4,7 @@ import type { EPWProjectSchema } from './ProjectSchema';
 import { useStore } from '../store';
 import type { ScreenKind } from '../store';
 import { GRID_SIZE } from '../theme/ScadaTheme';
+import { HELP_DEFAULT_LANGUAGE } from '../i18n/HelpLanguage';
 
 export class ProjectManager {
   // feat/isometric-engine commit 5: kind defaults to SCHEMATIC, same as
@@ -61,9 +62,12 @@ export class ProjectManager {
       signalPanels: state.signalPanels || [],
       frames: state.frames || [],
       devices: state.devices || [],
+      locations: state.locations || [],
+      cards: state.cards || [],
       terrain: state.terrainTiles || {},
       kind: state.screenKind,
-      planObjects: state.planObjects || []
+      planObjects: state.planObjects || [],
+      helpLanguage: state.helpLanguage
     };
     const validation = validateProjectSchema(proj);
     if (!validation.valid) {
@@ -82,12 +86,15 @@ export class ProjectManager {
       signalPanels: project.signalPanels || [],
       frames: project.frames || [],
       devices: project.devices || [],
+      locations: project.locations || [],
+      cards: project.cards || [],
       terrainTiles: project.terrain || {},
       // feat/isometric-engine commit 5: a file with no `kind` field at
       // all (every file saved before this commit existed) loads as
       // SCHEMATIC - the task's own explicit default.
       screenKind: project.kind || 'SCHEMATIC',
       planObjects: project.planObjects || [],
+      helpLanguage: project.helpLanguage || HELP_DEFAULT_LANGUAGE,
       projectName: project.project.name,
       projectMetadata: {
         description: project.project.description || "",

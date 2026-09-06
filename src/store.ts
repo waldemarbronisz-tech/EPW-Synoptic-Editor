@@ -8,6 +8,8 @@ import { createHistorySlice } from './store/historySlice';
 import { createLayoutSlice } from './store/layoutSlice';
 import { createTerrainSlice } from './store/terrainSlice';
 import { createPlanSlice } from './store/planSlice';
+import { createDeviceRegistrySlice } from './store/deviceRegistrySlice';
+import { createHelpSlice } from './store/helpSlice';
 import type { AppState } from './store/appState';
 
 // Internal-audit fix (god-file breakup): this file used to hold the
@@ -44,4 +46,6 @@ export const useStore = create<AppState>()((...a) => ({
   ...createLayoutSlice(...a),
   ...createTerrainSlice(...a),
   ...createPlanSlice(...a),
+  ...createDeviceRegistrySlice(...a),
+  ...createHelpSlice(...a),
 }));

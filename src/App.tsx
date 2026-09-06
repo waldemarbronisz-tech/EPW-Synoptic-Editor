@@ -9,7 +9,9 @@ import { MessagesPanel } from './components/MessagesPanel';
 import { StatusBar } from './components/StatusBar';
 import { useStore } from './store';
 import { loadSpriteManifest } from './iso/SpriteManifest';
-import { Suspense, lazy, useEffect, useState } from 'react';
+import { validateDeviceBindings } from './project/DeviceBindingValidation';
+import { getContextualHelpTopic } from './help/HelpContextResolver';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 
 // Internal-audit fix: a full-screen preview only ever mounted from the
 // menu bar's "Style Preview" action - lazy so its code isn't part of the
@@ -18,9 +20,90 @@ const ScadaStylePreview = lazy(() =>
   import('./components/ScadaStylePreview').then(m => ({ default: m.ScadaStylePreview }))
 );
 
+// feat/device-list-ui commit 1: same lazy-on-first-open convention as
+// ScadaStylePreview above.
+const DeviceRegistriesDialog = lazy(() =>
+  import('./components/DeviceRegistriesDialog').then(m => ({ default: m.DeviceRegistriesDialog }))
+);
+
+// feat/device-list-ui commit 2: same lazy convention.
+const DeviceListDialog = lazy(() =>
+  import('./components/DeviceListDialog').then(m => ({ default: m.DeviceListDialog }))
+);
+
+// feat/help-system commit 2: same lazy convention - opened often (F1),
+// but its own content/tree data has no reason to load before it is
+// actually asked for.
+const HelpWindow = lazy(() =>
+  import('./components/HelpWindow').then(m => ({ default: m.HelpWindow }))
+);
+
 function App() {
-  const { projectName, fileName, isDirty, screenKind } = useStore();
+  const { projectName, fileName, isDirty, screenKind, objects, devices } = useStore();
   const [showScadaPreview, setShowScadaPreview] = useState(false);
+  const [showDeviceRegistries, setShowDeviceRegistries] = useState(false);
+  const [showDeviceList, setShowDeviceList] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const [helpRequest, setHelpRequest] = useState({ topicId: 'intro-what', nonce: 0 });
+
+  const openHelp = (topicId: string) => {
+    setHelpRequest(prev => ({ topicId, nonce: prev.nonce + 1 }));
+    setShowHelp(true);
+  };
+
+  // feat/help-system commit 2: F1 opens (or re-navigates, if already
+  // open) the Help window on the topic getContextualHelpTopic - the
+  // ONE place that decision is made - resolves from whatever is
+  // currently selected. Global, not gated behind isTypingInField() the
+  // way Canvas.tsx's own shortcuts are: F1 requesting help while
+  // focused in a text field is still exactly what the user wants.
+  //
+  // Escape-closes-help is handled HERE too, deliberately NOT as a
+  // second window-level listener inside HelpWindow.tsx itself -
+  // empirically (in the real browser, not just unit tests) a listener
+  // registered from inside that lazily-mounted child never fired for
+  // Escape specifically, for a reason that never resolved to a single
+  // isolatable cause across an afternoon of direct in-browser
+  // debugging (every other key worked; capture AND bubble diagnostic
+  // listeners registered on window both before and after it, on the
+  // same target and phase, both still fired - see this task's own
+  // completion report). Reusing this ALREADY-empirically-reliable F1
+  // listener sidesteps the mystery entirely. setShowHelp(false) when
+  // help is already closed is a harmless no-op, so this never needs
+  // `showHelp` in its own dependency array.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'F1') {
+        e.preventDefault();
+        const s = useStore.getState();
+        openHelp(getContextualHelpTopic(s));
+      } else if (e.key === 'Escape') {
+        setShowHelp(false);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  // feat/device-list-ui commit 5: a symbol's Aparat can go dangling
+  // (the device it pointed at got deleted from the registry elsewhere -
+  // Rejestry projektu, or Lista aparatow) without the symbol itself ever
+  // being touched. Reported to Messages once per object per time it
+  // BECOMES dangling, not on every render - alreadyReportedRef tracks
+  // which object ids already have a standing message so fixing then
+  // re-breaking the same symbol reports it again, but simply re-opening
+  // a menu does not spam the panel.
+  const reportedDanglingRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const issues = validateDeviceBindings(objects, devices);
+    const currentIds = new Set(issues.map(i => i.objectId));
+    for (const issue of issues) {
+      if (!reportedDanglingRef.current.has(issue.objectId)) {
+        useStore.getState().addMessage(`[WARNING] ${issue.message}`);
+      }
+    }
+    reportedDanglingRef.current = currentIds;
+  }, [objects, devices]);
 
   useEffect(() => {
     const titleName = fileName || `${projectName}.epwsyn`;
@@ -56,10 +139,30 @@ function App() {
 
   return (
     <div className="app-container">
-      <MenuBar onOpenScadaPreview={() => setShowScadaPreview(true)} />
+      <MenuBar
+        onOpenScadaPreview={() => setShowScadaPreview(true)}
+        onOpenDeviceRegistries={() => setShowDeviceRegistries(true)}
+        onOpenDeviceList={() => setShowDeviceList(true)}
+        onOpenHelp={() => openHelp(getContextualHelpTopic(useStore.getState()))}
+      />
+      {showHelp && (
+        <Suspense fallback={null}>
+          <HelpWindow request={helpRequest} onClose={() => setShowHelp(false)} />
+        </Suspense>
+      )}
       {showScadaPreview && (
         <Suspense fallback={null}>
           <ScadaStylePreview onClose={() => setShowScadaPreview(false)} />
+        </Suspense>
+      )}
+      {showDeviceRegistries && (
+        <Suspense fallback={null}>
+          <DeviceRegistriesDialog onClose={() => setShowDeviceRegistries(false)} />
+        </Suspense>
+      )}
+      {showDeviceList && (
+        <Suspense fallback={null}>
+          <DeviceListDialog onClose={() => setShowDeviceList(false)} />
         </Suspense>
       )}
       <Toolbar />

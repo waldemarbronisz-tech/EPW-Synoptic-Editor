@@ -35,6 +35,14 @@ export interface SynopticObject {
   // Properties
   designation?: string;
   name?: string;
+  // feat/device-list-ui commit 5: which project-level device (src/
+  // project/DeviceSchema.ts) this symbol represents - '' or undefined
+  // means none, a perfectly valid state. The screen element never
+  // stores anything about the device beyond its id: no config is ever
+  // copied here, and the SAME device id may legitimately appear on any
+  // number of objects/screens (this task's own core principle - see
+  // DeviceBindingValidation.ts).
+  deviceId?: string;
   tag: string;
   description: string;
   color: string;

@@ -2,10 +2,11 @@ import type { SynopticObject, SynopticConnection } from '../store';
 import type { MeterElement } from '../meter/MeterElement';
 import type { SignalPanelElement } from '../elements/SignalPanelElement';
 import type { FrameElement } from '../elements/FrameElement';
-import type { Device } from './DeviceSchema';
+import type { Device, LocationEntry, CardEntry } from './DeviceSchema';
 import type { TerrainTileType } from '../iso/TerrainTile';
 import type { PlanObject } from '../iso/PlanObject';
 import type { ScreenKind } from '../store';
+import type { HelpLanguage } from '../i18n/HelpLanguage';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 import { COLOR_CANVAS_BACKGROUND, GRID_SIZE } from '../theme/ScadaTheme';
 
@@ -54,6 +55,12 @@ export interface EPWProjectSchema {
   // unused would be dead weight. Optional and additive for the same
   // reason meters is - no schema version bump.
   devices?: Device[];
+  // feat/device-list-ui commit 1: the other two thirds of DeviceSchema.ts's
+  // DeviceRegistry shape, now that this editor actually manages them - same
+  // optional/additive treatment as devices above (an older file simply has
+  // no locations/cards, not an invalid one). No schema version bump.
+  locations?: LocationEntry[];
+  cards?: CardEntry[];
   // feat/isometric-engine commit 3: the PLAN screen's painted terrain -
   // same treatment as meters/signalPanels/frames/devices above: optional
   // and additive, keyed by "gx,gy" (TerrainTile.ts's own terrainKey), one
@@ -70,6 +77,13 @@ export interface EPWProjectSchema {
   // feat/isometric-engine commit 5: the PLAN screen's placed objects -
   // same optional/additive treatment as terrain above.
   planObjects?: PlanObject[];
+  // feat/help-system commit 1: which language the Help window shows -
+  // same optional/additive treatment as every field above (an older
+  // file simply has no saved choice, defaulting to Polish - see
+  // helpSlice.ts). No schema version bump: this is a preference, not
+  // drawing content, the same category devices/locations/cards already
+  // established.
+  helpLanguage?: HelpLanguage;
 }
 
 // v2: node-based wiring. A connection is a freehand orthogonal polyline
