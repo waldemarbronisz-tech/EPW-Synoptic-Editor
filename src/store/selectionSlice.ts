@@ -1,13 +1,13 @@
 import type { StateCreator } from 'zustand';
 import type { AppState } from './appState';
 
-// The five parallel "selected ids" arrays (one per element kind - see
+// The six parallel "selected ids" arrays (one per element kind - see
 // elementsSlice.ts) and every action that reads or replaces them,
 // including the rubber-band's cross-kind selectMixed and arrow-key
 // moveSelectionBy.
 export type SelectionSlice = Pick<AppState,
-  | 'selectedIds' | 'selectedConnectionIds' | 'selectedMeterIds' | 'selectedSignalPanelIds' | 'selectedFrameIds'
-  | 'selectObjects' | 'selectConnections' | 'selectMeters' | 'selectSignalPanels' | 'selectFrames'
+  | 'selectedIds' | 'selectedConnectionIds' | 'selectedMeterIds' | 'selectedSignalPanelIds' | 'selectedFrameIds' | 'selectedGroupCommandIds'
+  | 'selectObjects' | 'selectConnections' | 'selectMeters' | 'selectSignalPanels' | 'selectFrames' | 'selectGroupCommands'
   | 'selectMixed' | 'selectAll' | 'clearSelection' | 'moveSelectionBy'
 >;
 
@@ -17,6 +17,7 @@ export const createSelectionSlice: StateCreator<AppState, [], [], SelectionSlice
   selectedMeterIds: [],
   selectedSignalPanelIds: [],
   selectedFrameIds: [],
+  selectedGroupCommandIds: [],
 
   // multi (Shift held, commit 3) toggles WITHIN this one kind's array
   // and leaves the other kinds' current selection untouched - that
@@ -34,7 +35,7 @@ export const createSelectionSlice: StateCreator<AppState, [], [], SelectionSlice
       });
       return { selectedIds: newSelection };
     }
-    return { selectedIds: ids, selectedConnectionIds: [], selectedMeterIds: [], selectedSignalPanelIds: [], selectedFrameIds: [] };
+    return { selectedIds: ids, selectedConnectionIds: [], selectedMeterIds: [], selectedSignalPanelIds: [], selectedFrameIds: [], selectedGroupCommandIds: [] };
   }),
 
   selectConnections: (ids, multi = false) => set((state) => {
@@ -47,7 +48,7 @@ export const createSelectionSlice: StateCreator<AppState, [], [], SelectionSlice
       });
       return { selectedConnectionIds: newSelection };
     }
-    return { selectedConnectionIds: ids, selectedIds: [], selectedMeterIds: [], selectedSignalPanelIds: [], selectedFrameIds: [] };
+    return { selectedConnectionIds: ids, selectedIds: [], selectedMeterIds: [], selectedSignalPanelIds: [], selectedFrameIds: [], selectedGroupCommandIds: [] };
   }),
 
   selectMeters: (ids, multi = false) => set((state) => {
@@ -60,7 +61,7 @@ export const createSelectionSlice: StateCreator<AppState, [], [], SelectionSlice
       });
       return { selectedMeterIds: newSelection };
     }
-    return { selectedMeterIds: ids, selectedIds: [], selectedConnectionIds: [], selectedSignalPanelIds: [], selectedFrameIds: [] };
+    return { selectedMeterIds: ids, selectedIds: [], selectedConnectionIds: [], selectedSignalPanelIds: [], selectedFrameIds: [], selectedGroupCommandIds: [] };
   }),
 
   selectSignalPanels: (ids, multi = false) => set((state) => {
@@ -73,7 +74,7 @@ export const createSelectionSlice: StateCreator<AppState, [], [], SelectionSlice
       });
       return { selectedSignalPanelIds: newSelection };
     }
-    return { selectedSignalPanelIds: ids, selectedIds: [], selectedConnectionIds: [], selectedMeterIds: [], selectedFrameIds: [] };
+    return { selectedSignalPanelIds: ids, selectedIds: [], selectedConnectionIds: [], selectedMeterIds: [], selectedFrameIds: [], selectedGroupCommandIds: [] };
   }),
 
   selectFrames: (ids, multi = false) => set((state) => {
@@ -86,7 +87,20 @@ export const createSelectionSlice: StateCreator<AppState, [], [], SelectionSlice
       });
       return { selectedFrameIds: newSelection };
     }
-    return { selectedFrameIds: ids, selectedIds: [], selectedConnectionIds: [], selectedMeterIds: [], selectedSignalPanelIds: [] };
+    return { selectedFrameIds: ids, selectedIds: [], selectedConnectionIds: [], selectedMeterIds: [], selectedSignalPanelIds: [], selectedGroupCommandIds: [] };
+  }),
+
+  selectGroupCommands: (ids, multi = false) => set((state) => {
+    if (multi) {
+      const newSelection = [...state.selectedGroupCommandIds];
+      ids.forEach(id => {
+        const index = newSelection.indexOf(id);
+        if (index >= 0) newSelection.splice(index, 1);
+        else newSelection.push(id);
+      });
+      return { selectedGroupCommandIds: newSelection };
+    }
+    return { selectedGroupCommandIds: ids, selectedIds: [], selectedConnectionIds: [], selectedMeterIds: [], selectedSignalPanelIds: [], selectedFrameIds: [] };
   }),
 
   // The rubber-band (commit 3, feat/editing-and-signal-panel) selects
@@ -99,21 +113,23 @@ export const createSelectionSlice: StateCreator<AppState, [], [], SelectionSlice
     selectedConnectionIds: selection.connectionIds || [],
     selectedMeterIds: selection.meterIds || [],
     selectedSignalPanelIds: selection.signalPanelIds || [],
-    selectedFrameIds: selection.frameIds || []
+    selectedFrameIds: selection.frameIds || [],
+    selectedGroupCommandIds: selection.groupCommandIds || []
   }),
 
   selectAll: () => {
-    const { objects, connections, meters, signalPanels, frames } = get();
+    const { objects, connections, meters, signalPanels, frames, groupCommands } = get();
     set({
       selectedIds: objects.map(o => o.id),
       selectedConnectionIds: connections.map(c => c.id),
       selectedMeterIds: meters.map(m => m.id),
       selectedSignalPanelIds: signalPanels.map(p => p.id),
-      selectedFrameIds: frames.map(f => f.id)
+      selectedFrameIds: frames.map(f => f.id),
+      selectedGroupCommandIds: groupCommands.map(g => g.id)
     });
   },
 
-  clearSelection: () => set({ selectedIds: [], selectedConnectionIds: [], selectedMeterIds: [], selectedSignalPanelIds: [], selectedFrameIds: [] }),
+  clearSelection: () => set({ selectedIds: [], selectedConnectionIds: [], selectedMeterIds: [], selectedSignalPanelIds: [], selectedFrameIds: [], selectedGroupCommandIds: [] }),
 
   // Locked objects are skipped, same as an ordinary drag already
   // refuses to move them (draggable={!obj.locked} in Canvas.tsx) -
@@ -122,13 +138,14 @@ export const createSelectionSlice: StateCreator<AppState, [], [], SelectionSlice
   // of those always moves. A single set() call, then one saveHistory()
   // - one history entry per keypress, not per moved item.
   moveSelectionBy: (dx, dy) => {
-    const { selectedIds, selectedMeterIds, selectedConnectionIds, selectedSignalPanelIds, selectedFrameIds } = get();
-    if (selectedIds.length === 0 && selectedMeterIds.length === 0 && selectedConnectionIds.length === 0 && selectedSignalPanelIds.length === 0 && selectedFrameIds.length === 0) return;
+    const { selectedIds, selectedMeterIds, selectedConnectionIds, selectedSignalPanelIds, selectedFrameIds, selectedGroupCommandIds } = get();
+    if (selectedIds.length === 0 && selectedMeterIds.length === 0 && selectedConnectionIds.length === 0 && selectedSignalPanelIds.length === 0 && selectedFrameIds.length === 0 && selectedGroupCommandIds.length === 0) return;
     set((state) => ({
       objects: state.objects.map(o => (selectedIds.includes(o.id) && !o.locked) ? { ...o, x: o.x + dx, y: o.y + dy } : o),
       meters: state.meters.map(m => selectedMeterIds.includes(m.id) ? { ...m, x: m.x + dx, y: m.y + dy } : m),
       signalPanels: state.signalPanels.map(p => selectedSignalPanelIds.includes(p.id) ? { ...p, x: p.x + dx, y: p.y + dy } : p),
       frames: state.frames.map(f => selectedFrameIds.includes(f.id) ? { ...f, x: f.x + dx, y: f.y + dy } : f),
+      groupCommands: state.groupCommands.map(g => selectedGroupCommandIds.includes(g.id) ? { ...g, x: g.x + dx, y: g.y + dy } : g),
       connections: state.connections.map(c => selectedConnectionIds.includes(c.id)
         ? { ...c, points: c.points.map(p => ({ x: p.x + dx, y: p.y + dy })) }
         : c)

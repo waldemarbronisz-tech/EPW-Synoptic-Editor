@@ -2,17 +2,19 @@ import type { StateCreator } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import type { AppState } from './appState';
 
-// The five drawing-surface collections (objects/connections/meters/
-// signalPanels/frames) and their CRUD actions - this is the data an
-// .epwsyn file actually persists. Selection, clipboard, and undo/redo
-// over these same arrays each live in their own slice instead.
+// The six drawing-surface collections (objects/connections/meters/
+// signalPanels/frames/groupCommands) and their CRUD actions - this is
+// the data an .epwsyn file actually persists. Selection, clipboard, and
+// undo/redo over these same arrays each live in their own slice
+// instead.
 export type ElementsSlice = Pick<AppState,
-  | 'objects' | 'connections' | 'meters' | 'signalPanels' | 'frames'
+  | 'objects' | 'connections' | 'meters' | 'signalPanels' | 'frames' | 'groupCommands'
   | 'addObject' | 'updateObject' | 'updateObjects'
   | 'addConnection' | 'updateConnection'
   | 'addMeter' | 'updateMeter'
   | 'addSignalPanel' | 'updateSignalPanel'
   | 'addFrame' | 'updateFrame'
+  | 'addGroupCommand' | 'updateGroupCommand'
   | 'deleteObjects'
 >;
 
@@ -22,6 +24,7 @@ export const createElementsSlice: StateCreator<AppState, [], [], ElementsSlice> 
   meters: [],
   signalPanels: [],
   frames: [],
+  groupCommands: [],
 
   addObject: (obj) => {
     set((state) => ({
@@ -106,6 +109,20 @@ export const createElementsSlice: StateCreator<AppState, [], [], ElementsSlice> 
     }));
   },
 
+  addGroupCommand: (el) => {
+    set((state) => ({
+      groupCommands: [...state.groupCommands, { ...el, id: uuidv4() }]
+    }));
+    get().saveHistory();
+  },
+
+  updateGroupCommand: (id, updates) => {
+    set((state) => ({
+      groupCommands: state.groupCommands.map(g => g.id === id ? { ...g, ...updates } : g),
+      isDirty: true
+    }));
+  },
+
   // Bug fix (node-based wiring rewrite): deleting an object used to
   // cascade-delete every connection whose fromId/toId pointed at it. A
   // connection no longer references any object id at all - it is a free
@@ -113,8 +130,8 @@ export const createElementsSlice: StateCreator<AppState, [], [], ElementsSlice> 
   // needs to cascade any more. A wire left dangling by a deleted object
   // simply stops being part of any net; it stays on the canvas exactly
   // like drawing a wire into empty space always could.
-  deleteObjects: (ids, connIds = [], meterIds = [], signalPanelIds = [], frameIds = []) => {
-    if (ids.length === 0 && connIds.length === 0 && meterIds.length === 0 && signalPanelIds.length === 0 && frameIds.length === 0) return;
+  deleteObjects: (ids, connIds = [], meterIds = [], signalPanelIds = [], frameIds = [], groupCommandIds = []) => {
+    if (ids.length === 0 && connIds.length === 0 && meterIds.length === 0 && signalPanelIds.length === 0 && frameIds.length === 0 && groupCommandIds.length === 0) return;
     set((state) => ({
       objects: state.objects.filter(obj => !ids.includes(obj.id)),
       selectedIds: state.selectedIds.filter(id => !ids.includes(id)),
@@ -125,7 +142,9 @@ export const createElementsSlice: StateCreator<AppState, [], [], ElementsSlice> 
       signalPanels: state.signalPanels.filter(p => !signalPanelIds.includes(p.id)),
       selectedSignalPanelIds: state.selectedSignalPanelIds.filter(id => !signalPanelIds.includes(id)),
       frames: state.frames.filter(f => !frameIds.includes(f.id)),
-      selectedFrameIds: state.selectedFrameIds.filter(id => !frameIds.includes(id))
+      selectedFrameIds: state.selectedFrameIds.filter(id => !frameIds.includes(id)),
+      groupCommands: state.groupCommands.filter(g => !groupCommandIds.includes(g.id)),
+      selectedGroupCommandIds: state.selectedGroupCommandIds.filter(id => !groupCommandIds.includes(id))
     }));
     get().saveHistory();
   },

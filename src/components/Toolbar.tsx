@@ -6,11 +6,12 @@ import {
   BringToFront, SendToBack, AlignLeft, AlignCenter, AlignRight,
   AlignVerticalSpaceAround, AlignHorizontalSpaceAround,
   Lock, Unlock, RotateCcw, RotateCw, PenLine, Zap, Droplet, Wind, Gauge, CircleDot,
-  Square, Home, MousePointer2
+  Square, Home, MousePointer2, Power
 } from 'lucide-react';
 import { COLOR_ENERGIZED, COLOR_WATER, VENTILATION_ACTIVE, COLOR_WHITE, COLOR_RUN, COLOR_OUTLINE } from '../theme/ScadaTheme';
 import { METER_DEFAULT_FONT_SIZE } from '../meter/MeterElement';
 import { SIGNAL_PANEL_DEFAULT_FONT_SIZE } from '../elements/SignalPanelElement';
+import { GROUP_COMMAND_DEFAULT_WIDTH } from '../elements/GroupCommandElement';
 import { TERRAIN_TILE_TYPES, getTerrainTileColors } from '../iso/TerrainTile';
 
 // One icon/color pair per medium - reused by both the toolbar buttons
@@ -32,6 +33,7 @@ export const Toolbar: React.FC = () => {
     addMeter, selectedMeterIds, selectMeters,
     addSignalPanel, selectedSignalPanelIds, selectSignalPanels,
     selectedFrameIds, isDrawingFrame, drawingFrameVariant, setDrawingFrameMode,
+    addGroupCommand, selectedGroupCommandIds, selectGroupCommands,
     screenKind, terrainPaintTool, setTerrainPaintTool, selectedPlanObjectIds, deletePlanObjects
   } = useStore();
 
@@ -110,7 +112,7 @@ export const Toolbar: React.FC = () => {
       <div className="toolbar-group">
         <button title="Copy" onClick={copySelected}><Copy size={16} /></button>
         <button title="Paste" onClick={paste}><ClipboardPaste size={16} /></button>
-        <button title="Delete" onClick={() => deleteObjects(selectedIds, selectedConnectionIds, selectedMeterIds, selectedSignalPanelIds, selectedFrameIds)}><Trash2 size={16} /></button>
+        <button title="Delete" onClick={() => deleteObjects(selectedIds, selectedConnectionIds, selectedMeterIds, selectedSignalPanelIds, selectedFrameIds, selectedGroupCommandIds)}><Trash2 size={16} /></button>
       </div>
 
       <div className="toolbar-divider" />
@@ -144,6 +146,24 @@ export const Toolbar: React.FC = () => {
           }}
         >
           <CircleDot size={16} />
+        </button>
+      </div>
+
+      {/* The group command button (feat/control-elements commit 2): same
+          mechanism, same reasoning for a toolbar button as the meter/
+          signal panel above - one click to insert at a fixed spot, then
+          drag into place, then configure label/command/members in
+          Properties. */}
+      <div className="toolbar-group">
+        <button
+          title="Dodaj Przycisk Grupowy"
+          onClick={() => {
+            addGroupCommand({ x: 160, y: 160, width: GROUP_COMMAND_DEFAULT_WIDTH, label: 'Nowy przycisk', command: 'CLOSE', deviceIds: [] });
+            const newest = useStore.getState().groupCommands[useStore.getState().groupCommands.length - 1];
+            if (newest) selectGroupCommands([newest.id], false);
+          }}
+        >
+          <Power size={16} />
         </button>
       </div>
 

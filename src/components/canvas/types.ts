@@ -19,7 +19,7 @@
 // this purpose is always (0,0), never its points' own coordinates. Every
 // other kind (object/meter/signal panel) is absolute, matching its own
 // x/y field directly.
-export type DragKey = string; // "obj:<id>" | "meter:<id>" | "panel:<id>" | "conn:<id>"
+export type DragKey = string; // "obj:<id>" | "meter:<id>" | "panel:<id>" | "frame:<id>" | "groupcmd:<id>" | "conn:<id>"
 
 export interface GroupDragApi {
   // Reports one element's own Konva node so ANOTHER element's leader

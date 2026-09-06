@@ -18,17 +18,20 @@ import type { SynopticObject, SynopticConnection } from '../store';
 import type { MeterElement } from '../meter/MeterElement';
 import type { SignalPanelElement } from '../elements/SignalPanelElement';
 import type { FrameElement } from '../elements/FrameElement';
+import type { GroupCommandElement } from '../elements/GroupCommandElement';
 
 export interface ClonedSelection {
   objects: SynopticObject[];
   meters: MeterElement[];
   signalPanels: SignalPanelElement[];
   frames: FrameElement[];
+  groupCommands: GroupCommandElement[];
   connections: SynopticConnection[];
   objectIds: string[];
   meterIds: string[];
   signalPanelIds: string[];
   frameIds: string[];
+  groupCommandIds: string[];
   connectionIds: string[];
 }
 
@@ -52,18 +55,21 @@ export function cloneSelectionWithOffset(
   connections: SynopticConnection[],
   dx: number,
   dy: number,
-  makeId: () => string
+  makeId: () => string,
+  groupCommands: GroupCommandElement[] = []
 ): ClonedSelection {
   const clonedObjects: SynopticObject[] = JSON.parse(JSON.stringify(objects));
   const clonedMeters: MeterElement[] = JSON.parse(JSON.stringify(meters));
   const clonedSignalPanels: SignalPanelElement[] = JSON.parse(JSON.stringify(signalPanels));
   const clonedFrames: FrameElement[] = JSON.parse(JSON.stringify(frames));
+  const clonedGroupCommands: GroupCommandElement[] = JSON.parse(JSON.stringify(groupCommands));
   const clonedConnections: SynopticConnection[] = JSON.parse(JSON.stringify(connections));
 
   const newObjects = clonedObjects.map(obj => ({ ...obj, id: makeId(), x: obj.x + dx, y: obj.y + dy }));
   const newMeters = clonedMeters.map(m => ({ ...m, id: makeId(), x: m.x + dx, y: m.y + dy }));
   const newSignalPanels = clonedSignalPanels.map(p => ({ ...p, id: makeId(), x: p.x + dx, y: p.y + dy }));
   const newFrames = clonedFrames.map(f => ({ ...f, id: makeId(), x: f.x + dx, y: f.y + dy }));
+  const newGroupCommands = clonedGroupCommands.map(g => ({ ...g, id: makeId(), x: g.x + dx, y: g.y + dy }));
   const newConnections = clonedConnections.map(conn => ({
     ...conn,
     id: makeId(),
@@ -75,11 +81,13 @@ export function cloneSelectionWithOffset(
     meters: newMeters,
     signalPanels: newSignalPanels,
     frames: newFrames,
+    groupCommands: newGroupCommands,
     connections: newConnections,
     objectIds: newObjects.map(o => o.id),
     meterIds: newMeters.map(m => m.id),
     signalPanelIds: newSignalPanels.map(p => p.id),
     frameIds: newFrames.map(f => f.id),
+    groupCommandIds: newGroupCommands.map(g => g.id),
     connectionIds: newConnections.map(c => c.id)
   };
 }
