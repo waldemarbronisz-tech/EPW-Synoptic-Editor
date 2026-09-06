@@ -64,7 +64,11 @@ describe('SignalPanelResolver.resolveSignalPanelRow', () => {
     const row = makeRow({ device: 'SIG1', label: '' });
     const display = resolveSignalPanelRow(row, [device]);
     expect(display.label).toBe('-B7');
-    expect(display.state).toBe('ON');
+    // feat/selector-symbol-setpoint-alarm: a SIGNAL device previews
+    // ALARM, not a generic ON - see resolveSignalPanelRow's own comment
+    // for why (a SIGNAL device's whole reason for existing is alarm
+    // signalling, unlike a SWITCHED device's normal-operation ON below).
+    expect(display.state).toBe('ALARM');
     expect(display.colorKind).toBe('PREVIEW');
   });
 

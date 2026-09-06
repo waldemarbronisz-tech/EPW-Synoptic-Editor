@@ -62,8 +62,8 @@ describe('Pilot lamp (PilotLampSymbol)', () => {
 });
 
 describe('Indicator diode (IndicatorDiodeSymbol)', () => {
-  it('7. has states ON, OFF, QUALITY', () => {
-    expect(INDICATOR_DIODE_STATES).toEqual(['ON', 'OFF', 'QUALITY']);
+  it('7. has states ON, OFF, QUALITY, ALARM', () => {
+    expect(INDICATOR_DIODE_STATES).toEqual(['ON', 'OFF', 'QUALITY', 'ALARM']);
   });
 
   it('8. accepts two sizes and returns different radii', () => {

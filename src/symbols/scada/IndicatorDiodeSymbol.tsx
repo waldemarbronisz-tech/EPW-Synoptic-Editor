@@ -5,12 +5,16 @@ import React from 'react';
 import { Circle, Group } from 'react-konva';
 import {
   COLOR_OUTLINE, DIODE_RADIUS_SMALL, DIODE_RADIUS_LARGE,
-  DIODE_ON, DIODE_ON_CORE, DIODE_OFF, DIODE_QUALITY, DIODE_QUALITY_CORE
+  DIODE_ON, DIODE_ON_CORE, DIODE_OFF, DIODE_ALARM, DIODE_ALARM_CORE, DIODE_QUALITY, DIODE_QUALITY_CORE
 } from '../../theme/ScadaTheme';
 
-export type IndicatorDiodeState = 'ON' | 'OFF' | 'QUALITY';
+// feat/selector-symbol-setpoint-alarm: ALARM joins the three original
+// states - see this file's own getIndicatorDiodeFillColor/CoreColor
+// comment below for what it wires into, and SignalPanelResolver.ts for
+// the one place a device's own behavior now picks it automatically.
+export type IndicatorDiodeState = 'ON' | 'OFF' | 'QUALITY' | 'ALARM';
 // oxlint-disable-next-line react/only-export-components -- one file per symbol is required; this state list belongs beside its component.
-export const INDICATOR_DIODE_STATES: IndicatorDiodeState[] = ['ON', 'OFF', 'QUALITY'];
+export const INDICATOR_DIODE_STATES: IndicatorDiodeState[] = ['ON', 'OFF', 'QUALITY', 'ALARM'];
 
 export type IndicatorDiodeSize = 'small' | 'large';
 
@@ -32,30 +36,32 @@ export function getIndicatorDiodeRadius(size: IndicatorDiodeSize): number {
 export function getIndicatorDiodeFillColor(state: IndicatorDiodeState): string {
   if (state === 'ON') return DIODE_ON;
   if (state === 'QUALITY') return DIODE_QUALITY;
+  if (state === 'ALARM') return DIODE_ALARM;
   return DIODE_OFF; // OFF
 }
 
-// 3b/3c: a LIT state (ON, QUALITY) gets a brighter, smaller inner
-// circle - the highlight that reads as an actual light source, not a
-// painted disc. OFF returns null: no inner circle at all is what
+// 3b/3c: a LIT state (ON, QUALITY, ALARM) gets a brighter, smaller
+// inner circle - the highlight that reads as an actual light source,
+// not a painted disc. OFF returns null: no inner circle at all is what
 // signals "not lit" (3c is explicit that this must be the absence of
 // a highlight, not a color choice of its own).
 //
-// Note on ALARM: ScadaTheme.ts also defines DIODE_ALARM/DIODE_ALARM_CORE
-// per this fix's own 3a spec, but no ALARM diode state exists anywhere
-// in the current data model - IndicatorDiodeState is ON/OFF/QUALITY
-// only, and SignalPanelElement's own row state reuses this exact same
-// three-value type verbatim (see that file's own comment). Wiring
-// ALARM in would mean widening this type and every place that
-// switches on it (SignalPanelElement.ts, SignalPanelResolver.ts,
-// PropertyInspector.tsx's state picker) - a change to the diode/panel
-// DATA MODEL, not to how an existing state renders, so out of this
-// fix's own scope (a visual fix, no new element kind/state). Flagged
-// in raport.md rather than silently invented or silently dropped.
+// feat/selector-symbol-setpoint-alarm: ALARM now wired in (was
+// previously flagged as unreachable dead colors - DIODE_ALARM/
+// DIODE_ALARM_CORE existed in ScadaTheme.ts per an earlier fix's own
+// 3a spec, but no state ever produced them). See SignalPanelResolver.ts
+// for the one place a device's own behavior picks this automatically
+// (a SIGNAL device's row previews ALARM, not a generic ON - a SIGNAL
+// device's whole reason for existing is alarm signalling); everywhere
+// else (a manual signal-panel row, a placed Indicator Diode symbol's
+// own preview_state) it is simply one more choice in the same
+// INDICATOR_DIODE_STATES list PropertyInspector.tsx's dropdown already
+// reads, no special-casing needed there.
 // oxlint-disable-next-line react/only-export-components -- one file per symbol is required; this helper belongs beside its component.
 export function getIndicatorDiodeCoreColor(state: IndicatorDiodeState): string | null {
   if (state === 'ON') return DIODE_ON_CORE;
   if (state === 'QUALITY') return DIODE_QUALITY_CORE;
+  if (state === 'ALARM') return DIODE_ALARM_CORE;
   return null; // OFF - no highlight, on purpose
 }
 
