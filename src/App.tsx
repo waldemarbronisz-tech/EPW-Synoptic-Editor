@@ -10,6 +10,7 @@ import { StatusBar } from './components/StatusBar';
 import { useStore } from './store';
 import { loadSpriteManifest } from './iso/SpriteManifest';
 import { validateDeviceBindings } from './project/DeviceBindingValidation';
+import { getContextualHelpTopic } from './help/HelpContextResolver';
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 
 // Internal-audit fix: a full-screen preview only ever mounted from the
@@ -30,11 +31,59 @@ const DeviceListDialog = lazy(() =>
   import('./components/DeviceListDialog').then(m => ({ default: m.DeviceListDialog }))
 );
 
+// feat/help-system commit 2: same lazy convention - opened often (F1),
+// but its own content/tree data has no reason to load before it is
+// actually asked for.
+const HelpWindow = lazy(() =>
+  import('./components/HelpWindow').then(m => ({ default: m.HelpWindow }))
+);
+
 function App() {
   const { projectName, fileName, isDirty, screenKind, objects, devices } = useStore();
   const [showScadaPreview, setShowScadaPreview] = useState(false);
   const [showDeviceRegistries, setShowDeviceRegistries] = useState(false);
   const [showDeviceList, setShowDeviceList] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const [helpRequest, setHelpRequest] = useState({ topicId: 'intro-what', nonce: 0 });
+
+  const openHelp = (topicId: string) => {
+    setHelpRequest(prev => ({ topicId, nonce: prev.nonce + 1 }));
+    setShowHelp(true);
+  };
+
+  // feat/help-system commit 2: F1 opens (or re-navigates, if already
+  // open) the Help window on the topic getContextualHelpTopic - the
+  // ONE place that decision is made - resolves from whatever is
+  // currently selected. Global, not gated behind isTypingInField() the
+  // way Canvas.tsx's own shortcuts are: F1 requesting help while
+  // focused in a text field is still exactly what the user wants.
+  //
+  // Escape-closes-help is handled HERE too, deliberately NOT as a
+  // second window-level listener inside HelpWindow.tsx itself -
+  // empirically (in the real browser, not just unit tests) a listener
+  // registered from inside that lazily-mounted child never fired for
+  // Escape specifically, for a reason that never resolved to a single
+  // isolatable cause across an afternoon of direct in-browser
+  // debugging (every other key worked; capture AND bubble diagnostic
+  // listeners registered on window both before and after it, on the
+  // same target and phase, both still fired - see this task's own
+  // completion report). Reusing this ALREADY-empirically-reliable F1
+  // listener sidesteps the mystery entirely. setShowHelp(false) when
+  // help is already closed is a harmless no-op, so this never needs
+  // `showHelp` in its own dependency array.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'F1') {
+        e.preventDefault();
+        const s = useStore.getState();
+        openHelp(getContextualHelpTopic(s));
+      } else if (e.key === 'Escape') {
+        setShowHelp(false);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   // feat/device-list-ui commit 5: a symbol's Aparat can go dangling
   // (the device it pointed at got deleted from the registry elsewhere -
@@ -94,7 +143,13 @@ function App() {
         onOpenScadaPreview={() => setShowScadaPreview(true)}
         onOpenDeviceRegistries={() => setShowDeviceRegistries(true)}
         onOpenDeviceList={() => setShowDeviceList(true)}
+        onOpenHelp={() => openHelp(getContextualHelpTopic(useStore.getState()))}
       />
+      {showHelp && (
+        <Suspense fallback={null}>
+          <HelpWindow request={helpRequest} onClose={() => setShowHelp(false)} />
+        </Suspense>
+      )}
       {showScadaPreview && (
         <Suspense fallback={null}>
           <ScadaStylePreview onClose={() => setShowScadaPreview(false)} />

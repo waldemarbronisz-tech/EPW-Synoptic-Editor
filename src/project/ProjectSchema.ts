@@ -6,6 +6,7 @@ import type { Device, LocationEntry, CardEntry } from './DeviceSchema';
 import type { TerrainTileType } from '../iso/TerrainTile';
 import type { PlanObject } from '../iso/PlanObject';
 import type { ScreenKind } from '../store';
+import type { HelpLanguage } from '../i18n/HelpLanguage';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 import { COLOR_CANVAS_BACKGROUND, GRID_SIZE } from '../theme/ScadaTheme';
 
@@ -76,6 +77,13 @@ export interface EPWProjectSchema {
   // feat/isometric-engine commit 5: the PLAN screen's placed objects -
   // same optional/additive treatment as terrain above.
   planObjects?: PlanObject[];
+  // feat/help-system commit 1: which language the Help window shows -
+  // same optional/additive treatment as every field above (an older
+  // file simply has no saved choice, defaulting to Polish - see
+  // helpSlice.ts). No schema version bump: this is a preference, not
+  // drawing content, the same category devices/locations/cards already
+  // established.
+  helpLanguage?: HelpLanguage;
 }
 
 // v2: node-based wiring. A connection is a freehand orthogonal polyline
