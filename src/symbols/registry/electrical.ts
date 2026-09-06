@@ -217,6 +217,26 @@ export const electricalSymbols: Record<string, SymbolDefinition> = {
     connectionPoints: [{id: 'GND', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}],
     terminals: [{ id: 'GND', side: 'TOP', medium: 'ELECTRICAL' }]
   },
+  // feat/selector-symbol-setpoint-alarm: the schematic symbol for a
+  // SELECTOR device (DeviceSchema.ts) - a physical Hand-Off-Auto-style
+  // rotary switch. LEFT/CENTER/RIGHT are generic preview positions
+  // (SelectorSwitchSymbol.tsx's own header explains why, not the
+  // specific position names configured on any one device); kept
+  // visible in the Toolbox unlike most of this file's own hidden
+  // symbols, since - like Indicator Lamp/Circuit Breaker/Disconnect
+  // Switch above - it has no more specific dedicated toolbox entry
+  // anywhere else to draw from.
+  'electrical.selector_switch': {
+    type: 'electrical.selector_switch',
+    label: 'Selector Switch',
+    category: 'Electrical',
+    defaultWidth: 64,
+    defaultHeight: 64,
+    allowedStates: ['LEFT', 'CENTER', 'RIGHT', 'FAULT'],
+    defaultState: 'CENTER',
+    connectionPoints: [{id: 'IN', x: 0.5, y: 0, domain: 'electrical', direction: 'passive'}],
+    terminals: [{ id: 'IN', side: 'TOP', medium: 'ELECTRICAL' }]
+  },
 
   // Water
 };
