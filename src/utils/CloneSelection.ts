@@ -19,6 +19,7 @@ import type { MeterElement } from '../meter/MeterElement';
 import type { SignalPanelElement } from '../elements/SignalPanelElement';
 import type { FrameElement } from '../elements/FrameElement';
 import type { GroupCommandElement } from '../elements/GroupCommandElement';
+import type { SetpointPanelElement } from '../elements/SetpointElement';
 
 export interface ClonedSelection {
   objects: SynopticObject[];
@@ -26,12 +27,14 @@ export interface ClonedSelection {
   signalPanels: SignalPanelElement[];
   frames: FrameElement[];
   groupCommands: GroupCommandElement[];
+  setpointPanels: SetpointPanelElement[];
   connections: SynopticConnection[];
   objectIds: string[];
   meterIds: string[];
   signalPanelIds: string[];
   frameIds: string[];
   groupCommandIds: string[];
+  setpointPanelIds: string[];
   connectionIds: string[];
 }
 
@@ -56,13 +59,15 @@ export function cloneSelectionWithOffset(
   dx: number,
   dy: number,
   makeId: () => string,
-  groupCommands: GroupCommandElement[] = []
+  groupCommands: GroupCommandElement[] = [],
+  setpointPanels: SetpointPanelElement[] = []
 ): ClonedSelection {
   const clonedObjects: SynopticObject[] = JSON.parse(JSON.stringify(objects));
   const clonedMeters: MeterElement[] = JSON.parse(JSON.stringify(meters));
   const clonedSignalPanels: SignalPanelElement[] = JSON.parse(JSON.stringify(signalPanels));
   const clonedFrames: FrameElement[] = JSON.parse(JSON.stringify(frames));
   const clonedGroupCommands: GroupCommandElement[] = JSON.parse(JSON.stringify(groupCommands));
+  const clonedSetpointPanels: SetpointPanelElement[] = JSON.parse(JSON.stringify(setpointPanels));
   const clonedConnections: SynopticConnection[] = JSON.parse(JSON.stringify(connections));
 
   const newObjects = clonedObjects.map(obj => ({ ...obj, id: makeId(), x: obj.x + dx, y: obj.y + dy }));
@@ -70,6 +75,7 @@ export function cloneSelectionWithOffset(
   const newSignalPanels = clonedSignalPanels.map(p => ({ ...p, id: makeId(), x: p.x + dx, y: p.y + dy }));
   const newFrames = clonedFrames.map(f => ({ ...f, id: makeId(), x: f.x + dx, y: f.y + dy }));
   const newGroupCommands = clonedGroupCommands.map(g => ({ ...g, id: makeId(), x: g.x + dx, y: g.y + dy }));
+  const newSetpointPanels = clonedSetpointPanels.map(p => ({ ...p, id: makeId(), x: p.x + dx, y: p.y + dy }));
   const newConnections = clonedConnections.map(conn => ({
     ...conn,
     id: makeId(),
@@ -82,12 +88,14 @@ export function cloneSelectionWithOffset(
     signalPanels: newSignalPanels,
     frames: newFrames,
     groupCommands: newGroupCommands,
+    setpointPanels: newSetpointPanels,
     connections: newConnections,
     objectIds: newObjects.map(o => o.id),
     meterIds: newMeters.map(m => m.id),
     signalPanelIds: newSignalPanels.map(p => p.id),
     frameIds: newFrames.map(f => f.id),
     groupCommandIds: newGroupCommands.map(g => g.id),
+    setpointPanelIds: newSetpointPanels.map(p => p.id),
     connectionIds: newConnections.map(c => c.id)
   };
 }

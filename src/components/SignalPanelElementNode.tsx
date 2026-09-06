@@ -22,22 +22,24 @@ import { COLOR_OUTLINE, COLOR_TEXT, FONT_UI, FONT_SIZE_BASE, GRID_SIZE } from '.
 const DIODE_RADIUS = getIndicatorDiodeRadius('large'); // 12, per this element's own spec - reusing the Indicator Diode symbol's own radius helper rather than a coincidentally-equal literal
 const diodeCore = getIndicatorDiodeCoreGeometry(DIODE_RADIUS); // fix/handles-insert-mode-diodes commit 3b: same lit-core geometry as IndicatorDiodeSymbol.tsx's own
 
-// A device-linked row's diode always previews ON (SignalPanelResolver.ts
-// has no live data to draw from, same as the meter's own preview value) -
-// but that preview must never be mistaken for a manually-entered ON, per
-// this element's own spec: "narysowana INNYM ODCIENIEM niz stan wpisany
-// recznie" (drawn in a different shade than a manually-entered state).
-// The meter's own convention for this (MeterElementNode.tsx's
-// colorForRow) recolors the value TEXT to a fixed color per colorKind,
-// completely independent of the value itself. A diode has no separate
-// "text" - its fill IS the value - so the equivalent treatment here
-// dims the same state-derived fill with reduced opacity rather than
-// picking a different color outright: the state stays legible (still
-// the ON/OFF/QUALITY hue from getIndicatorDiodeFillColor, still every
-// color sourced from ScadaTheme, still the same Indicator Diode circle)
-// while remaining visibly, immediately distinguishable from a manually
-// entered state at full strength - exactly the same "never read as real
-// data for even a second" goal the meter's own comment states.
+// A device-linked row's diode always previews a fixed, representative
+// state (SignalPanelResolver.ts has no live data to draw from, same as
+// the meter's own preview value - ON for SWITCHED, ALARM for SIGNAL as
+// of feat/selector-symbol-setpoint-alarm) - but that preview must never
+// be mistaken for a manually-entered state, per this element's own
+// spec: "narysowana INNYM ODCIENIEM niz stan wpisany recznie" (drawn in
+// a different shade than a manually-entered state). The meter's own
+// convention for this (MeterElementNode.tsx's colorForRow) recolors the
+// value TEXT to a fixed color per colorKind, completely independent of
+// the value itself. A diode has no separate "text" - its fill IS the
+// value - so the equivalent treatment here dims the same state-derived
+// fill with reduced opacity rather than picking a different color
+// outright: the state stays legible (still the ON/OFF/QUALITY/ALARM hue
+// from getIndicatorDiodeFillColor, still every color sourced from
+// ScadaTheme, still the same Indicator Diode circle) while remaining
+// visibly, immediately distinguishable from a manually entered state at
+// full strength - exactly the same "never read as real data for even a
+// second" goal the meter's own comment states.
 const PREVIEW_DIODE_OPACITY = 0.5;
 
 export interface SignalPanelElementNodeProps {

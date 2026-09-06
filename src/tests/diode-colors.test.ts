@@ -66,11 +66,27 @@ describe('A lit diode (ON/QUALITY) has a brighter core; OFF does not (12, 13)', 
     // via source scan rather than re-deriving Konva's own draw here.
   });
 
-  it('DIODE_ALARM/DIODE_ALARM_CORE exist in ScadaTheme per 3a, even though no diode state currently produces ALARM (see raport.md)', () => {
+  it('DIODE_ALARM/DIODE_ALARM_CORE exist in ScadaTheme per 3a', () => {
     expect(typeof DIODE_ALARM).toBe('string');
     expect(typeof DIODE_ALARM_CORE).toBe('string');
     expect(DIODE_ALARM).toMatch(/^#[0-9A-Fa-f]{6}$/);
     expect(DIODE_ALARM_CORE).toMatch(/^#[0-9A-Fa-f]{6}$/);
+  });
+
+  // feat/selector-symbol-setpoint-alarm: ALARM is now a real, wired
+  // diode state (previously the two colors above existed with nothing
+  // that ever produced them) - same lit-core treatment as ON/QUALITY.
+  it('ALARM has its own fill color, distinct from ON/OFF/QUALITY', () => {
+    expect(getIndicatorDiodeFillColor('ALARM')).toBe(DIODE_ALARM);
+    expect(getIndicatorDiodeFillColor('ALARM')).not.toBe(getIndicatorDiodeFillColor('ON'));
+    expect(getIndicatorDiodeFillColor('ALARM')).not.toBe(getIndicatorDiodeFillColor('OFF'));
+    expect(getIndicatorDiodeFillColor('ALARM')).not.toBe(getIndicatorDiodeFillColor('QUALITY'));
+  });
+
+  it('ALARM has a brighter core color, same as every other lit state', () => {
+    const core = getIndicatorDiodeCoreColor('ALARM');
+    expect(core).toBe(DIODE_ALARM_CORE);
+    expect(core).not.toBe(getIndicatorDiodeFillColor('ALARM'));
   });
 });
 

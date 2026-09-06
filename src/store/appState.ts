@@ -8,6 +8,7 @@ import type { MeterElement } from '../meter/MeterElement';
 import type { SignalPanelElement } from '../elements/SignalPanelElement';
 import type { FrameElement } from '../elements/FrameElement';
 import type { GroupCommandElement } from '../elements/GroupCommandElement';
+import type { SetpointPanelElement } from '../elements/SetpointElement';
 import type { Device, LocationEntry, CardEntry } from '../project/DeviceSchema';
 import type { CanvasState, HistorySnapshot, Message, ScreenKind, SynopticConnection, SynopticObject } from './types';
 import type { TerrainTileType } from '../iso/TerrainTile';
@@ -46,18 +47,25 @@ export interface AppState {
   // see elements/GroupCommandElement.ts's own header for why this is
   // not new control logic.
   groupCommands: GroupCommandElement[];
+  // The setpoint panel element (feat/selector-symbol-setpoint-alarm): the
+  // same mechanism as the meter, for MODULATED devices instead of
+  // MEASURED ones - see elements/SetpointElement.ts's own header for
+  // why this is design-time layout only, never a live control.
+  setpointPanels: SetpointPanelElement[];
   selectedIds: string[];
   selectedConnectionIds: string[];
   selectedMeterIds: string[];
   selectedSignalPanelIds: string[];
   selectedFrameIds: string[];
   selectedGroupCommandIds: string[];
+  selectedSetpointPanelIds: string[];
   canvasState: CanvasState;
   clipboard: SynopticObject[];
   clipboardMeters: MeterElement[];
   clipboardSignalPanels: SignalPanelElement[];
   clipboardFrames: FrameElement[];
   clipboardGroupCommands: GroupCommandElement[];
+  clipboardSetpointPanels: SetpointPanelElement[];
   clipboardConnections: SynopticConnection[];
   history: HistorySnapshot[];
   historyIndex: number;
@@ -151,19 +159,23 @@ export interface AppState {
   updateFrame: (id: string, updates: Partial<FrameElement>) => void;
   addGroupCommand: (el: Omit<GroupCommandElement, 'id'>) => void;
   updateGroupCommand: (id: string, updates: Partial<GroupCommandElement>) => void;
-  deleteObjects: (ids: string[], connIds?: string[], meterIds?: string[], signalPanelIds?: string[], frameIds?: string[], groupCommandIds?: string[]) => void;
+  addSetpointPanel: (panel: Omit<SetpointPanelElement, 'id'>) => void;
+  updateSetpointPanel: (id: string, updates: Partial<SetpointPanelElement>) => void;
+  deleteObjects: (ids: string[], connIds?: string[], meterIds?: string[], signalPanelIds?: string[], frameIds?: string[], groupCommandIds?: string[], setpointPanelIds?: string[]) => void;
   selectObjects: (ids: string[], multi?: boolean) => void;
   selectConnections: (ids: string[], multi?: boolean) => void;
   selectMeters: (ids: string[], multi?: boolean) => void;
   selectSignalPanels: (ids: string[], multi?: boolean) => void;
   selectFrames: (ids: string[], multi?: boolean) => void;
   selectGroupCommands: (ids: string[], multi?: boolean) => void;
+  selectSetpointPanels: (ids: string[], multi?: boolean) => void;
   // commit 3 (feat/editing-and-signal-panel), extended in commit 2
-  // (feat/appearance-selection-frames) with a fifth kind, and in
-  // feat/control-elements commit 2 with a sixth: replaces the whole
-  // selection with a mix of all six kinds at once (the rubber-band's
-  // own result) - and Ctrl+A's "select everything on screen".
-  selectMixed: (selection: { objectIds?: string[]; connectionIds?: string[]; meterIds?: string[]; signalPanelIds?: string[]; frameIds?: string[]; groupCommandIds?: string[] }) => void;
+  // (feat/appearance-selection-frames) with a fifth kind, in
+  // feat/control-elements commit 2 with a sixth, and in
+  // feat/selector-symbol-setpoint-alarm with a seventh: replaces the
+  // whole selection with a mix of all seven kinds at once (the
+  // rubber-band's own result) - and Ctrl+A's "select everything on screen".
+  selectMixed: (selection: { objectIds?: string[]; connectionIds?: string[]; meterIds?: string[]; signalPanelIds?: string[]; frameIds?: string[]; groupCommandIds?: string[]; setpointPanelIds?: string[] }) => void;
   selectAll: () => void;
   clearSelection: () => void;
   // Arrow keys (commit 3): every selected object/meter/signalPanel/
@@ -185,6 +197,7 @@ export interface AppState {
   duplicateSignalPanelInPlace: (id: string) => void;
   duplicateFrameInPlace: (id: string) => void;
   duplicateGroupCommandInPlace: (id: string) => void;
+  duplicateSetpointPanelInPlace: (id: string) => void;
 
   // History
   undo: () => void;

@@ -22,6 +22,7 @@ import { GridSourceSymbol } from './electrical/GridSourceSymbol';
 import { RCDSymbol } from './electrical/RCDSymbol';
 import { SPDSymbol } from './electrical/SPDSymbol';
 import { GenericLoadSymbol } from './electrical/GenericLoadSymbol';
+import { SelectorSwitchSymbol } from './electrical/SelectorSwitchSymbol';
 import { PipeSymbol } from './water/PipeSymbol';
 import { PipeElbowSymbol } from './water/PipeElbowSymbol';
 import { TeeSymbol } from './water/TeeSymbol';
@@ -168,6 +169,8 @@ export const SymbolRenderer: React.FC<{ obj: SynopticObject }> = ({ obj }) => {
       return <CableTraySymbol obj={obj} state={state} />;
     case 'electrical.earth':
       return <EarthSymbol obj={obj} state={state} />;
+    case 'electrical.selector_switch':
+      return <SelectorSwitchSymbol obj={obj} state={state} />;
     case 'water.pipe':
       return <PipeSymbol obj={obj} state={state} />;
     case 'water.pipe_elbow':

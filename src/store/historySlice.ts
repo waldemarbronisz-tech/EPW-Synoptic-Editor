@@ -12,11 +12,11 @@ const MAX_HISTORY = 100;
 export type HistorySlice = Pick<AppState, 'history' | 'historyIndex' | 'saveHistory' | 'undo' | 'redo'>;
 
 export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = (set, get) => ({
-  history: [{ objects: [], connections: [], meters: [], signalPanels: [], frames: [], terrainTiles: {}, planObjects: [], groupCommands: [] }],
+  history: [{ objects: [], connections: [], meters: [], signalPanels: [], frames: [], terrainTiles: {}, planObjects: [], groupCommands: [], setpointPanels: [] }],
   historyIndex: 0,
 
   saveHistory: () => {
-    const { objects, connections, meters, signalPanels, frames, terrainTiles, planObjects, groupCommands, history, historyIndex } = get();
+    const { objects, connections, meters, signalPanels, frames, terrainTiles, planObjects, groupCommands, setpointPanels, history, historyIndex } = get();
     const objectsJson = JSON.stringify(objects);
     const connectionsJson = JSON.stringify(connections);
     const metersJson = JSON.stringify(meters);
@@ -25,6 +25,7 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
     const terrainTilesJson = JSON.stringify(terrainTiles);
     const planObjectsJson = JSON.stringify(planObjects);
     const groupCommandsJson = JSON.stringify(groupCommands);
+    const setpointPanelsJson = JSON.stringify(setpointPanels);
 
     // Skip if nothing actually changed since the last entry (e.g. a field
     // was clicked into and blurred without editing) - don't clutter undo
@@ -39,7 +40,8 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
       JSON.stringify(lastEntry.frames || []) === framesJson &&
       JSON.stringify(lastEntry.terrainTiles || {}) === terrainTilesJson &&
       JSON.stringify(lastEntry.planObjects || []) === planObjectsJson &&
-      JSON.stringify(lastEntry.groupCommands || []) === groupCommandsJson
+      JSON.stringify(lastEntry.groupCommands || []) === groupCommandsJson &&
+      JSON.stringify(lastEntry.setpointPanels || []) === setpointPanelsJson
     ) {
       return;
     }
@@ -53,7 +55,8 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
       frames: JSON.parse(framesJson),
       terrainTiles: JSON.parse(terrainTilesJson),
       planObjects: JSON.parse(planObjectsJson),
-      groupCommands: JSON.parse(groupCommandsJson)
+      groupCommands: JSON.parse(groupCommandsJson),
+      setpointPanels: JSON.parse(setpointPanelsJson)
     });
 
     // Cap history length; drop oldest entries once the cap is exceeded.
@@ -80,12 +83,14 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
         terrainTiles: JSON.parse(JSON.stringify(prevState.terrainTiles || {})),
         planObjects: JSON.parse(JSON.stringify(prevState.planObjects || [])),
         groupCommands: JSON.parse(JSON.stringify(prevState.groupCommands || [])),
+        setpointPanels: JSON.parse(JSON.stringify(prevState.setpointPanels || [])),
         selectedIds: [],
         selectedConnectionIds: [],
         selectedMeterIds: [],
         selectedSignalPanelIds: [],
         selectedFrameIds: [],
         selectedGroupCommandIds: [],
+        selectedSetpointPanelIds: [],
         selectedPlanObjectIds: [],
         isDirty: true
       });
@@ -106,12 +111,14 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
         terrainTiles: JSON.parse(JSON.stringify(nextState.terrainTiles || {})),
         planObjects: JSON.parse(JSON.stringify(nextState.planObjects || [])),
         groupCommands: JSON.parse(JSON.stringify(nextState.groupCommands || [])),
+        setpointPanels: JSON.parse(JSON.stringify(nextState.setpointPanels || [])),
         selectedIds: [],
         selectedConnectionIds: [],
         selectedMeterIds: [],
         selectedSignalPanelIds: [],
         selectedFrameIds: [],
         selectedGroupCommandIds: [],
+        selectedSetpointPanelIds: [],
         selectedPlanObjectIds: [],
         isDirty: true
       });

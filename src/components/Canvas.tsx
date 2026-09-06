@@ -22,6 +22,8 @@ import { SignalPanelElementNode } from './SignalPanelElementNode';
 import { computeSignalPanelHeight } from '../elements/SignalPanelElement';
 import { GroupCommandElementNode } from './GroupCommandElementNode';
 import { computeGroupCommandHeight } from '../elements/GroupCommandElement';
+import { SetpointElementNode } from './SetpointElementNode';
+import { computeSetpointHeight } from '../elements/SetpointElement';
 import { isObjectFullyInBox, isMeterFullyInBox, isConnectionFullyInBox, mergeSelectionAdditive } from '../utils/SelectionBox';
 import { clampZoom, computeContentBounds, computeFitView, GRID_THIN_BELOW_ZOOM } from '../utils/CanvasView';
 import { FrameElementNode } from './FrameElementNode';
@@ -71,6 +73,7 @@ export const Canvas: React.FC = () => {
   const { signalPanels, selectedSignalPanelIds, selectSignalPanels, updateSignalPanel } = useStore();
   const { frames, selectedFrameIds, selectFrames, addFrame, updateFrame, isDrawingFrame, drawingFrameVariant, frameToolContinuous, setDrawingFrameMode } = useStore();
   const { groupCommands, selectedGroupCommandIds, selectGroupCommands, updateGroupCommand } = useStore();
+  const { setpointPanels, selectedSetpointPanelIds, selectSetpointPanels, updateSetpointPanel } = useStore();
   const { selectMixed } = useStore();
   const [size, setSize] = useState({ width: 800, height: 600 });
   // Mirrors `size` for the keydown handler below (registered once,
@@ -122,6 +125,7 @@ export const Canvas: React.FC = () => {
     ...selectedSignalPanelIds.map(id => `panel:${id}`),
     ...selectedFrameIds.map(id => `frame:${id}`),
     ...selectedGroupCommandIds.map(id => `groupcmd:${id}`),
+    ...selectedSetpointPanelIds.map(id => `setpoint:${id}`),
     ...selectedConnectionIds.map(id => `conn:${id}`)
   ];
 
@@ -154,7 +158,8 @@ export const Canvas: React.FC = () => {
           : key.startsWith('meter:') ? meters.find(m => m.id === id)
           : key.startsWith('panel:') ? signalPanels.find(p => p.id === id)
           : key.startsWith('frame:') ? frames.find(f => f.id === id)
-          : groupCommands.find(g => g.id === id);
+          : key.startsWith('groupcmd:') ? groupCommands.find(g => g.id === id)
+          : setpointPanels.find(p => p.id === id);
         if (!source) return;
         node.x(source.x + dx);
         node.y(source.y + dy);
@@ -265,7 +270,7 @@ export const Canvas: React.FC = () => {
         // already in this effect.
         e.preventDefault();
         const s = useStore.getState();
-        s.deleteObjects(s.selectedIds, s.selectedConnectionIds, s.selectedMeterIds, s.selectedSignalPanelIds, s.selectedFrameIds, s.selectedGroupCommandIds);
+        s.deleteObjects(s.selectedIds, s.selectedConnectionIds, s.selectedMeterIds, s.selectedSignalPanelIds, s.selectedFrameIds, s.selectedGroupCommandIds, s.selectedSetpointPanelIds);
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
         // Select everything on the current screen - objects,
         // connections and meters together.
@@ -553,17 +558,18 @@ export const Canvas: React.FC = () => {
       // field of its own) exactly like a meter/signal panel - reuses
       // isMeterFullyInBox's own {x,y,width}+height signature, no new helper.
       const groupCommandIds = groupCommands.filter(g => isMeterFullyInBox(g, computeGroupCommandHeight(), box)).map(g => g.id);
+      const setpointPanelIds = setpointPanels.filter(p => isMeterFullyInBox(p, computeSetpointHeight(p), box)).map(p => p.id);
       const connectionIds = connections.filter(c => isConnectionFullyInBox(c, box)).map(c => c.id);
 
-      if (objectIds.length > 0 || meterIds.length > 0 || signalPanelIds.length > 0 || frameIds.length > 0 || groupCommandIds.length > 0 || connectionIds.length > 0) {
+      if (objectIds.length > 0 || meterIds.length > 0 || signalPanelIds.length > 0 || frameIds.length > 0 || groupCommandIds.length > 0 || setpointPanelIds.length > 0 || connectionIds.length > 0) {
         if (e.evt.shiftKey) {
           // Shift+drag adds to whatever was already selected, per kind.
           selectMixed(mergeSelectionAdditive(
-            { objectIds: selectedIds, connectionIds: selectedConnectionIds, meterIds: selectedMeterIds, signalPanelIds: selectedSignalPanelIds, frameIds: selectedFrameIds, groupCommandIds: selectedGroupCommandIds },
-            { objectIds, connectionIds, meterIds, signalPanelIds, frameIds, groupCommandIds }
+            { objectIds: selectedIds, connectionIds: selectedConnectionIds, meterIds: selectedMeterIds, signalPanelIds: selectedSignalPanelIds, frameIds: selectedFrameIds, groupCommandIds: selectedGroupCommandIds, setpointPanelIds: selectedSetpointPanelIds },
+            { objectIds, connectionIds, meterIds, signalPanelIds, frameIds, groupCommandIds, setpointPanelIds }
           ));
         } else {
-          selectMixed({ objectIds, connectionIds, meterIds, signalPanelIds, frameIds, groupCommandIds });
+          selectMixed({ objectIds, connectionIds, meterIds, signalPanelIds, frameIds, groupCommandIds, setpointPanelIds });
         }
       }
       // An empty box selects nothing new - a non-shift click already
@@ -718,7 +724,7 @@ export const Canvas: React.FC = () => {
   // (an axis-aligned box, not each object's own rotated bounds) - the
   // same simplification isObjectFullyInBox already makes for the
   // rubber-band box itself.
-  const selectedTotalCount = selectedIds.length + selectedMeterIds.length + selectedSignalPanelIds.length + selectedFrameIds.length + selectedGroupCommandIds.length + selectedConnectionIds.length;
+  const selectedTotalCount = selectedIds.length + selectedMeterIds.length + selectedSignalPanelIds.length + selectedFrameIds.length + selectedGroupCommandIds.length + selectedSetpointPanelIds.length + selectedConnectionIds.length;
   const selectionGroupBounds = (() => {
     if (selectedTotalCount <= 1) return null;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -733,6 +739,7 @@ export const Canvas: React.FC = () => {
     signalPanels.filter(p => selectedSignalPanelIds.includes(p.id)).forEach(p => extend(p.x, p.y, p.x + p.width, p.y + computeSignalPanelHeight(p)));
     frames.filter(f => selectedFrameIds.includes(f.id)).forEach(f => extend(f.x, f.y, f.x + f.width, f.y + f.height));
     groupCommands.filter(g => selectedGroupCommandIds.includes(g.id)).forEach(g => extend(g.x, g.y, g.x + g.width, g.y + computeGroupCommandHeight()));
+    setpointPanels.filter(p => selectedSetpointPanelIds.includes(p.id)).forEach(p => extend(p.x, p.y, p.x + p.width, p.y + computeSetpointHeight(p)));
     connections.filter(c => selectedConnectionIds.includes(c.id)).forEach(c => c.points.forEach(pt => extend(pt.x, pt.y, pt.x, pt.y)));
     if (!Number.isFinite(minX)) return null;
     const padding = 8;
@@ -992,6 +999,40 @@ export const Canvas: React.FC = () => {
               }}
             />
           ))}
+          {/* The setpoint panel element (feat/selector-symbol-setpoint-alarm):
+              same mechanism as the meter/signal panel, for MODULATED
+              devices instead of MEASURED ones - see
+              elements/SetpointElement.ts. */}
+          {setpointPanels.map((panel) => (
+            <SetpointElementNode
+              key={panel.id}
+              panel={panel}
+              devices={devices}
+              onSelect={(e: any) => selectSetpointPanels([panel.id], !!e?.evt?.shiftKey)}
+              onShapeRef={(node) => groupDrag.registerNode(`setpoint:${panel.id}`, node)}
+              onDragStart={() => {
+                if (isAltKeyDown()) useStore.getState().duplicateSetpointPanelInPlace(panel.id);
+                groupDrag.start(`setpoint:${panel.id}`);
+              }}
+              onDragMove={(x, y) => {
+                if (groupDrag.isActive()) groupDrag.follow(x - panel.x, y - panel.y);
+              }}
+              onDragEnd={(x, y) => {
+                const finalX = snapValue(x, gridSize, isAltKeyDown());
+                const finalY = snapValue(y, gridSize, isAltKeyDown());
+                if (groupDrag.isActive()) {
+                  groupDrag.commit(finalX - panel.x, finalY - panel.y);
+                } else {
+                  updateSetpointPanel(panel.id, { x: finalX, y: finalY });
+                  useStore.getState().saveHistory();
+                }
+              }}
+              onResize={(x, width) => {
+                updateSetpointPanel(panel.id, { x, width });
+                useStore.getState().saveHistory();
+              }}
+            />
+          ))}
           {/* Layer 6, labels: a SEPARATE pass over every object, drawn
               after every symbol/junction/meter so a label never falls
               under another object's own shape - each wrapped in its own
@@ -1100,6 +1141,12 @@ export const Canvas: React.FC = () => {
             <WidthOnlyTransformerHandle
               key={`panel-tr-${id}`}
               node={dragNodeRefs.current.get(`panel:${id}`)}
+            />
+          ))}
+          {selectedSetpointPanelIds.map((id) => (
+            <WidthOnlyTransformerHandle
+              key={`setpoint-tr-${id}`}
+              node={dragNodeRefs.current.get(`setpoint:${id}`)}
             />
           ))}
           {selectedFrameIds.map((id) => (

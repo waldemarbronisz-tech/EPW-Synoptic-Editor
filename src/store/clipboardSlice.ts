@@ -9,9 +9,9 @@ import type { AppState } from './appState';
 // (historySlice.ts), so pasting after several undos still pastes the last
 // thing actually copied.
 export type ClipboardSlice = Pick<AppState,
-  | 'clipboard' | 'clipboardMeters' | 'clipboardSignalPanels' | 'clipboardFrames' | 'clipboardGroupCommands' | 'clipboardConnections'
+  | 'clipboard' | 'clipboardMeters' | 'clipboardSignalPanels' | 'clipboardFrames' | 'clipboardGroupCommands' | 'clipboardSetpointPanels' | 'clipboardConnections'
   | 'copySelected' | 'paste' | 'duplicateSelected'
-  | 'duplicateObjectInPlace' | 'duplicateMeterInPlace' | 'duplicateSignalPanelInPlace' | 'duplicateFrameInPlace' | 'duplicateGroupCommandInPlace'
+  | 'duplicateObjectInPlace' | 'duplicateMeterInPlace' | 'duplicateSignalPanelInPlace' | 'duplicateFrameInPlace' | 'duplicateGroupCommandInPlace' | 'duplicateSetpointPanelInPlace'
 >;
 
 export const createClipboardSlice: StateCreator<AppState, [], [], ClipboardSlice> = (set, get) => ({
@@ -20,6 +20,7 @@ export const createClipboardSlice: StateCreator<AppState, [], [], ClipboardSlice
   clipboardSignalPanels: [],
   clipboardFrames: [],
   clipboardGroupCommands: [],
+  clipboardSetpointPanels: [],
   clipboardConnections: [],
 
   // copySelected reads all three selection arrays at once - objects,
@@ -32,12 +33,13 @@ export const createClipboardSlice: StateCreator<AppState, [], [], ClipboardSlice
   // connection needs no relinking at all to stay attached to the
   // objects it was copied along with.
   copySelected: () => {
-    const { objects, selectedIds, meters, selectedMeterIds, signalPanels, selectedSignalPanelIds, frames, selectedFrameIds, groupCommands, selectedGroupCommandIds, connections, selectedConnectionIds } = get();
+    const { objects, selectedIds, meters, selectedMeterIds, signalPanels, selectedSignalPanelIds, frames, selectedFrameIds, groupCommands, selectedGroupCommandIds, setpointPanels, selectedSetpointPanelIds, connections, selectedConnectionIds } = get();
     const toCopy = objects.filter(obj => selectedIds.includes(obj.id));
     const metersToCopy = meters.filter(m => selectedMeterIds.includes(m.id));
     const signalPanelsToCopy = signalPanels.filter(p => selectedSignalPanelIds.includes(p.id));
     const framesToCopy = frames.filter(f => selectedFrameIds.includes(f.id));
     const groupCommandsToCopy = groupCommands.filter(g => selectedGroupCommandIds.includes(g.id));
+    const setpointPanelsToCopy = setpointPanels.filter(p => selectedSetpointPanelIds.includes(p.id));
     const connectionsToCopy = connections.filter(c => selectedConnectionIds.includes(c.id));
     set({
       clipboard: JSON.parse(JSON.stringify(toCopy)),
@@ -45,6 +47,7 @@ export const createClipboardSlice: StateCreator<AppState, [], [], ClipboardSlice
       clipboardSignalPanels: JSON.parse(JSON.stringify(signalPanelsToCopy)),
       clipboardFrames: JSON.parse(JSON.stringify(framesToCopy)),
       clipboardGroupCommands: JSON.parse(JSON.stringify(groupCommandsToCopy)),
+      clipboardSetpointPanels: JSON.parse(JSON.stringify(setpointPanelsToCopy)),
       clipboardConnections: JSON.parse(JSON.stringify(connectionsToCopy))
     });
   },
@@ -53,10 +56,10 @@ export const createClipboardSlice: StateCreator<AppState, [], [], ClipboardSlice
   // original, and always back on the grid (GRID_SIZE is itself the
   // grid's own pitch, so a grid-aligned source stays grid-aligned).
   paste: () => {
-    const { clipboard, clipboardMeters, clipboardSignalPanels, clipboardFrames, clipboardGroupCommands, clipboardConnections } = get();
-    if (clipboard.length === 0 && clipboardMeters.length === 0 && clipboardSignalPanels.length === 0 && clipboardFrames.length === 0 && clipboardGroupCommands.length === 0 && clipboardConnections.length === 0) return;
+    const { clipboard, clipboardMeters, clipboardSignalPanels, clipboardFrames, clipboardGroupCommands, clipboardSetpointPanels, clipboardConnections } = get();
+    if (clipboard.length === 0 && clipboardMeters.length === 0 && clipboardSignalPanels.length === 0 && clipboardFrames.length === 0 && clipboardGroupCommands.length === 0 && clipboardSetpointPanels.length === 0 && clipboardConnections.length === 0) return;
 
-    const cloned = cloneSelectionWithOffset(clipboard, clipboardMeters, clipboardSignalPanels, clipboardFrames, clipboardConnections, GRID_SIZE, GRID_SIZE, uuidv4, clipboardGroupCommands);
+    const cloned = cloneSelectionWithOffset(clipboard, clipboardMeters, clipboardSignalPanels, clipboardFrames, clipboardConnections, GRID_SIZE, GRID_SIZE, uuidv4, clipboardGroupCommands, clipboardSetpointPanels);
 
     set((state) => ({
       objects: [...state.objects, ...cloned.objects],
@@ -64,13 +67,15 @@ export const createClipboardSlice: StateCreator<AppState, [], [], ClipboardSlice
       signalPanels: [...state.signalPanels, ...cloned.signalPanels],
       frames: [...state.frames, ...cloned.frames],
       groupCommands: [...state.groupCommands, ...cloned.groupCommands],
+      setpointPanels: [...state.setpointPanels, ...cloned.setpointPanels],
       connections: [...state.connections, ...cloned.connections],
       selectedIds: cloned.objectIds,
       selectedConnectionIds: cloned.connectionIds,
       selectedMeterIds: cloned.meterIds,
       selectedSignalPanelIds: cloned.signalPanelIds,
       selectedFrameIds: cloned.frameIds,
-      selectedGroupCommandIds: cloned.groupCommandIds
+      selectedGroupCommandIds: cloned.groupCommandIds,
+      selectedSetpointPanelIds: cloned.setpointPanelIds
     }));
     get().saveHistory();
   },
@@ -80,16 +85,17 @@ export const createClipboardSlice: StateCreator<AppState, [], [], ClipboardSlice
   // untouched (a subsequent Ctrl+V still pastes whatever was last
   // explicitly copied, not this duplicate).
   duplicateSelected: () => {
-    const { objects, selectedIds, meters, selectedMeterIds, signalPanels, selectedSignalPanelIds, frames, selectedFrameIds, groupCommands, selectedGroupCommandIds, connections, selectedConnectionIds } = get();
+    const { objects, selectedIds, meters, selectedMeterIds, signalPanels, selectedSignalPanelIds, frames, selectedFrameIds, groupCommands, selectedGroupCommandIds, setpointPanels, selectedSetpointPanelIds, connections, selectedConnectionIds } = get();
     const toDuplicate = objects.filter(obj => selectedIds.includes(obj.id));
     const metersToDuplicate = meters.filter(m => selectedMeterIds.includes(m.id));
     const signalPanelsToDuplicate = signalPanels.filter(p => selectedSignalPanelIds.includes(p.id));
     const framesToDuplicate = frames.filter(f => selectedFrameIds.includes(f.id));
     const groupCommandsToDuplicate = groupCommands.filter(g => selectedGroupCommandIds.includes(g.id));
+    const setpointPanelsToDuplicate = setpointPanels.filter(p => selectedSetpointPanelIds.includes(p.id));
     const connectionsToDuplicate = connections.filter(c => selectedConnectionIds.includes(c.id));
-    if (toDuplicate.length === 0 && metersToDuplicate.length === 0 && signalPanelsToDuplicate.length === 0 && framesToDuplicate.length === 0 && groupCommandsToDuplicate.length === 0 && connectionsToDuplicate.length === 0) return;
+    if (toDuplicate.length === 0 && metersToDuplicate.length === 0 && signalPanelsToDuplicate.length === 0 && framesToDuplicate.length === 0 && groupCommandsToDuplicate.length === 0 && setpointPanelsToDuplicate.length === 0 && connectionsToDuplicate.length === 0) return;
 
-    const cloned = cloneSelectionWithOffset(toDuplicate, metersToDuplicate, signalPanelsToDuplicate, framesToDuplicate, connectionsToDuplicate, GRID_SIZE, GRID_SIZE, uuidv4, groupCommandsToDuplicate);
+    const cloned = cloneSelectionWithOffset(toDuplicate, metersToDuplicate, signalPanelsToDuplicate, framesToDuplicate, connectionsToDuplicate, GRID_SIZE, GRID_SIZE, uuidv4, groupCommandsToDuplicate, setpointPanelsToDuplicate);
 
     set((state) => ({
       objects: [...state.objects, ...cloned.objects],
@@ -97,13 +103,15 @@ export const createClipboardSlice: StateCreator<AppState, [], [], ClipboardSlice
       signalPanels: [...state.signalPanels, ...cloned.signalPanels],
       frames: [...state.frames, ...cloned.frames],
       groupCommands: [...state.groupCommands, ...cloned.groupCommands],
+      setpointPanels: [...state.setpointPanels, ...cloned.setpointPanels],
       connections: [...state.connections, ...cloned.connections],
       selectedIds: cloned.objectIds,
       selectedConnectionIds: cloned.connectionIds,
       selectedMeterIds: cloned.meterIds,
       selectedSignalPanelIds: cloned.signalPanelIds,
       selectedFrameIds: cloned.frameIds,
-      selectedGroupCommandIds: cloned.groupCommandIds
+      selectedGroupCommandIds: cloned.groupCommandIds,
+      selectedSetpointPanelIds: cloned.setpointPanelIds
     }));
     get().saveHistory();
   },
@@ -141,5 +149,12 @@ export const createClipboardSlice: StateCreator<AppState, [], [], ClipboardSlice
     if (!el) return;
     const clone = { ...JSON.parse(JSON.stringify(el)), id: uuidv4() };
     set((state) => ({ groupCommands: [...state.groupCommands, clone] }));
+  },
+
+  duplicateSetpointPanelInPlace: (id) => {
+    const panel = get().setpointPanels.find(p => p.id === id);
+    if (!panel) return;
+    const clone = { ...JSON.parse(JSON.stringify(panel)), id: uuidv4() };
+    set((state) => ({ setpointPanels: [...state.setpointPanels, clone] }));
   },
 });

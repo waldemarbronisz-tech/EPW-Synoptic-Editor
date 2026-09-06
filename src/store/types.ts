@@ -9,6 +9,7 @@ import type { MeterElement } from '../meter/MeterElement';
 import type { SignalPanelElement } from '../elements/SignalPanelElement';
 import type { FrameElement } from '../elements/FrameElement';
 import type { GroupCommandElement } from '../elements/GroupCommandElement';
+import type { SetpointPanelElement } from '../elements/SetpointElement';
 import type { TerrainTileType } from '../iso/TerrainTile';
 import type { PlanObject } from '../iso/PlanObject';
 
@@ -157,4 +158,7 @@ export interface HistorySnapshot {
   // fields here, so it follows their later, optional convention
   // instead of joining them as a required one).
   groupCommands?: GroupCommandElement[];
+  // feat/selector-symbol-setpoint-alarm: the setpoint panel - same
+  // optional/additive treatment as groupCommands above.
+  setpointPanels?: SetpointPanelElement[];
 }

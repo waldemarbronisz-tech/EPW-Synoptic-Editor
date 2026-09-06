@@ -8,6 +8,9 @@ import { clampSignalPanelWidth, SIGNAL_PANEL_MIN_WIDTH, SIGNAL_PANEL_MAX_WIDTH, 
 import type { SignalPanelRow } from '../elements/SignalPanelElement';
 import { clampGroupCommandWidth, GROUP_COMMAND_MIN_WIDTH, GROUP_COMMAND_MAX_WIDTH } from '../elements/GroupCommandElement';
 import { getCommandableDevices, resolveGroupCommandMembers, getGroupCommandTargetNames } from '../elements/GroupCommandResolver';
+import { clampSetpointWidth, SETPOINT_MIN_WIDTH, SETPOINT_MAX_WIDTH, SETPOINT_DEFAULT_FONT_SIZE } from '../elements/SetpointElement';
+import type { SetpointRow } from '../elements/SetpointElement';
+import { getSetpointCapableDevices } from '../elements/SetpointResolver';
 import { INDICATOR_DIODE_STATES } from '../symbols/scada/IndicatorDiodeSymbol';
 import { FONT_SIZE_BASE, FONT_SIZE_SMALL } from '../theme/ScadaTheme';
 import type { SynopticConnection, SynopticObject } from '../store';
@@ -39,6 +42,7 @@ export const PropertyInspector: React.FC = () => {
   const { signalPanels, selectedSignalPanelIds, updateSignalPanel } = useStore();
   const { frames, selectedFrameIds, updateFrame } = useStore();
   const { groupCommands, selectedGroupCommandIds, updateGroupCommand } = useStore();
+  const { setpointPanels, selectedSetpointPanelIds, updateSetpointPanel } = useStore();
   const { planObjects, selectedPlanObjectIds, updatePlanObject } = useStore();
   // Hooks must run unconditionally on every render (this component is
   // otherwise a chain of early returns depending on what is selected),
@@ -196,7 +200,7 @@ export const PropertyInspector: React.FC = () => {
     );
   }
 
-  if (selectedIds.length === 0 && selectedConnectionIds.length === 0 && selectedMeterIds.length === 0 && selectedSignalPanelIds.length === 0 && selectedFrameIds.length === 0 && selectedGroupCommandIds.length === 0) {
+  if (selectedIds.length === 0 && selectedConnectionIds.length === 0 && selectedMeterIds.length === 0 && selectedSignalPanelIds.length === 0 && selectedFrameIds.length === 0 && selectedGroupCommandIds.length === 0 && selectedSetpointPanelIds.length === 0) {
     return (
       <div className="property-inspector">
         <div className="inspector-header">Properties</div>
@@ -205,8 +209,8 @@ export const PropertyInspector: React.FC = () => {
     );
   }
 
-  const selectionKindCount = (selectedIds.length > 0 ? 1 : 0) + (selectedConnectionIds.length > 0 ? 1 : 0) + (selectedMeterIds.length > 0 ? 1 : 0) + (selectedSignalPanelIds.length > 0 ? 1 : 0) + (selectedFrameIds.length > 0 ? 1 : 0) + (selectedGroupCommandIds.length > 0 ? 1 : 0);
-  if (selectedIds.length > 1 || selectedConnectionIds.length > 1 || selectedMeterIds.length > 1 || selectedSignalPanelIds.length > 1 || selectedFrameIds.length > 1 || selectedGroupCommandIds.length > 1 || selectionKindCount > 1) {
+  const selectionKindCount = (selectedIds.length > 0 ? 1 : 0) + (selectedConnectionIds.length > 0 ? 1 : 0) + (selectedMeterIds.length > 0 ? 1 : 0) + (selectedSignalPanelIds.length > 0 ? 1 : 0) + (selectedFrameIds.length > 0 ? 1 : 0) + (selectedGroupCommandIds.length > 0 ? 1 : 0) + (selectedSetpointPanelIds.length > 0 ? 1 : 0);
+  if (selectedIds.length > 1 || selectedConnectionIds.length > 1 || selectedMeterIds.length > 1 || selectedSignalPanelIds.length > 1 || selectedFrameIds.length > 1 || selectedGroupCommandIds.length > 1 || selectedSetpointPanelIds.length > 1 || selectionKindCount > 1) {
     return (
       <div className="property-inspector">
         <div className="inspector-header">Properties</div>
@@ -220,14 +224,16 @@ export const PropertyInspector: React.FC = () => {
   const isSignalPanelSelected = selectedSignalPanelIds.length === 1;
   const isFrameSelected = selectedFrameIds.length === 1;
   const isGroupCommandSelected = selectedGroupCommandIds.length === 1;
-  const selectedObj = isConnectionSelected || isMeterSelected || isSignalPanelSelected || isFrameSelected || isGroupCommandSelected ? null : objects.find(o => o.id === selectedIds[0]);
+  const isSetpointPanelSelected = selectedSetpointPanelIds.length === 1;
+  const selectedObj = isConnectionSelected || isMeterSelected || isSignalPanelSelected || isFrameSelected || isGroupCommandSelected || isSetpointPanelSelected ? null : objects.find(o => o.id === selectedIds[0]);
   const selectedConn = isConnectionSelected ? connections.find(c => c.id === selectedConnectionIds[0]) : null;
   const selectedMeter = isMeterSelected ? meters.find(m => m.id === selectedMeterIds[0]) : null;
   const selectedSignalPanel = isSignalPanelSelected ? signalPanels.find(p => p.id === selectedSignalPanelIds[0]) : null;
   const selectedFrame = isFrameSelected ? frames.find(f => f.id === selectedFrameIds[0]) : null;
   const selectedGroupCommand = isGroupCommandSelected ? groupCommands.find(g => g.id === selectedGroupCommandIds[0]) : null;
+  const selectedSetpointPanel = isSetpointPanelSelected ? setpointPanels.find(p => p.id === selectedSetpointPanelIds[0]) : null;
 
-  if (!selectedObj && !selectedConn && !selectedMeter && !selectedSignalPanel && !selectedFrame && !selectedGroupCommand) return null;
+  if (!selectedObj && !selectedConn && !selectedMeter && !selectedSignalPanel && !selectedFrame && !selectedGroupCommand && !selectedSetpointPanel) return null;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -798,6 +804,140 @@ export const PropertyInspector: React.FC = () => {
             >
               Testuj (podglad)
             </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (selectedSetpointPanel) {
+    // feat/selector-symbol-setpoint-alarm: title/font size/width plus
+    // row management, mirroring the meter's own Part A branch above -
+    // same shape (label + manual value/unit, or a bound device). No
+    // wizard dialog here (proportionate to this element's own scope,
+    // unlike the meter/signal panel's own location-grouped Kreator) -
+    // picking a MODULATED device from the dropdown below adds it as a
+    // new row directly, the same pattern the group command button's own
+    // member picker already uses.
+    const setRows = (rows: SetpointRow[]) => {
+      updateSetpointPanel(selectedSetpointPanel.id, { rows });
+      useStore.getState().saveHistory();
+    };
+    const addManualRow = () => setRows([...selectedSetpointPanel.rows, { device: '', label: '', manualValue: '', manualUnit: '' }]);
+    const removeRow = (idx: number) => setRows(selectedSetpointPanel.rows.filter((_, i) => i !== idx));
+    const moveRow = (idx: number, dir: -1 | 1) => {
+      const target = idx + dir;
+      if (target < 0 || target >= selectedSetpointPanel.rows.length) return;
+      const rows = [...selectedSetpointPanel.rows];
+      [rows[idx], rows[target]] = [rows[target], rows[idx]];
+      setRows(rows);
+    };
+    const updateRowField = (idx: number, field: keyof SetpointRow, value: string) => {
+      setRows(selectedSetpointPanel.rows.map((r, i) => i === idx ? { ...r, [field]: value } : r));
+    };
+    const usedDeviceIds = new Set(selectedSetpointPanel.rows.map(r => r.device).filter(Boolean));
+    const availableToAdd = getSetpointCapableDevices(devices).filter(d => !usedDeviceIds.has(d.id));
+    const addDeviceRow = (deviceId: string) => {
+      if (!deviceId) return;
+      setRows([...selectedSetpointPanel.rows, { device: deviceId, label: '', manualValue: '', manualUnit: '' }]);
+    };
+
+    return (
+      <div className="property-inspector">
+        <div className="inspector-header">Setpoint Panel Properties</div>
+        <div className="inspector-content">
+          <div className="property-group">
+            <div className="property-group-title">Panel nastaw</div>
+            <div className="property-row">
+              <label>Title</label>
+              <input
+                type="text"
+                value={selectedSetpointPanel.title || ''}
+                onChange={(e) => updateSetpointPanel(selectedSetpointPanel.id, { title: e.target.value })}
+                onBlur={() => useStore.getState().saveHistory()}
+              />
+            </div>
+            <div className="property-row">
+              <label>Font Size</label>
+              <input
+                type="number"
+                value={selectedSetpointPanel.fontSize || SETPOINT_DEFAULT_FONT_SIZE}
+                onChange={(e) => {
+                  const size = parseFloat(e.target.value);
+                  if (!isNaN(size) && size > 0) updateSetpointPanel(selectedSetpointPanel.id, { fontSize: size });
+                }}
+                onBlur={() => useStore.getState().saveHistory()}
+              />
+            </div>
+            <div className="property-row">
+              <label>Width</label>
+              <input
+                type="number"
+                min={SETPOINT_MIN_WIDTH}
+                max={SETPOINT_MAX_WIDTH}
+                value={Math.round(selectedSetpointPanel.width)}
+                onChange={(e) => {
+                  const width = parseFloat(e.target.value);
+                  if (!isNaN(width)) updateSetpointPanel(selectedSetpointPanel.id, { width: clampSetpointWidth(width) });
+                }}
+                onBlur={() => useStore.getState().saveHistory()}
+              />
+            </div>
+          </div>
+
+          <div className="property-group">
+            <div className="property-group-title">
+              Rows
+              <select
+                style={{ marginLeft: 'auto', fontSize: UI_SMALL }}
+                value=""
+                onChange={(e) => addDeviceRow(e.target.value)}
+                disabled={availableToAdd.length === 0}
+              >
+                <option value="">+ Dodaj aparat...</option>
+                {availableToAdd.map(d => <option key={d.id} value={d.id}>{d.id} ({d.designation})</option>)}
+              </select>
+              <button onClick={addManualRow} style={{ fontSize: UI_SMALL }}>+ Manual row</button>
+            </div>
+            {selectedSetpointPanel.rows.map((row, idx) => (
+              <div className="property-row" key={idx} style={{ gap: '2px', alignItems: 'center' }}>
+                <button onClick={() => moveRow(idx, -1)} disabled={idx === 0} style={{ fontSize: UI_SMALL }}>up</button>
+                <button onClick={() => moveRow(idx, 1)} disabled={idx === selectedSetpointPanel.rows.length - 1} style={{ fontSize: UI_SMALL }}>down</button>
+                <input
+                  type="text"
+                  placeholder="Label"
+                  value={row.label}
+                  onChange={(e) => updateRowField(idx, 'label', e.target.value)}
+                  onBlur={() => useStore.getState().saveHistory()}
+                  style={{ flex: 2 }}
+                />
+                {!row.device && (
+                  <>
+                    <input
+                      type="text"
+                      placeholder="Value"
+                      value={row.manualValue}
+                      onChange={(e) => updateRowField(idx, 'manualValue', e.target.value)}
+                      onBlur={() => useStore.getState().saveHistory()}
+                      style={{ flex: 1 }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Unit"
+                      value={row.manualUnit}
+                      onChange={(e) => updateRowField(idx, 'manualUnit', e.target.value)}
+                      onBlur={() => useStore.getState().saveHistory()}
+                      style={{ flex: 1 }}
+                    />
+                  </>
+                )}
+                {row.device && <span style={{ flex: 2, fontSize: UI_SMALL }}><em>device: {row.device}</em></span>}
+                <button onClick={() => removeRow(idx)} style={{ fontSize: UI_SMALL }}>x</button>
+              </div>
+            ))}
+            {selectedSetpointPanel.rows.length === 0 && (
+              <div className="property-row"><em>No rows yet - use + Manual row, or pick a MODULATED device above.</em></div>
+            )}
           </div>
         </div>
       </div>

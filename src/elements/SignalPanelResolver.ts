@@ -43,11 +43,20 @@ export interface SignalPanelRowDisplay {
  * What one row actually shows. A manual row (no device) is untouched
  * from commit 6 - manualState, straight through. A device-linked row
  * resolves its label (falling back to the device's own designation
- * when the row's own label is empty) from the device; its diode always
- * previews ON when the device resolves - the editor has no live input/
- * closed-contact data, the same reasoning MeterResolver.ts's preview
- * value follows, just with nothing to compute (a two-state signal has
- * no "middle" to preview, so ON is the one meaningful preview state).
+ * when the row's own label is empty) from the device; the editor has
+ * no live input/closed-contact data, the same reasoning
+ * MeterResolver.ts's preview value follows, just with nothing to
+ * compute (a two-state signal has no "middle" to preview).
+ *
+ * The preview STATE depends on which behavior resolved: a SWITCHED
+ * device previews ON - a contactor sitting closed/energized is its
+ * normal operating state, not an alarm condition. A SIGNAL device
+ * previews ALARM instead (feat/selector-symbol-setpoint-alarm) - a
+ * SIGNAL device's entire reason for being modeled separately from
+ * SWITCHED is alarm signalling (see its own alarmState field in
+ * DeviceSchema.ts), so the representative preview for laying out a
+ * panel is what it looks like TRIPPED, not a meaningless generic ON.
+ *
  * A row pointing at a device id that either does not exist, or exists
  * but is not itself SIGNAL or SWITCHED (a MEASURED or MODULATED device
  * has no notion of "closed"/"input active" to preview at all), is
@@ -64,7 +73,8 @@ export function resolveSignalPanelRow(row: SignalPanelRow, devices: Device[]): S
   }
 
   const label = row.label || device.designation;
-  return { label, state: 'ON', colorKind: 'PREVIEW' };
+  const state = device.behavior === 'SIGNAL' ? 'ALARM' : 'ON';
+  return { label, state, colorKind: 'PREVIEW' };
 }
 
 export interface SignalPanelDanglingRowIssue {
