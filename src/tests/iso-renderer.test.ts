@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
+import type { IsoPlacedObject } from '../iso/IsoRenderer';
 import {
   sortPlacementsByDepth, compareByDepth, buildDrawOrder, getSpriteDrawPosition
-} from '../iso/IsoRenderer';
-import type { IsoPlacedObject } from '../iso/IsoRenderer';
+} from '../iso/IsoRenderUtils';
 import { tileToScreen } from '../iso/IsoGrid';
 
 function place(id: string, gx: number, gy: number, footprint = { x: 1, y: 1 }): IsoPlacedObject {
