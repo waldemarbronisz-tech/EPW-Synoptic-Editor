@@ -94,6 +94,10 @@ describe('DeviceFormDialog - SWITCHED section', () => {
       { id: 'ADA1', model: 'ADA01', channelKind: 'DO', channelCount: 16 }
     ], devices: [] });
     render(<DeviceFormDialog mode="edit" initialDevice={makeSwitched({ supervision: { confirmTimeoutMs: 500, discrepancyAlarm: false } })} onSave={() => {}} onCancel={() => {}} />);
+    // fix/inline-device-creation commit 4: Nadzor (supervision) is one
+    // of SWITCHED's own CollapsibleSections, collapsed by default until
+    // it holds an error - 500 is valid, so it starts collapsed here.
+    fireEvent.click(screen.getByText('Nadzor (supervision)'));
 
     const timeoutInput = input('Timeout potwierdzenia (ms)');
     fireEvent.change(timeoutInput, { target: { value: '50' } });
