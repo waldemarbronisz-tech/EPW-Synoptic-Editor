@@ -11,7 +11,13 @@ import type { SelectorDevice } from '../project/DeviceSchema';
 function makeSelector(overrides: Partial<SelectorDevice> = {}): SelectorDevice {
   return {
     id: 'KOT_HOA1', designation: '-SA1', name: 'Przelacznik reka-0-automat', behavior: 'SELECTOR', kind: 'selector_switch', publishToHa: false,
-    positions: [{ name: 'RECZNIE' }, { name: '0' }, { name: 'AUTOMAT' }],
+    // fix/audit-findings commit 1: feedback on positions[0] and [2],
+    // none on [1] - same fixture shape selector-device.test.ts's own
+    // makeSelector() already uses. A SELECTOR with feedback nowhere at
+    // all is now rejected (SELECTOR_NO_FEEDBACK_AT_ALL), so a "fully
+    // valid" default fixture must have at least one - two, so removing
+    // either end position (as one test below does) still leaves one.
+    positions: [{ name: 'RECZNIE', feedback: 'ELA1.DI.1' }, { name: '0' }, { name: 'AUTOMAT', feedback: 'ELA1.DI.2' }],
     ...overrides
   };
 }

@@ -29,3 +29,7 @@ node_modules/
 __pycache__/
 *.pyc
 .venv/
+
+# Notatki robocze agenta - nigdy nie commitowane
+raport.md
+audit-report-*.md
