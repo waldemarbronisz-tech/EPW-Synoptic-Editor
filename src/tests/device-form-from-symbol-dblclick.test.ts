@@ -44,6 +44,7 @@ function resetStore() {
     objects: [], devices: [], messages: [],
     selectedIds: ['SOMETHING_ELSE'],
     deviceFormRequest: null,
+    deviceCreateOrAssignRequest: null,
     isDrawingConnection: false
   });
 }
@@ -77,26 +78,35 @@ describe('1. double-click on a symbol WITH a device opens that device\'s form', 
   });
 });
 
-describe('2. double-click on a symbol WITHOUT a device does not open a form, and reports it', () => {
+// fix/inline-device-creation commit 3: a device-less symbol used to
+// just post a Messages notice here - it now opens
+// deviceCreateOrAssignRequest instead (DeviceFormDialog's own "create
+// or assign" mode - see mandatory test 9 in
+// device-create-or-assign.test.tsx for the fuller behavioral coverage
+// of that flow). This describe block only re-covers what changed at
+// THIS exact function - handleSymbolDblClick's own no-device branch.
+describe('2. double-click on a symbol WITHOUT a device opens the create-or-assign flow instead of reporting it', () => {
   beforeEach(resetStore);
 
-  it('leaves deviceFormRequest null and posts an INFO message naming the symbol', () => {
-    const obj = makeObj({ deviceId: undefined, designation: '-Q1' });
+  it('sets deviceCreateOrAssignRequest with the symbol\'s own id/type and posts no message at all', () => {
+    const obj = makeObj({ id: 'OBJ1', deviceId: undefined, designation: '-Q1', type: 'electrical.disconnect_switch' });
 
     handleSymbolDblClick(mockEvent(), obj);
 
     expect(useStore.getState().deviceFormRequest).toBeNull();
-    const messages = useStore.getState().messages;
-    expect(messages.length).toBe(1);
-    expect(messages[0].type).toBe('info');
-    expect(messages[0].text).toContain('-Q1');
+    expect(useStore.getState().deviceCreateOrAssignRequest).toEqual({
+      symbolId: 'OBJ1',
+      symbolType: 'electrical.disconnect_switch',
+      sourceContext: expect.stringContaining('-Q1')
+    });
+    expect(useStore.getState().messages).toEqual([]);
   });
 
   it('an empty-string deviceId is treated the same as no device at all', () => {
     const obj = makeObj({ deviceId: '' });
     handleSymbolDblClick(mockEvent(), obj);
     expect(useStore.getState().deviceFormRequest).toBeNull();
-    expect(useStore.getState().messages.length).toBe(1);
+    expect(useStore.getState().deviceCreateOrAssignRequest).not.toBeNull();
   });
 });
 

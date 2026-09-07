@@ -16,10 +16,14 @@ import type { AppState } from './appState';
 // form - it reports a Messages warning naming the missing id and
 // leaves deviceFormRequest untouched (still whatever it was before -
 // null, if nothing else was already open).
-export type DeviceFormSlice = Pick<AppState, 'deviceFormRequest' | 'openDeviceForm' | 'closeDeviceForm'>;
+export type DeviceFormSlice = Pick<AppState,
+  | 'deviceFormRequest' | 'openDeviceForm' | 'closeDeviceForm'
+  | 'deviceCreateOrAssignRequest' | 'openDeviceCreateOrAssignForm' | 'closeDeviceCreateOrAssignForm'
+>;
 
 export const createDeviceFormSlice: StateCreator<AppState, [], [], DeviceFormSlice> = (set, get) => ({
   deviceFormRequest: null,
+  deviceCreateOrAssignRequest: null,
 
   openDeviceForm: (deviceId, sourceContext) => {
     const device = get().devices.find(d => d.id === deviceId);
@@ -27,8 +31,21 @@ export const createDeviceFormSlice: StateCreator<AppState, [], [], DeviceFormSli
       get().addMessage(`[WARNING] Nie znaleziono aparatu '${deviceId}' - nie mozna otworzyc formularza konfiguracji.`);
       return;
     }
-    set({ deviceFormRequest: { deviceId, sourceContext } });
+    // Mutually exclusive with the create-or-assign request below - a
+    // symbol is either bound to a real device (this path) or not (that
+    // one), never both at once.
+    set({ deviceFormRequest: { deviceId, sourceContext }, deviceCreateOrAssignRequest: null });
   },
 
   closeDeviceForm: () => set({ deviceFormRequest: null }),
+
+  // fix/inline-device-creation commit 3: opened by ObjectNode.tsx's own
+  // handleSymbolDblClick when the double-clicked symbol has no deviceId
+  // yet - no existence check needed (symbolId is always the object that
+  // was just clicked, not a possibly-stale reference).
+  openDeviceCreateOrAssignForm: (symbolId, symbolType, sourceContext) => {
+    set({ deviceCreateOrAssignRequest: { symbolId, symbolType, sourceContext }, deviceFormRequest: null });
+  },
+
+  closeDeviceCreateOrAssignForm: () => set({ deviceCreateOrAssignRequest: null }),
 });

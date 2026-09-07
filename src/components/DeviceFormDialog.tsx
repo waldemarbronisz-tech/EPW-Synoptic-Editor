@@ -26,6 +26,9 @@ import { getOccupiedChannels } from '../project/DeviceRegistryQueries';
 import { getMeasuredPreviewValue, formatMeasuredValue } from '../meter/MeterResolver';
 import { ChannelAddressPicker } from './ChannelAddressPicker';
 import { AddLocationDialog } from './AddLocationDialog';
+import { AssignExistingDeviceList } from './AssignExistingDeviceList';
+import { suggestBehaviorForSymbolType } from '../project/SymbolBehaviorMapping';
+import { suggestNextDeviceIdSuffix, suggestNextDesignation, deriveKindFromSymbolType } from '../project/DeviceCreationSuggestions';
 import { FONT_SIZE_SMALL, COLOR_ALARM } from '../theme/ScadaTheme';
 
 const BEHAVIORS: DeviceBehavior[] = ['SWITCHED', 'SIGNAL', 'MEASURED', 'MODULATED', 'SELECTOR'];
@@ -51,6 +54,26 @@ const FieldErrors: React.FC<{ messages?: string[] }> = ({ messages }) => {
   return <>{messages.map((m, i) => <div key={i} style={errorStyle}>{m}</div>)}</>;
 };
 
+// fix/inline-device-creation commit 3: passed only when this form was
+// opened from a device-less symbol's own double-click
+// (openDeviceCreateOrAssignForm/deviceCreateOrAssignRequest) - GRANICE's
+// "do not create a second device form, only extend the existing one
+// with modes" means this whole flow lives INSIDE DeviceFormDialog
+// itself (an internal UTWORZ NOWY/PRZYPISZ ISTNIEJACY mode switcher),
+// never as a second, parallel dialog.
+export interface DeviceFormCreationContext {
+  // SynopticObject.type of the originating symbol - feeds
+  // SymbolBehaviorMapping.ts's own suggestBehaviorForSymbolType and
+  // DeviceCreationSuggestions.ts's own id/designation suggestions, and
+  // PRZYPISZ ISTNIEJACY's own behavior pre-filter.
+  symbolType: string;
+  // PRZYPISZ ISTNIEJACY's own "Przypisz" button calls this with the
+  // selected device's id - a completely different save path from
+  // onSave below (nothing is created or edited, only the symbol's own
+  // deviceId is set), so it is never routed through onSave/canAttemptSave.
+  onAssignExisting: (deviceId: string) => void;
+}
+
 export interface DeviceFormDialogProps {
   mode: 'add' | 'edit';
   // For 'edit': the device being edited. For 'add': present only when
@@ -66,12 +89,14 @@ export interface DeviceFormDialogProps {
   // path's header stays exactly what it always was - one line, nothing
   // more (task 3b/GRANICE: don't change it).
   sourceContext?: string;
+  creationContext?: DeviceFormCreationContext;
 }
 
-export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initialDevice, onSave, onCancel, sourceContext }) => {
+export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initialDevice, onSave, onCancel, sourceContext, creationContext }) => {
   const locations = useStore(s => s.locations);
   const cards = useStore(s => s.cards);
   const devices = useStore(s => s.devices);
+  const objects = useStore(s => s.objects);
   const isEdit = mode === 'edit';
 
   const initialSplit = initialDevice ? splitId(initialDevice.id) : { code: locations[0]?.code ?? '', suffix: '' };
@@ -81,14 +106,65 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
   const [name, setName] = useState(initialDevice?.name ?? '');
   const [kind, setKind] = useState(initialDevice?.kind ?? '');
   const [publishToHa, setPublishToHa] = useState(initialDevice?.publishToHa ?? false);
-  const [behavior, setBehavior] = useState<DeviceBehavior>(initialDevice?.behavior ?? 'SWITCHED');
+  // fix/inline-device-creation commit 3: '' is a genuine third state,
+  // "not chosen yet" - only reachable when this form was opened from a
+  // device-less symbol whose type is OUTSIDE SymbolBehaviorMapping.ts's
+  // own mapping (suggestBehaviorForSymbolType returns undefined). Every
+  // other path (edit, ordinary add, or a symbol type that IS in the
+  // mapping) still starts with a real DeviceBehavior exactly as before -
+  // this never changes what Lista aparatow's own Dodaj already did.
+  const [behavior, setBehavior] = useState<DeviceBehavior | ''>(() => {
+    if (initialDevice) return initialDevice.behavior;
+    if (creationContext) return suggestBehaviorForSymbolType(creationContext.symbolType) ?? '';
+    return 'SWITCHED';
+  });
   const [ownFields, setOwnFields] = useState<DeviceOwnFields>(() =>
-    initialDevice ? extractOwnFields(initialDevice) : defaultFieldsForBehavior(behavior)
+    initialDevice ? extractOwnFields(initialDevice) : defaultFieldsForBehavior(behavior || 'SWITCHED')
   );
   // fix/inline-device-creation commit 2: "+ Dodaj lokalizacje" next to
   // the location <select> below - see AddLocationDialog.tsx's own
   // header for the shared check/save path it uses.
   const [showAddLocation, setShowAddLocation] = useState(false);
+
+  // fix/inline-device-creation commit 3: the mode switcher shown at the
+  // top of the window only when this form was opened from a device-less
+  // symbol - UTWORZ NOWY (this component's own ordinary add form, just
+  // pre-suggested) or PRZYPISZ ISTNIEJACY (AssignExistingDeviceList
+  // below, an entirely different body/footer, still the SAME window).
+  const [createOrAssignMode, setCreateOrAssignMode] = useState<'create' | 'assign'>('create');
+  const [assignSelectedId, setAssignSelectedId] = useState<string | null>(null);
+
+  // fix/inline-device-creation commit 3b: after picking a location, the
+  // suggested id suffix and designation are typed AND selected so the
+  // first keystroke overwrites them - suffixInputRef/designationInputRef
+  // are focused+selected via suggestionNonce (bumped only by an actual
+  // auto-suggestion, never by ordinary typing) and, as a safety net for
+  // whenever the user tabs back into either field later, both also
+  // select-on-focus (see the inputs themselves, below).
+  const suffixInputRef = useRef<HTMLInputElement>(null);
+  const [suggestionNonce, setSuggestionNonce] = useState(0);
+  useEffect(() => {
+    // suggestionNonce is only ever bumped from inside handleLocationChange's
+    // own `if (!creationContext || !code) return;` guard below, so
+    // creationContext is implicitly already known truthy here - checking
+    // it again would only add a dependency-array entry for an object
+    // App.tsx recreates on every render, without changing what this does.
+    if (suggestionNonce > 0) {
+      suffixInputRef.current?.focus();
+      suffixInputRef.current?.select();
+    }
+  }, [suggestionNonce]);
+
+  const handleLocationChange = (code: string) => {
+    setLocationCode(code);
+    if (!creationContext || !code) return;
+    const effectiveKind = kind.trim() || deriveKindFromSymbolType(creationContext.symbolType);
+    if (!kind.trim()) setKind(effectiveKind);
+    const effectiveBehavior = behavior || suggestBehaviorForSymbolType(creationContext.symbolType) || 'SWITCHED';
+    setSuffix(suggestNextDeviceIdSuffix(code, effectiveKind, devices));
+    setDesignation(suggestNextDesignation(code, effectiveBehavior, effectiveKind, devices));
+    setSuggestionNonce(n => n + 1);
+  };
 
   const handleBehaviorChange = (next: DeviceBehavior) => {
     if (next === behavior) return;
@@ -101,7 +177,7 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
 
   const id = isEdit ? (initialDevice?.id ?? '') : (locationCode && suffix ? `${locationCode}_${suffix}` : '');
 
-  const common: DeviceCommon = { id, designation, name, behavior, kind, publishToHa };
+  const common: DeviceCommon = { id, designation, name, behavior: behavior || 'SWITCHED', kind, publishToHa };
   const candidateDevice = assembleDevice(common, ownFields);
 
   // feat/device-form-from-canvas commit 3c: whatever the very first
@@ -124,13 +200,16 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
   const ownIssues = getDeviceOwnIssues(candidateDevice, otherDevices, locations, cards);
   const fieldErrors = mapDeviceIssuesToFields(ownIssues, candidateDevice);
 
-  const hasFullForm = BEHAVIORS_WITH_FULL_FORM.includes(behavior);
+  const hasFullForm = behavior !== '' && BEHAVIORS_WITH_FULL_FORM.includes(behavior);
   const commonFieldsFilled = id.length > 0 && designation.trim().length > 0 && name.trim().length > 0 && kind.trim().length > 0;
   // Commit 3: for SWITCHED/SIGNAL, every field is now editable, so Save
   // is withheld until every reported issue is resolved. MEASURED/
   // MODULATED (commit 4's job) keep the earlier, lighter gate - their
   // fields cannot be fixed through this UI yet.
-  const canAttemptSave = commonFieldsFilled && (!hasFullForm || ownIssues.length === 0);
+  // fix/inline-device-creation commit 3: behavior === '' (only reachable
+  // via creationContext - see this file's own comment on that state)
+  // blocks Save outright, same as any other unfilled common field.
+  const canAttemptSave = behavior !== '' && commonFieldsFilled && (!hasFullForm || ownIssues.length === 0);
 
   const handleSave = () => {
     if (!canAttemptSave) return;
@@ -241,15 +320,54 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
       >
         <div style={headerStyle}>
           <div>
-            <div>{isEdit ? `Edycja aparatu ${initialDevice?.id}` : 'Nowy aparat'}</div>
+            <div>
+              {isEdit
+                ? `Edycja aparatu ${initialDevice?.id}`
+                : (creationContext && createOrAssignMode === 'assign' ? 'Przypisz aparat' : 'Nowy aparat')}
+            </div>
             {/* 3a: shown only when the caller passed one (every entry
                 point but Lista aparatow's own Dodaj/Edytuj) - see this
-                prop's own comment on DeviceFormDialogProps for why. */}
+                prop's own comment on DeviceFormDialogProps for why.
+                fix/inline-device-creation commit 3: for the create-or-
+                assign flow, App.tsx always passes one (screen name and
+                symbol kind - deviceCreateOrAssignRequest.sourceContext
+                is not optional, unlike deviceFormRequest's own). */}
             {sourceContext && <div style={sourceContextStyle}>{sourceContext}</div>}
           </div>
           <button onClick={onCancel} title="Anuluj" style={closeButtonStyle}>x</button>
         </div>
 
+        {/* fix/inline-device-creation commit 3: the two-mode switcher -
+            only for a device-less symbol's own double-click. Double-
+            clicking a symbol that already has a device still opens
+            plain edit mode, no switcher at all (creationContext is
+            never passed there). */}
+        {creationContext && !isEdit && (
+          <div style={modeTabBarStyle}>
+            <div
+              style={createOrAssignMode === 'create' ? modeTabActiveStyle : modeTabInactiveStyle}
+              onClick={() => setCreateOrAssignMode('create')}
+            >
+              Utworz nowy
+            </div>
+            <div
+              style={createOrAssignMode === 'assign' ? modeTabActiveStyle : modeTabInactiveStyle}
+              onClick={() => setCreateOrAssignMode('assign')}
+            >
+              Przypisz istniejacy
+            </div>
+          </div>
+        )}
+
+        {creationContext && !isEdit && createOrAssignMode === 'assign' ? (
+          <AssignExistingDeviceList
+            devices={devices}
+            objects={objects}
+            suggestedBehavior={suggestBehaviorForSymbolType(creationContext.symbolType)}
+            selectedId={assignSelectedId}
+            onSelect={setAssignSelectedId}
+          />
+        ) : (
         <div style={bodyStyle}>
           <div className="property-group">
             <div className="property-row">
@@ -258,18 +376,25 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
                 <input value={id} readOnly disabled style={inputStyle} />
               ) : (
                 <div style={{ display: 'flex', gap: '4px' }}>
-                  <select value={locationCode} onChange={e => setLocationCode(e.target.value)} style={inputStyle}>
+                  <select value={locationCode} onChange={e => handleLocationChange(e.target.value)} style={inputStyle}>
                     <option value="">-</option>
                     {locations.map(l => <option key={l.code} value={l.code}>{l.code}</option>)}
                   </select>
                   <button type="button" onClick={() => setShowAddLocation(true)} title="Dodaj nowa lokalizacje">+</button>
                   <span>_</span>
-                  <input value={suffix} onChange={e => setSuffix(e.target.value)} style={inputStyle} placeholder="KMG1" />
+                  <input
+                    ref={suffixInputRef}
+                    value={suffix}
+                    onChange={e => setSuffix(e.target.value)}
+                    onFocus={e => e.target.select()}
+                    style={inputStyle}
+                    placeholder="KMG1"
+                  />
                 </div>
               )}
               {showAddLocation && (
                 <AddLocationDialog
-                  onAdded={(code) => { setShowAddLocation(false); setLocationCode(code); }}
+                  onAdded={(code) => { setShowAddLocation(false); handleLocationChange(code); }}
                   onCancel={() => setShowAddLocation(false)}
                 />
               )}
@@ -277,7 +402,13 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
             </div>
             <div className="property-row">
               <label>Oznaczenie</label>
-              <input value={designation} onChange={e => setDesignation(e.target.value)} style={inputStyle} placeholder="-K1" />
+              <input
+                value={designation}
+                onChange={e => setDesignation(e.target.value)}
+                onFocus={e => creationContext && e.target.select()}
+                style={inputStyle}
+                placeholder="-K1"
+              />
               <FieldErrors messages={fieldErrors.get('designation')} />
             </div>
             <div className="property-row">
@@ -288,6 +419,13 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
             <div className="property-row">
               <label>Zachowanie</label>
               <select value={behavior} onChange={e => handleBehaviorChange(e.target.value as DeviceBehavior)} style={inputStyle}>
+                {/* fix/inline-device-creation commit 3: only reachable
+                    when a device-less symbol's own type is outside
+                    SymbolBehaviorMapping.ts's mapping - the suggestion
+                    is always changeable, but here there is none to start
+                    from, so the user must pick explicitly (Save stays
+                    disabled until they do). */}
+                {behavior === '' && <option value="">-- wybierz --</option>}
                 {BEHAVIORS.map(b => <option key={b} value={b}>{b}</option>)}
               </select>
             </div>
@@ -609,10 +747,20 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
 
           <FieldErrors messages={fieldErrors.get('_general')} />
         </div>
+        )}
 
         <div style={footerStyle}>
           <button onClick={onCancel}>Anuluj</button>
-          <button onClick={handleSave} disabled={!canAttemptSave}>Zapisz</button>
+          {creationContext && !isEdit && createOrAssignMode === 'assign' ? (
+            <button
+              onClick={() => assignSelectedId && creationContext.onAssignExisting(assignSelectedId)}
+              disabled={!assignSelectedId}
+            >
+              Przypisz
+            </button>
+          ) : (
+            <button onClick={handleSave} disabled={!canAttemptSave}>Zapisz</button>
+          )}
         </div>
       </div>
     </>
@@ -641,6 +789,12 @@ const closeButtonStyle: React.CSSProperties = { background: 'transparent', borde
 // deliberately does not, so the two read as "what" then "where from",
 // not two equally-weighted titles.
 const sourceContextStyle: React.CSSProperties = { fontWeight: 'normal', fontSize: `${FONT_SIZE_SMALL}px`, marginTop: '2px' };
+// fix/inline-device-creation commit 3: same tab-bar convention
+// DeviceRegistriesDialog.tsx's own Lokalizacje/Karty tabs already use.
+const modeTabBarStyle: React.CSSProperties = { display: 'flex', borderBottom: '1px solid var(--scada-outline)' };
+const modeTabBaseStyle: React.CSSProperties = { padding: '6px 16px', cursor: 'pointer' };
+const modeTabActiveStyle: React.CSSProperties = { ...modeTabBaseStyle, background: 'var(--scada-value-field)', fontWeight: 'bold' };
+const modeTabInactiveStyle: React.CSSProperties = { ...modeTabBaseStyle };
 const bodyStyle: React.CSSProperties = { overflowY: 'auto', flex: 1 };
 const inputStyle: React.CSSProperties = { width: '100%', fontSize: 'var(--scada-font-size-base)' };
 const errorStyle: React.CSSProperties = { color: COLOR_ALARM, fontSize: `${FONT_SIZE_SMALL}px` };

@@ -47,3 +47,59 @@ export function syncObjectDesignationsAfterDeviceSave(
 export function formatDeviceSavedMessage(device: Pick<Device, 'designation' | 'name'>): string {
   return `[INFO] Zapisano aparat ${device.designation} (${device.name})`;
 }
+
+// fix/inline-device-creation commit 3c - PRZYPISZ ISTNIEJACY's own
+// Messages confirmation, same "designation and name, never a raw id"
+// rule as formatDeviceSavedMessage above, worded for an assignment
+// rather than a save (nothing about the device itself changed).
+export function formatDeviceAssignedMessage(device: Pick<Device, 'designation' | 'name'>): string {
+  return `[INFO] Przypisano aparat ${device.designation} (${device.name})`;
+}
+
+// fix/inline-device-creation commit 3c: the two store-mutation paths
+// DeviceFormDialog's own "create or assign" mode ends in - pulled out of
+// App.tsx's own onSave/creationContext.onAssignExisting callbacks (which
+// would otherwise be untestable inline JSX closures, the same reasoning
+// every other *Sync.ts function in this file already follows) so both
+// are directly unit-testable against the real store, with no need to
+// mount Canvas.tsx (this project has no jsdom canvas backend - see
+// rotation-handle-removal.test.ts's own header for why).
+//
+// Takes only the slice of the store each one actually needs, typed
+// structurally rather than importing the whole AppState (this file has
+// never depended on store.ts/appState.ts, and importing either just for
+// a parameter type would create the exact import cycle store.ts's own
+// composition-root comment warns against).
+export interface DeviceMutationStore {
+  addDevice: (device: Device) => void;
+  updateObject: (id: string, updates: { deviceId?: string }) => void;
+  saveHistory: () => void;
+  addMessage: (text: string) => void;
+}
+
+/**
+ * UTWORZ NOWY's own save path: the device is created AND immediately
+ * assigned to the originating symbol - one undo step (a single
+ * saveHistory call after both mutations), one Messages confirmation.
+ */
+export function createAndAssignDevice(store: DeviceMutationStore, symbolId: string, savedDevice: Device): void {
+  store.addDevice(savedDevice);
+  store.updateObject(symbolId, { deviceId: savedDevice.id });
+  store.saveHistory();
+  store.addMessage(formatDeviceSavedMessage(savedDevice));
+}
+
+/**
+ * PRZYPISZ ISTNIEJACY's own confirm path: nothing is created, only the
+ * symbol's own deviceId is set - a missing device (deleted from the
+ * registry between opening the list and confirming) is a no-op, not a
+ * crash, the same "problem, not a crash" treatment every other dangling
+ * reference in this project already gets.
+ */
+export function assignExistingDeviceById(store: DeviceMutationStore & { devices: Device[] }, symbolId: string, deviceId: string): void {
+  const device = store.devices.find(d => d.id === deviceId);
+  if (!device) return;
+  store.updateObject(symbolId, { deviceId: device.id });
+  store.saveHistory();
+  store.addMessage(formatDeviceAssignedMessage(device));
+}
