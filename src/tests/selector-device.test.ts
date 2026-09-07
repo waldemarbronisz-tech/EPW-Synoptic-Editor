@@ -79,9 +79,51 @@ describe('SelectorDevice business-rule validation (validateDeviceFields)', () =>
     expect(validateDeviceFields(device).some(i => i.code === 'DEVICE_FIELD_WRONG_CHANNEL_KIND')).toBe(true);
   });
 
-  it('a position with no feedback at all is valid - feedback is optional per position', () => {
-    const device = makeSelector({ positions: [{ name: 'RECZNIE' }, { name: 'AUTOMAT' }] });
+  it('a SINGLE position with no feedback is valid - feedback is optional per position, as long as some OTHER position has one', () => {
+    const device = makeSelector({ positions: [{ name: 'RECZNIE', feedback: 'ELA1.DI.1' }, { name: 'AUTOMAT' }] });
     expect(validateDeviceFields(device)).toEqual([]);
+  });
+
+  // fix/audit-findings commit 1: external audit finding - a SELECTOR
+  // where NO position has feedback has no input at all and can never
+  // report where it actually is, yet this passed validation before
+  // this rule existed (this exact test used to assert `toEqual([])`
+  // for this same fixture).
+  describe('at least one position must have a feedback channel (SELECTOR_NO_FEEDBACK_AT_ALL)', () => {
+    // 1. no position at all has feedback -> error
+    it('two positions, neither with feedback, is an error', () => {
+      const device = makeSelector({ positions: [{ name: 'RECZNIE' }, { name: 'AUTOMAT' }] });
+      const issues = validateDeviceFields(device);
+      expect(issues.some(i => i.code === 'SELECTOR_NO_FEEDBACK_AT_ALL')).toBe(true);
+    });
+
+    // 2. one of two positions has feedback -> valid
+    it('two positions, one with feedback, is valid', () => {
+      const device = makeSelector({ positions: [{ name: 'RECZNIE', feedback: 'ELA1.DI.1' }, { name: 'AUTOMAT' }] });
+      expect(validateDeviceFields(device)).toEqual([]);
+    });
+
+    // 3. one of three positions has feedback -> valid
+    it('three positions, one with feedback, is valid', () => {
+      const device = makeSelector({ positions: [{ name: 'RECZNIE' }, { name: '0' }, { name: 'AUTOMAT', feedback: 'ELA1.DI.2' }] });
+      expect(validateDeviceFields(device)).toEqual([]);
+    });
+
+    // 4. every position has feedback -> valid
+    it('every position with feedback is valid', () => {
+      expect(validateDeviceFields(makeSelector())).toEqual([]);
+    });
+
+    // 5. a selector with only one position (already invalid on its
+    // own) and no feedback reports BOTH errors, not just one -
+    // SELECTOR_NO_FEEDBACK_AT_ALL does not suppress or replace
+    // SELECTOR_TOO_FEW_POSITIONS.
+    it('one position with no feedback reports both SELECTOR_TOO_FEW_POSITIONS and SELECTOR_NO_FEEDBACK_AT_ALL', () => {
+      const device = makeSelector({ positions: [{ name: 'RECZNIE' }] });
+      const codes = validateDeviceFields(device).map(i => i.code);
+      expect(codes).toContain('SELECTOR_TOO_FEW_POSITIONS');
+      expect(codes).toContain('SELECTOR_NO_FEEDBACK_AT_ALL');
+    });
   });
 });
 

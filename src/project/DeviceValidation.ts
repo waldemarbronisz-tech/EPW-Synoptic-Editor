@@ -285,6 +285,7 @@ export function validateDeviceFields(device: Device): ValidationIssue[] {
       }
 
       const seenNames = new Set<string>();
+      let feedbackCount = 0;
       device.positions.forEach((position, i) => {
         if (position.name.trim().length === 0) {
           issues.push({ severity: 'ERROR', code: 'SELECTOR_EMPTY_POSITION_NAME', message: `Device '${id}': positions[${i}].name must not be empty`, deviceId: id });
@@ -293,8 +294,19 @@ export function validateDeviceFields(device: Device): ValidationIssue[] {
         }
         seenNames.add(position.name);
 
+        if (position.feedback) feedbackCount++;
         checkChannelKind(issues, id, `positions[${i}].feedback`, position.feedback, 'DI');
       });
+
+      // A single position's own feedback is genuinely optional (see
+      // SelectorPosition's own comment in DeviceSchema.ts - some
+      // installations only wire a contact to the non-default
+      // positions and infer the rest) - but if NONE of them has one,
+      // the device has no input at all and can never report where it
+      // actually is. Audit finding: this passed validation today.
+      if (feedbackCount === 0) {
+        issues.push({ severity: 'ERROR', code: 'SELECTOR_NO_FEEDBACK_AT_ALL', message: `Device '${id}': at least one position must have a feedback channel`, deviceId: id });
+      }
       break;
     }
   }

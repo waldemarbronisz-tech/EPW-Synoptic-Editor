@@ -85,6 +85,7 @@ const FIXED_FIELD_BY_CODE: Record<string, string | string[]> = {
   SELECTOR_TOO_FEW_POSITIONS: 'positions',
   SELECTOR_EMPTY_POSITION_NAME: 'positions',
   SELECTOR_DUPLICATE_POSITION_NAME: 'positions',
+  SELECTOR_NO_FEEDBACK_AT_ALL: 'positions',
 };
 
 const FIELD_LABEL_RE = /field '([^']+)'/;

@@ -492,6 +492,15 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
                 na szafie. Musza byc co najmniej 2 polozenia; wejscie zwrotne (DI) jest
                 opcjonalne dla kazdego z nich.
               </div>
+              {/* fix/audit-findings commit 1: always visible, not tied
+                  to any error state - a single position's own feedback
+                  is optional, but the audit found that a selector where
+                  NONE of them have one passed validation anyway (no
+                  input at all, so it can never report where it is). */}
+              <div style={warningStyle}>
+                Co najmniej jedna pozycja musi miec przypisane wejscie. Pozycje bez
+                wejscia sa dozwolone - stan takiej pozycji wnioskuje sie z pozostalych.
+              </div>
               <FieldErrors messages={fieldErrors.get('positions')} />
               {selector.positions.map((position, i) => (
                 <div key={i} className="property-row">
