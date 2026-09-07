@@ -25,6 +25,7 @@ import { getDeviceOwnIssues, mapDeviceIssuesToFields } from '../project/DeviceFo
 import { getOccupiedChannels } from '../project/DeviceRegistryQueries';
 import { getMeasuredPreviewValue, formatMeasuredValue } from '../meter/MeterResolver';
 import { ChannelAddressPicker } from './ChannelAddressPicker';
+import { AddLocationDialog } from './AddLocationDialog';
 import { FONT_SIZE_SMALL, COLOR_ALARM } from '../theme/ScadaTheme';
 
 const BEHAVIORS: DeviceBehavior[] = ['SWITCHED', 'SIGNAL', 'MEASURED', 'MODULATED', 'SELECTOR'];
@@ -84,6 +85,10 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
   const [ownFields, setOwnFields] = useState<DeviceOwnFields>(() =>
     initialDevice ? extractOwnFields(initialDevice) : defaultFieldsForBehavior(behavior)
   );
+  // fix/inline-device-creation commit 2: "+ Dodaj lokalizacje" next to
+  // the location <select> below - see AddLocationDialog.tsx's own
+  // header for the shared check/save path it uses.
+  const [showAddLocation, setShowAddLocation] = useState(false);
 
   const handleBehaviorChange = (next: DeviceBehavior) => {
     if (next === behavior) return;
@@ -257,9 +262,16 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
                     <option value="">-</option>
                     {locations.map(l => <option key={l.code} value={l.code}>{l.code}</option>)}
                   </select>
+                  <button type="button" onClick={() => setShowAddLocation(true)} title="Dodaj nowa lokalizacje">+</button>
                   <span>_</span>
                   <input value={suffix} onChange={e => setSuffix(e.target.value)} style={inputStyle} placeholder="KMG1" />
                 </div>
+              )}
+              {showAddLocation && (
+                <AddLocationDialog
+                  onAdded={(code) => { setShowAddLocation(false); setLocationCode(code); }}
+                  onCancel={() => setShowAddLocation(false)}
+                />
               )}
               <FieldErrors messages={fieldErrors.get('id')} />
             </div>
