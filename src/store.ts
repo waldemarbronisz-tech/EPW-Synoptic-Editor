@@ -10,6 +10,7 @@ import { createTerrainSlice } from './store/terrainSlice';
 import { createPlanSlice } from './store/planSlice';
 import { createDeviceRegistrySlice } from './store/deviceRegistrySlice';
 import { createHelpSlice } from './store/helpSlice';
+import { createDeviceFormSlice } from './store/deviceFormSlice';
 import type { AppState } from './store/appState';
 
 // Internal-audit fix (god-file breakup): this file used to hold the
@@ -48,4 +49,5 @@ export const useStore = create<AppState>()((...a) => ({
   ...createPlanSlice(...a),
   ...createDeviceRegistrySlice(...a),
   ...createHelpSlice(...a),
+  ...createDeviceFormSlice(...a),
 }));

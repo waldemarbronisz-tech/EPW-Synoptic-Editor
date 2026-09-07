@@ -162,3 +162,21 @@ export interface HistorySnapshot {
   // optional/additive treatment as groupCommands above.
   setpointPanels?: SetpointPanelElement[];
 }
+
+// feat/device-form-from-canvas: which device's configuration form is
+// currently requested to be open, and why - the one piece of state
+// every "aparat is visible here" entry point (a schematic symbol's own
+// double-click, Properties' Aparat row, a meter/signal-panel row, a
+// wizard row, Lista aparatow's own Edytuj) shares, via
+// deviceFormSlice.ts's openDeviceForm/closeDeviceForm. Lives here, not
+// in the slice file itself, for the same reason HistorySnapshot/Message
+// above do: appState.ts imports shape types from this file, never from
+// a sibling *Slice.ts (see appState.ts's own header comment on why).
+export interface DeviceFormRequest {
+  deviceId: string;
+  // Shown in DeviceFormDialog's own header when present (task 3a) - e.g.
+  // "Schemat, symbol -K1" - so the user knows where they opened the form
+  // from. Left undefined for Lista aparatow's own Edytuj button: that
+  // path's header stays exactly what it always was, unchanged.
+  sourceContext?: string;
+}
