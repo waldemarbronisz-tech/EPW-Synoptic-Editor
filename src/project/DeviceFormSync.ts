@@ -38,3 +38,12 @@ export function syncObjectDesignationsAfterDeviceSave(
     .filter(o => o.deviceId === savedDevice.id && o.designation === oldDesignation)
     .map(o => ({ id: o.id, updates: { designation: savedDevice.designation } }));
 }
+
+// feat/device-form-from-canvas commit 3d - the Messages confirmation
+// after saving through this form: designation and name, exactly what
+// the task asks for, never the device's own id/UUID (utils/ObjectDisplay.ts's
+// own header comment states the same "never a raw id/UUID" rule for
+// naming an object in a message; this is the same rule for a device).
+export function formatDeviceSavedMessage(device: Pick<Device, 'designation' | 'name'>): string {
+  return `[INFO] Zapisano aparat ${device.designation} (${device.name})`;
+}

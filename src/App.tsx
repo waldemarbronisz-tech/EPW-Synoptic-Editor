@@ -10,7 +10,7 @@ import { StatusBar } from './components/StatusBar';
 import { useStore } from './store';
 import { loadSpriteManifest } from './iso/SpriteManifest';
 import { validateDeviceBindings } from './project/DeviceBindingValidation';
-import { syncObjectDesignationsAfterDeviceSave } from './project/DeviceFormSync';
+import { syncObjectDesignationsAfterDeviceSave, formatDeviceSavedMessage } from './project/DeviceFormSync';
 import { getContextualHelpTopic } from './help/HelpContextResolver';
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 
@@ -190,6 +190,7 @@ function App() {
             <DeviceFormDialog
               mode="edit"
               initialDevice={device}
+              sourceContext={deviceFormRequest.sourceContext}
               onSave={(saved) => {
                 const store = useStore.getState();
                 // Keep every symbol bound to this device whose own
@@ -204,6 +205,8 @@ function App() {
                   store.updateObjects(objectUpdates);
                   store.saveHistory();
                 }
+                // 3d: designation + name, never a raw id/UUID.
+                store.addMessage(formatDeviceSavedMessage(saved));
                 store.closeDeviceForm();
               }}
               onCancel={() => useStore.getState().closeDeviceForm()}
