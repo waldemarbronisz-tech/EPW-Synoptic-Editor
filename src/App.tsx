@@ -10,7 +10,7 @@ import { StatusBar } from './components/StatusBar';
 import { useStore } from './store';
 import { loadSpriteManifest } from './iso/SpriteManifest';
 import { validateDeviceBindings } from './project/DeviceBindingValidation';
-import { syncObjectDesignationsAfterDeviceSave, formatDeviceSavedMessage } from './project/DeviceFormSync';
+import { syncObjectDesignationsAfterDeviceSave, formatDeviceSavedMessage, createAndAssignDevice, assignExistingDeviceById } from './project/DeviceFormSync';
 import { getContextualHelpTopic } from './help/HelpContextResolver';
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 
@@ -50,7 +50,7 @@ const DeviceFormDialog = lazy(() =>
 );
 
 function App() {
-  const { projectName, fileName, isDirty, screenKind, objects, devices, deviceFormRequest } = useStore();
+  const { projectName, fileName, isDirty, screenKind, objects, devices, deviceFormRequest, deviceCreateOrAssignRequest } = useStore();
   const [showScadaPreview, setShowScadaPreview] = useState(false);
   const [showDeviceRegistries, setShowDeviceRegistries] = useState(false);
   const [showDeviceList, setShowDeviceList] = useState(false);
@@ -214,6 +214,34 @@ function App() {
           </Suspense>
         );
       })()}
+      {deviceCreateOrAssignRequest && (
+        <Suspense fallback={null}>
+          <DeviceFormDialog
+            mode="add"
+            sourceContext={deviceCreateOrAssignRequest.sourceContext}
+            creationContext={{
+              symbolType: deviceCreateOrAssignRequest.symbolType,
+              // fix/inline-device-creation commit 3c: PRZYPISZ ISTNIEJACY -
+              // DeviceFormSync.ts's own assignExistingDeviceById, so it
+              // is testable without mounting Canvas.tsx.
+              onAssignExisting: (deviceId) => {
+                const store = useStore.getState();
+                assignExistingDeviceById(store, deviceCreateOrAssignRequest.symbolId, deviceId);
+                store.closeDeviceCreateOrAssignForm();
+              },
+            }}
+            onSave={(saved) => {
+              // fix/inline-device-creation commit 3c: UTWORZ NOWY -
+              // DeviceFormSync.ts's own createAndAssignDevice, same
+              // reasoning as onAssignExisting above.
+              const store = useStore.getState();
+              createAndAssignDevice(store, deviceCreateOrAssignRequest.symbolId, saved);
+              store.closeDeviceCreateOrAssignForm();
+            }}
+            onCancel={() => useStore.getState().closeDeviceCreateOrAssignForm()}
+          />
+        </Suspense>
+      )}
       <Toolbar />
 
       <div className="main-workspace">

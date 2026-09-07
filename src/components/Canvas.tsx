@@ -292,6 +292,19 @@ export const Canvas: React.FC = () => {
         useStore.getState().setDrawingMedium('WATER');
       } else if (e.key === '3') {
         useStore.getState().setDrawingMedium('VENTILATION');
+      } else if (e.key.toLowerCase() === 'r') {
+        // fix/inline-device-creation commit 1: R rotates the current
+        // selection 90 degrees clockwise, Shift+R counter-clockwise -
+        // same convention PlanCanvas.tsx's own R/Shift+R already uses
+        // for plan objects. Added alongside this commit's own removal
+        // of the free-rotation handle (rotateEnabled on
+        // ObjectTransformerHandle) so rotation stays fully reachable
+        // without it - Toolbar's Rotate Left/Right buttons and
+        // Properties' own Rotation field both already called
+        // rotateSelected; this is simply a third, keyboard, path to the
+        // same action. rotateSelected itself is a no-op when nothing is
+        // selected, so no guard is needed here.
+        useStore.getState().rotateSelected(e.shiftKey ? 'ccw' : 'cw');
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
         // Commit 2: copy the current selection (objects, connections
         // and meters together, whatever is currently non-empty).

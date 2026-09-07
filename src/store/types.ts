@@ -180,3 +180,30 @@ export interface DeviceFormRequest {
   // path's header stays exactly what it always was, unchanged.
   sourceContext?: string;
 }
+
+// fix/inline-device-creation commit 3: double-clicking a symbol that has
+// NO device yet used to just post a Messages notice (feat/device-form-
+// from-canvas commit 1) - it now opens DeviceFormDialog in its own
+// "create or assign" mode instead, via openDeviceCreateOrAssignForm/
+// closeDeviceCreateOrAssignForm (deviceFormSlice.ts). Kept as a SEPARATE
+// field from DeviceFormRequest above, rather than folding both into one
+// discriminated union: every existing caller of openDeviceForm/
+// deviceFormRequest (Properties' Aparat row, meter/signal-panel rows,
+// wizard rows, Lista aparatow's Edytuj, and this task's own device-form-
+// from-canvas tests) keeps working completely unchanged, since it is
+// still looking up an EXISTING deviceId - this is a genuinely different
+// request shape (a symbol with no device yet, identified by the symbol
+// itself, not a device id) rather than a variant of the same one.
+export interface DeviceCreateOrAssignRequest {
+  symbolId: string;
+  // SynopticObject.type of the originating symbol - e.g.
+  // 'electrical.disconnect_switch' - SymbolBehaviorMapping.ts's own
+  // suggestBehaviorForSymbolType and DeviceCreationSuggestions.ts's own
+  // suggestion functions are both keyed on this.
+  symbolType: string;
+  // Always present here (unlike DeviceFormRequest's own optional
+  // sourceContext) - GRANICE requires the window's header to show where
+  // it was opened from (screen name and symbol kind) for this flow,
+  // there is no path that opens it without one.
+  sourceContext: string;
+}

@@ -24,6 +24,7 @@ import React, { useState } from 'react';
 import { useStore } from '../store';
 import type { LocationEntry, CardEntry, ChannelKind } from '../project/DeviceSchema';
 import { validateDeviceRegistry } from '../project/DeviceValidation';
+import { checkAddLocation, checkAddCard, issuesMentioning } from '../project/DeviceRegistryMutations';
 import { getDevicesUsingLocation, getChannelUsagesForCard } from '../project/DeviceRegistryQueries';
 import { FONT_SIZE_BASE, FONT_SIZE_SMALL, COLOR_ALARM } from '../theme/ScadaTheme';
 
@@ -32,11 +33,6 @@ export interface DeviceRegistriesDialogProps {
 }
 
 const CHANNEL_KINDS: ChannelKind[] = ['DI', 'DO', 'AI', 'AO'];
-
-function issuesMentioning(issues: { message: string }[], quoted: string): string[] {
-  const needle = `'${quoted}'`;
-  return issues.filter(i => i.message.includes(needle)).map(i => i.message);
-}
 
 export const DeviceRegistriesDialog: React.FC<DeviceRegistriesDialogProps> = ({ onClose }) => {
   const [tab, setTab] = useState<'locations' | 'cards'>('locations');
@@ -59,10 +55,12 @@ export const DeviceRegistriesDialog: React.FC<DeviceRegistriesDialogProps> = ({ 
 
   const handleAddLocation = () => {
     const candidate: LocationEntry = { code: newLocCode, description: newLocDesc };
-    const result = validateDeviceRegistry({ locations: [...locations, candidate], cards, devices });
-    const relevant = issuesMentioning(result.issues, newLocCode || '(puste)');
-    if (relevant.length > 0) {
-      setLocError(relevant[0]);
+    // fix/inline-device-creation commit 2: the check itself now lives in
+    // DeviceRegistryMutations.ts, shared with DeviceFormDialog.tsx's own
+    // AddLocationDialog - see that module's header for why.
+    const outcome = checkAddLocation(candidate, locations, cards, devices);
+    if (!outcome.ok) {
+      setLocError(outcome.issue.message);
       return;
     }
     addLocation(candidate);
@@ -83,7 +81,7 @@ export const DeviceRegistriesDialog: React.FC<DeviceRegistriesDialogProps> = ({ 
     const result = validateDeviceRegistry({ locations: nextLocations, cards, devices });
     const relevant = issuesMentioning(result.issues, code);
     if (relevant.length > 0) {
-      setLocError(relevant[0]);
+      setLocError(relevant[0].message);
       return;
     }
     updateLocation(code, candidate);
@@ -115,10 +113,12 @@ export const DeviceRegistriesDialog: React.FC<DeviceRegistriesDialogProps> = ({ 
 
   const handleAddCard = () => {
     const candidate: CardEntry = { id: newCardId, model: newCardModel, channelKind: newCardKind, channelCount: newCardCount };
-    const result = validateDeviceRegistry({ locations, cards: [...cards, candidate], devices });
-    const relevant = issuesMentioning(result.issues, newCardId || '(puste)');
-    if (relevant.length > 0) {
-      setCardError(relevant[0]);
+    // fix/inline-device-creation commit 2: shared with DeviceFormDialog.tsx's
+    // own AddCardDialog (opened from ChannelAddressPicker.tsx) - see
+    // DeviceRegistryMutations.ts's header for why.
+    const outcome = checkAddCard(candidate, locations, cards, devices);
+    if (!outcome.ok) {
+      setCardError(outcome.issue.message);
       return;
     }
     addCard(candidate);
@@ -143,7 +143,7 @@ export const DeviceRegistriesDialog: React.FC<DeviceRegistriesDialogProps> = ({ 
     const result = validateDeviceRegistry({ locations, cards: nextCards, devices });
     const relevant = issuesMentioning(result.issues, id);
     if (relevant.length > 0) {
-      setCardError(relevant[0]);
+      setCardError(relevant[0].message);
       return;
     }
     updateCard(id, candidate);

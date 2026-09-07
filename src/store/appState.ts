@@ -10,7 +10,7 @@ import type { FrameElement } from '../elements/FrameElement';
 import type { GroupCommandElement } from '../elements/GroupCommandElement';
 import type { SetpointPanelElement } from '../elements/SetpointElement';
 import type { Device, LocationEntry, CardEntry } from '../project/DeviceSchema';
-import type { CanvasState, DeviceFormRequest, HistorySnapshot, Message, ScreenKind, SynopticConnection, SynopticObject } from './types';
+import type { CanvasState, DeviceCreateOrAssignRequest, DeviceFormRequest, HistorySnapshot, Message, ScreenKind, SynopticConnection, SynopticObject } from './types';
 import type { TerrainTileType } from '../iso/TerrainTile';
 import type { PlanObject } from '../iso/PlanObject';
 import type { HelpLanguage } from '../i18n/HelpLanguage';
@@ -274,4 +274,12 @@ export interface AppState {
   deviceFormRequest: DeviceFormRequest | null;
   openDeviceForm: (deviceId: string, sourceContext?: string) => void;
   closeDeviceForm: () => void;
+
+  // fix/inline-device-creation commit 3: the parallel request for a
+  // symbol that has NO device yet - see DeviceCreateOrAssignRequest's
+  // own comment (./types.ts) for why this is a separate field rather
+  // than a variant of deviceFormRequest above.
+  deviceCreateOrAssignRequest: DeviceCreateOrAssignRequest | null;
+  openDeviceCreateOrAssignForm: (symbolId: string, symbolType: string, sourceContext: string) => void;
+  closeDeviceCreateOrAssignForm: () => void;
 }

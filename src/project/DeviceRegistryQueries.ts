@@ -76,3 +76,22 @@ export function getTotalChannelCount(cards: { channelCount: number }[]): number 
 export function getUsedChannelCount(devices: Device[]): number {
   return getOccupiedChannels(devices).size;
 }
+
+/**
+ * How many placed screen symbols (SynopticObject.deviceId) currently
+ * reference each device - DeviceListDialog.tsx's own Uzycia column, and
+ * (fix/inline-device-creation commit 3) the row-by-row usage count
+ * PRZYPISZ ISTNIEJACY's own device list shows. The SAME device used by
+ * several symbols is normal, not an error, per this task's own
+ * architecture, so this only counts, it never flags - moved here
+ * (rather than staying a local useMemo in one dialog) so a second
+ * dialog needing the identical count is not tempted to re-derive it.
+ */
+export function getObjectUsageCounts(objects: { deviceId?: string }[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const obj of objects) {
+    if (!obj.deviceId) continue;
+    map.set(obj.deviceId, (map.get(obj.deviceId) ?? 0) + 1);
+  }
+  return map;
+}

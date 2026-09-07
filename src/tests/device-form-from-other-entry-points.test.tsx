@@ -185,9 +185,16 @@ describe('12. The form opened from the schematic and from Lista aparatow is the 
     expect(deviceListDialogSource).toContain('.openDeviceForm(');
   });
 
-  it('App.tsx renders DeviceFormDialog exactly once, from deviceFormRequest alone - not a second copy for the canvas path', () => {
-    const matches = appSource.match(/<DeviceFormDialog/g) || [];
-    expect(matches.length).toBe(1);
+  it('App.tsx renders the SAME DeviceFormDialog import from exactly two request sites (deviceFormRequest, deviceCreateOrAssignRequest) - never a second, different form component', () => {
+    // fix/inline-device-creation commit 3: a device-less symbol's own
+    // double-click now opens deviceCreateOrAssignRequest instead of
+    // posting a Messages notice - a second call site of the identical
+    // <DeviceFormDialog>, not a second form (GRANICE: "nie twórz
+    // drugiego okna formularza aparatu").
+    const lazyImportMatches = appSource.match(/const DeviceFormDialog = lazy\(/g) || [];
+    expect(lazyImportMatches.length).toBe(1);
+    const renderMatches = appSource.match(/<DeviceFormDialog/g) || [];
+    expect(renderMatches.length).toBe(2);
   });
 
   it('DeviceListDialog.tsx itself only ever renders DeviceFormDialog in mode="add" now - Edytuj no longer has a local copy', () => {

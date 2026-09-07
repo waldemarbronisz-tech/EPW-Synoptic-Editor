@@ -32,14 +32,19 @@ import type { DragKey, GroupDragApi } from './types';
 // drawingPointsRef is a local ref this component has no access to
 // anyway - erring towards "let the existing, tested behavior win"
 // rather than trying to special-case "armed but not yet started").
+//
+// fix/inline-device-creation commit 3: a device-less symbol used to
+// just post a Messages notice here (feat/device-form-from-canvas commit
+// 1) - it now opens DeviceFormDialog's own "create or assign" mode
+// instead (openDeviceCreateOrAssignForm), carrying the symbol's own id
+// and type for the behavior/id/designation suggestions and for the
+// PRZYPISZ ISTNIEJACY device list's own behavior pre-filter.
 // oxlint-disable-next-line react/only-export-components -- kept beside the component it belongs to, for testability without rendering Konva (same convention ObjectLabelRenderer.tsx's own resolveObjectLabelText/measureLabelLine already use).
 export function handleSymbolDblClick(e: { cancelBubble: boolean }, obj: SynopticObject) {
   if (useStore.getState().isDrawingConnection) return;
   e.cancelBubble = true;
   if (!obj.deviceId) {
-    useStore.getState().addMessage(
-      `[INFO] Symbol ${describeObject(obj)} nie jest powiazany z zadnym aparatem - przypisz go w polu 'Aparat' w panelu Properties.`
-    );
+    useStore.getState().openDeviceCreateOrAssignForm(obj.id, obj.type, `Schemat, symbol ${describeObject(obj)}`);
     return;
   }
   useStore.getState().openDeviceForm(obj.deviceId, `Schemat, symbol ${describeObject(obj)}`);

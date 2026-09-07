@@ -13,7 +13,7 @@ import { useStore } from '../store';
 import type { Device, DeviceBehavior } from '../project/DeviceSchema';
 import { validateDeviceRegistry } from '../project/DeviceValidation';
 import { getDeviceIOFields } from '../project/DeviceFieldMap';
-import { getDeviceLocationCode, getTotalChannelCount, getUsedChannelCount } from '../project/DeviceRegistryQueries';
+import { getDeviceLocationCode, getTotalChannelCount, getUsedChannelCount, getObjectUsageCounts } from '../project/DeviceRegistryQueries';
 import { DeviceFormDialog } from './DeviceFormDialog';
 import { FONT_SIZE_BASE, FONT_SIZE_SMALL, COLOR_ALARM } from '../theme/ScadaTheme';
 
@@ -127,14 +127,10 @@ export const DeviceListDialog: React.FC<DeviceListDialogProps> = ({ onClose }) =
   // lookup, unrelated to anything DeviceValidation.ts checks - the same
   // device used by several symbols is normal, not an error, per this
   // task's own architecture, so this only counts, it never flags.
-  const usageCountByDevice = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const obj of objects) {
-      if (!obj.deviceId) continue;
-      map.set(obj.deviceId, (map.get(obj.deviceId) ?? 0) + 1);
-    }
-    return map;
-  }, [objects]);
+  // fix/inline-device-creation commit 3: the count itself now lives in
+  // DeviceRegistryQueries.ts (getObjectUsageCounts), shared with the
+  // PRZYPISZ ISTNIEJACY device list.
+  const usageCountByDevice = useMemo(() => getObjectUsageCounts(objects), [objects]);
 
   const handleNavigateToUsage = (deviceId: string) => {
     const first = objects.find(o => o.deviceId === deviceId);

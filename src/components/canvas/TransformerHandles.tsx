@@ -25,6 +25,22 @@ import type { ResizeAnchor } from '../../utils/ResizeHandles';
 // w rogu... nie pozwala zmieniac szerokosci i wysokosci niezaleznie");
 // explicitly false here (and on every other Transformer in this file)
 // is the one-line fix underneath everything else this commit adds.
+//
+// fix/inline-device-creation commit 1: rotateEnabled explicitly false -
+// this was the ONE Transformer in the whole app still on Konva's own
+// default (true), so it was the only element kind (a schematic symbol,
+// and scada.boundary_point, which shares this same handle - both are
+// plain SynopticObject entries selected via selectedIds) that still
+// showed the free-rotation handle. FrameTransformerHandle and
+// WidthOnlyTransformerHandle below already set this false; a plan
+// object and the group command button never had a Transformer (and so
+// never had a rotate handle) to begin with - see this commit's own
+// completion report for the full inventory. A symbol only ever rotates
+// in 90-degree steps (Properties' own Rotation field, or the R key -
+// added to Canvas.tsx's keydown handler by this same commit, mirroring
+// PlanCanvas.tsx's existing R/Shift+R) so its terminals stay on grid
+// nodes; a freehand drag of this handle could misalign them, the same
+// class of bug this whole engagement has already fixed once before.
 export const ObjectTransformerHandle = ({ node }: { node: any }) => {
   const trRef = useRef<any>(null);
 
@@ -40,6 +56,7 @@ export const ObjectTransformerHandle = ({ node }: { node: any }) => {
   return (
     <Transformer
       ref={trRef}
+      rotateEnabled={false}
       keepRatio={false}
       onTransformStart={() => {
         setActiveResizeAnchor((trRef.current?.getActiveAnchor() || null) as ResizeAnchor | 'rotater' | null);
