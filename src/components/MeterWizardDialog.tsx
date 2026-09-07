@@ -12,6 +12,7 @@
 // picked here.
 
 import React, { useState } from 'react';
+import { useStore } from '../store';
 import type { Device } from '../project/DeviceSchema';
 import { groupMeasuredDevicesByUnit, buildRowsFromSelection } from '../meter/MeterWizard';
 import type { MeterElementRow } from '../meter/MeterElement';
@@ -100,15 +101,38 @@ export const MeterWizardDialog: React.FC<MeterWizardDialogProps> = ({ devices, o
                   </div>
                   {expanded.has(group.unit) && (
                     <div style={{ paddingLeft: '20px' }}>
+                      {/* feat/device-form-from-canvas commit 2d: the
+                          checkbox and the "open this device's form" zone
+                          are deliberately two separate elements, not one
+                          <label> wrapping both - a <label> around an
+                          <input type="checkbox"> makes ANY click inside it
+                          (both clicks of a double-click included) toggle
+                          the checkbox via native label-for-input
+                          semantics, so a double-click on the device name
+                          would silently toggle-then-toggle it (a checkbox
+                          that never visibly changes, not a reliable
+                          "leaves it alone"). Splitting them into a
+                          checkbox-only label and a plain, structurally
+                          unrelated sibling <span> means a double-click on
+                          the span can never touch the checkbox at all,
+                          regardless of click timing. */}
                       {group.devices.map(device => (
-                        <label key={device.id} style={rowLabelStyle}>
-                          <input
-                            type="checkbox"
-                            checked={selected.has(device.id)}
-                            onChange={() => toggleSelected(device.id)}
-                          />
-                          <span style={{ marginLeft: '6px' }}>{device.designation} - {device.name}</span>
-                        </label>
+                        <div key={device.id} style={rowLabelStyle}>
+                          <label style={{ display: 'flex', alignItems: 'center' }}>
+                            <input
+                              type="checkbox"
+                              checked={selected.has(device.id)}
+                              onChange={() => toggleSelected(device.id)}
+                            />
+                          </label>
+                          <span
+                            style={{ marginLeft: '6px', cursor: 'pointer' }}
+                            onDoubleClick={() => useStore.getState().openDeviceForm(device.id, 'Kreator wyboru pomiarow')}
+                            title="Dwuklik: otworz formularz tego aparatu"
+                          >
+                            {device.designation} - {device.name}
+                          </span>
+                        </div>
                       ))}
                     </div>
                   )}

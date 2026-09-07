@@ -20,7 +20,14 @@ import { FONT_SIZE_BASE, FONT_SIZE_SMALL, COLOR_ALARM } from '../theme/ScadaThem
 const BEHAVIORS: DeviceBehavior[] = ['SWITCHED', 'SIGNAL', 'MEASURED', 'MODULATED', 'SELECTOR'];
 
 type SortColumn = 'id' | 'designation' | 'name' | 'behavior' | 'kind';
-type FormState = { mode: 'add' | 'edit'; initialDevice?: Device } | null;
+// feat/device-form-from-canvas commit 2: 'edit' no longer has a local
+// FormState of its own - Edytuj now calls the exact same shared
+// openDeviceForm every other "aparat is visible" entry point calls
+// (App.tsx renders the form for that case, see deviceFormSlice.ts).
+// Only 'add' (Dodaj/Duplikuj) stays local: it has no existing device
+// id to hand the shared mechanism, which is built entirely around
+// editing one.
+type FormState = { mode: 'add'; initialDevice?: Device } | null;
 
 export interface DeviceListDialogProps {
   onClose: () => void;
@@ -33,7 +40,6 @@ export const DeviceListDialog: React.FC<DeviceListDialogProps> = ({ onClose }) =
   const objects = useStore(s => s.objects);
   const selectObjects = useStore(s => s.selectObjects);
   const addDevice = useStore(s => s.addDevice);
-  const updateDevice = useStore(s => s.updateDevice);
   const deleteDevice = useStore(s => s.deleteDevice);
 
   const [filterText, setFilterText] = useState('');
@@ -99,9 +105,20 @@ export const DeviceListDialog: React.FC<DeviceListDialogProps> = ({ onClose }) =
   };
 
   const handleSaveForm = (device: Device) => {
-    if (form?.mode === 'edit') updateDevice(device.id, device);
-    else addDevice(device);
+    // Only 'add' (Dodaj/Duplikuj) ever reaches here now - Edytuj's own
+    // save goes through App.tsx's shared onSave (deviceFormSlice.ts),
+    // the exact same path every other entry point uses.
+    addDevice(device);
     setForm(null);
+  };
+
+  // feat/device-form-from-canvas commit 2: Edytuj now opens the SAME
+  // form every other "aparat is visible" place opens - no sourceContext,
+  // so DeviceFormDialog's own header stays exactly what it always was
+  // for this path.
+  const handleEdit = () => {
+    if (!selectedId) return;
+    useStore.getState().openDeviceForm(selectedId);
   };
 
   // feat/device-list-ui commit 5: how many placed screen symbols
@@ -157,7 +174,7 @@ export const DeviceListDialog: React.FC<DeviceListDialogProps> = ({ onClose }) =
             {BEHAVIORS.map(b => <option key={b} value={b}>{b}</option>)}
           </select>
           <button onClick={() => setForm({ mode: 'add' })} disabled={locations.length === 0} title={locations.length === 0 ? 'Najpierw dodaj lokalizacje w Rejestrach projektu' : ''}>+ Dodaj</button>
-          <button onClick={() => { const d = devices.find(x => x.id === selectedId); if (d) setForm({ mode: 'edit', initialDevice: d }); }} disabled={!selectedId}>Edytuj</button>
+          <button onClick={handleEdit} disabled={!selectedId}>Edytuj</button>
           <button onClick={handleDuplicate} disabled={!selectedId}>Duplikuj</button>
           <button onClick={handleDelete} disabled={!selectedId}>Usun</button>
         </div>
@@ -227,7 +244,7 @@ export const DeviceListDialog: React.FC<DeviceListDialogProps> = ({ onClose }) =
 
       {form && (
         <DeviceFormDialog
-          mode={form.mode}
+          mode="add"
           initialDevice={form.initialDevice}
           onSave={handleSaveForm}
           onCancel={() => setForm(null)}
