@@ -10,7 +10,7 @@ import type { FrameElement } from '../elements/FrameElement';
 import type { GroupCommandElement } from '../elements/GroupCommandElement';
 import type { SetpointPanelElement } from '../elements/SetpointElement';
 import type { Device, LocationEntry, CardEntry } from '../project/DeviceSchema';
-import type { CanvasState, HistorySnapshot, Message, ScreenKind, SynopticConnection, SynopticObject } from './types';
+import type { CanvasState, DeviceFormRequest, HistorySnapshot, Message, ScreenKind, SynopticConnection, SynopticObject } from './types';
 import type { TerrainTileType } from '../iso/TerrainTile';
 import type { PlanObject } from '../iso/PlanObject';
 import type { HelpLanguage } from '../i18n/HelpLanguage';
@@ -264,4 +264,14 @@ export interface AppState {
   // GRANICE).
   helpLanguage: HelpLanguage;
   setHelpLanguage: (language: HelpLanguage) => void;
+
+  // feat/device-form-from-canvas: which device's own configuration form
+  // is currently requested open, if any - see DeviceFormRequest's own
+  // comment (./types.ts) and deviceFormSlice.ts for the full reasoning.
+  // App.tsx renders DeviceFormDialog (the SAME component Lista aparatow
+  // itself uses) from this alone; every place an aparat is visible
+  // calls openDeviceForm, never opens the dialog any other way.
+  deviceFormRequest: DeviceFormRequest | null;
+  openDeviceForm: (deviceId: string, sourceContext?: string) => void;
+  closeDeviceForm: () => void;
 }

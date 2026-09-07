@@ -6,6 +6,7 @@
 // Plain HTML overlay, not Konva - same reasoning as MeterWizardDialog.tsx.
 
 import React, { useState } from 'react';
+import { useStore } from '../store';
 import type { Device } from '../project/DeviceSchema';
 import { groupSignalCapableDevicesByLocation, buildSignalPanelRowsFromSelection } from '../elements/SignalPanelWizard';
 import type { SignalPanelRow } from '../elements/SignalPanelElement';
@@ -92,15 +93,30 @@ export const SignalPanelWizardDialog: React.FC<SignalPanelWizardDialogProps> = (
                   </div>
                   {expanded.has(group.location) && (
                     <div style={{ paddingLeft: '20px' }}>
+                      {/* feat/device-form-from-canvas commit 2d: same
+                          checkbox/double-click separation as
+                          MeterWizardDialog.tsx's own tree - see that
+                          file's comment for why a shared <label> around
+                          both would let a double-click silently
+                          toggle-then-toggle the checkbox instead of
+                          leaving it alone. */}
                       {group.devices.map(device => (
-                        <label key={device.id} style={rowLabelStyle}>
-                          <input
-                            type="checkbox"
-                            checked={selected.has(device.id)}
-                            onChange={() => toggleSelected(device.id)}
-                          />
-                          <span style={{ marginLeft: '6px' }}>{device.designation} - {device.name}</span>
-                        </label>
+                        <div key={device.id} style={rowLabelStyle}>
+                          <label style={{ display: 'flex', alignItems: 'center' }}>
+                            <input
+                              type="checkbox"
+                              checked={selected.has(device.id)}
+                              onChange={() => toggleSelected(device.id)}
+                            />
+                          </label>
+                          <span
+                            style={{ marginLeft: '6px', cursor: 'pointer' }}
+                            onDoubleClick={() => useStore.getState().openDeviceForm(device.id, 'Kreator wyboru sygnalow')}
+                            title="Dwuklik: otworz formularz tego aparatu"
+                          >
+                            {device.designation} - {device.name}
+                          </span>
+                        </div>
                       ))}
                     </div>
                   )}

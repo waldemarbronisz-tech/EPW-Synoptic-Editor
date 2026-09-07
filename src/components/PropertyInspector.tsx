@@ -17,6 +17,7 @@ import type { SynopticConnection, SynopticObject } from '../store';
 import { getSprite, getSpriteState } from '../iso/SpriteManifest';
 import { getPlanObjectFootprint } from '../iso/PlanObject';
 import { getAvailableRotations } from '../iso/SpriteRotation';
+import { describeObject } from '../utils/ObjectDisplay';
 
 // Internal-audit fix: these two wizards are only ever mounted after an
 // explicit "+ Wizard" click (see showMeterWizard/showSignalPanelWizard
@@ -460,7 +461,17 @@ export const PropertyInspector: React.FC = () => {
               <button onClick={addManualRow} style={{ fontSize: UI_SMALL }}>+ Manual row</button>
             </div>
             {selectedMeter.rows.map((row, idx) => (
-              <div className="property-row" key={idx} style={{ gap: '2px', alignItems: 'center' }}>
+              <div
+                className="property-row"
+                key={idx}
+                style={{ gap: '2px', alignItems: 'center', cursor: row.device ? 'pointer' : undefined }}
+                // feat/device-form-from-canvas commit 2b: double-click on a
+                // device-bound row opens that device's own form, through
+                // the exact same shared function every other entry point
+                // uses - a manual row (no device) has nothing to open.
+                onDoubleClick={() => row.device && useStore.getState().openDeviceForm(row.device, 'Wiersz miernika')}
+                title={row.device ? 'Dwuklik: otworz formularz tego aparatu' : undefined}
+              >
                 <button onClick={() => moveRow(idx, -1)} disabled={idx === 0} style={{ fontSize: UI_SMALL }}>up</button>
                 <button onClick={() => moveRow(idx, 1)} disabled={idx === selectedMeter.rows.length - 1} style={{ fontSize: UI_SMALL }}>down</button>
                 <input
@@ -599,7 +610,15 @@ export const PropertyInspector: React.FC = () => {
               <button onClick={addManualRow} style={{ fontSize: UI_SMALL }}>+ Manual row</button>
             </div>
             {selectedSignalPanel.rows.map((row, idx) => (
-              <div className="property-row" key={idx} style={{ gap: '2px', alignItems: 'center' }}>
+              <div
+                className="property-row"
+                key={idx}
+                style={{ gap: '2px', alignItems: 'center', cursor: row.device ? 'pointer' : undefined }}
+                // feat/device-form-from-canvas commit 2c: same shared
+                // openDeviceForm the meter row's own double-click uses.
+                onDoubleClick={() => row.device && useStore.getState().openDeviceForm(row.device, 'Wiersz panelu sygnalizacyjnego')}
+                title={row.device ? 'Dwuklik: otworz formularz tego aparatu' : undefined}
+              >
                 <button onClick={() => moveRow(idx, -1)} disabled={idx === 0} style={{ fontSize: UI_SMALL }}>up</button>
                 <button onClick={() => moveRow(idx, 1)} disabled={idx === selectedSignalPanel.rows.length - 1} style={{ fontSize: UI_SMALL }}>down</button>
                 <input
@@ -1018,6 +1037,17 @@ export const PropertyInspector: React.FC = () => {
                   {deviceMissing && <option value={selectedObj.deviceId}>{selectedObj.deviceId} (nie istnieje)</option>}
                   {devices.map(d => <option key={d.id} value={d.id}>{d.id} - {d.designation}</option>)}
                 </select>
+                {/* feat/device-form-from-canvas commit 2a: same shared
+                    openDeviceForm the symbol's own double-click uses -
+                    disabled when there is no device to open at all. */}
+                <button
+                  onClick={() => useStore.getState().openDeviceForm(selectedObj.deviceId!, `Panel Properties, symbol ${describeObject(selectedObj)}`)}
+                  disabled={!selectedObj.deviceId}
+                  title="Otworz formularz tego aparatu"
+                  style={{ fontSize: UI_SMALL }}
+                >
+                  Otworz...
+                </button>
               </div>
             );
           })()}

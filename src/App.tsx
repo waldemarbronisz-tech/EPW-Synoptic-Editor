@@ -10,6 +10,7 @@ import { StatusBar } from './components/StatusBar';
 import { useStore } from './store';
 import { loadSpriteManifest } from './iso/SpriteManifest';
 import { validateDeviceBindings } from './project/DeviceBindingValidation';
+import { syncObjectDesignationsAfterDeviceSave, formatDeviceSavedMessage } from './project/DeviceFormSync';
 import { getContextualHelpTopic } from './help/HelpContextResolver';
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 
@@ -38,8 +39,18 @@ const HelpWindow = lazy(() =>
   import('./components/HelpWindow').then(m => ({ default: m.HelpWindow }))
 );
 
+// feat/device-form-from-canvas: same lazy convention as the three
+// dialogs above - the SAME component DeviceListDialog.tsx has always
+// used for Dodaj/Edytuj/Duplikuj, rendered here too so every other
+// place an aparat is visible (a symbol's own double-click, Properties,
+// a meter/signal-panel row, a wizard row) can open it without needing
+// Lista aparatow to be open at all - see store/deviceFormSlice.ts.
+const DeviceFormDialog = lazy(() =>
+  import('./components/DeviceFormDialog').then(m => ({ default: m.DeviceFormDialog }))
+);
+
 function App() {
-  const { projectName, fileName, isDirty, screenKind, objects, devices } = useStore();
+  const { projectName, fileName, isDirty, screenKind, objects, devices, deviceFormRequest } = useStore();
   const [showScadaPreview, setShowScadaPreview] = useState(false);
   const [showDeviceRegistries, setShowDeviceRegistries] = useState(false);
   const [showDeviceList, setShowDeviceList] = useState(false);
@@ -165,6 +176,44 @@ function App() {
           <DeviceListDialog onClose={() => setShowDeviceList(false)} />
         </Suspense>
       )}
+      {deviceFormRequest && (() => {
+        // The device could in principle have been deleted from the
+        // registry while this request was pending (e.g. from another
+        // still-open Lista aparatow) - render nothing rather than an
+        // empty form; deviceFormRequest itself is left as-is (the same
+        // "problem, not a crash" treatment this project always gives a
+        // dangling reference, harmless here since nothing is showing).
+        const device = devices.find(d => d.id === deviceFormRequest.deviceId);
+        if (!device) return null;
+        return (
+          <Suspense fallback={null}>
+            <DeviceFormDialog
+              mode="edit"
+              initialDevice={device}
+              sourceContext={deviceFormRequest.sourceContext}
+              onSave={(saved) => {
+                const store = useStore.getState();
+                // Keep every symbol bound to this device whose own
+                // designation still exactly matches the device's OLD one
+                // (never customized away from it) in sync with the new
+                // value - see DeviceFormSync.ts's own header for why this
+                // is the same rule PropertyInspector.tsx's Aparat dropdown
+                // already applies on first assignment, not a new one.
+                const objectUpdates = syncObjectDesignationsAfterDeviceSave(store.objects, device.designation, saved);
+                store.updateDevice(saved.id, saved);
+                if (objectUpdates.length > 0) {
+                  store.updateObjects(objectUpdates);
+                  store.saveHistory();
+                }
+                // 3d: designation + name, never a raw id/UUID.
+                store.addMessage(formatDeviceSavedMessage(saved));
+                store.closeDeviceForm();
+              }}
+              onCancel={() => useStore.getState().closeDeviceForm()}
+            />
+          </Suspense>
+        );
+      })()}
       <Toolbar />
 
       <div className="main-workspace">

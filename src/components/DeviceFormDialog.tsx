@@ -16,7 +16,7 @@
 // displays the resulting issues next to the field they are about, never
 // invents a rule of its own.
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useStore } from '../store';
 import type { Device, DeviceBehavior, DeviceCommon, ChannelAddress, MeasuredDevice, SelectorPosition } from '../project/DeviceSchema';
 import { defaultFieldsForBehavior, assembleDevice } from '../project/DeviceFormDefaults';
@@ -58,9 +58,16 @@ export interface DeviceFormDialogProps {
   initialDevice?: Device;
   onSave: (device: Device) => void;
   onCancel: () => void;
+  // feat/device-form-from-canvas commit 3a: where this form was opened
+  // from, shown as a second header line when present - e.g. "Schemat,
+  // symbol -K1". Left undefined by Lista aparatow's own Dodaj/Edytuj
+  // (DeviceListDialog.tsx never passes this prop at all), so that
+  // path's header stays exactly what it always was - one line, nothing
+  // more (task 3b/GRANICE: don't change it).
+  sourceContext?: string;
 }
 
-export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initialDevice, onSave, onCancel }) => {
+export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initialDevice, onSave, onCancel, sourceContext }) => {
   const locations = useStore(s => s.locations);
   const cards = useStore(s => s.cards);
   const devices = useStore(s => s.devices);
@@ -92,6 +99,19 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
   const common: DeviceCommon = { id, designation, name, behavior, kind, publishToHa };
   const candidateDevice = assembleDevice(common, ownFields);
 
+  // feat/device-form-from-canvas commit 3c: whatever the very first
+  // candidateDevice looked like, on mount, in EITHER mode - a fresh
+  // 'add' draft's own defaults are just as much "nothing to lose yet"
+  // as an 'edit' draft's own initialDevice. Captured once (a lazy
+  // initializer never re-runs), compared against on every render, so
+  // Escape can tell "the user actually changed something" from "they
+  // opened the form and immediately hit Escape" without touching any
+  // of the many existing patchXxx functions above.
+  const [pristineJson] = useState(() => JSON.stringify(candidateDevice));
+  const hasUnsavedChanges = JSON.stringify(candidateDevice) !== pristineJson;
+
+  const dialogRef = useRef<HTMLDivElement>(null);
+
   const excludeId = isEdit ? initialDevice?.id : undefined;
   const otherDevices = devices.filter(d => d.id !== excludeId);
   const occupied = getOccupiedChannels(devices, excludeId);
@@ -111,6 +131,41 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
     if (!canAttemptSave) return;
     onSave(candidateDevice);
   };
+
+  // feat/device-form-from-canvas commit 3c: Escape closes without
+  // saving - confirmed first if anything was actually changed. Scoped
+  // to Escape alone, on purpose: the backdrop click, the header's own
+  // "x" and the footer's own Anuluj all still call onCancel directly,
+  // completely unchanged, exactly as before this commit (no
+  // confirmation there either, same as today) - GRANICE's own "don't
+  // touch what isn't asked" applies as much to already-working buttons
+  // as to anything else. A plain onKeyDown prop on this dialog's own
+  // root div, deliberately NOT a window-level addEventListener the way
+  // Canvas.tsx's own keyboard shortcuts are wired - see this file's own
+  // note on the dialogRef/tabIndex below for why.
+  const handleEscape = () => {
+    if (hasUnsavedChanges && !confirm('Masz niezapisane zmiany w formularzu aparatu. Zamknac bez zapisywania?')) {
+      return;
+    }
+    onCancel();
+  };
+
+  // The dialog's own root div holds keyboard focus from the moment it
+  // opens (tabIndex={-1} makes a plain div programmatically focusable
+  // without joining the tab order) so Escape is caught even before the
+  // user has clicked into any field - React's own onKeyDown bubbles up
+  // from whatever has focus through every ancestor exactly like a real
+  // keypress does, the same mechanism every <input>'s own onChange
+  // already relies on, and a genuinely different code path from a
+  // manually-added window-level listener (this project's own Help
+  // window investigation found ONE such listener, in a lazily-mounted
+  // component, that mysteriously never received Escape specifically,
+  // while every other key worked - never conclusively root-caused;
+  // sidestepped entirely here rather than risking the same class of
+  // bug again).
+  useEffect(() => {
+    dialogRef.current?.focus();
+  }, []);
 
   const switched = behavior === 'SWITCHED' ? (ownFields as SwitchedOwnFields) : null;
   const signal = behavior === 'SIGNAL' ? (ownFields as SignalOwnFields) : null;
@@ -172,9 +227,21 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
   return (
     <>
       <div style={backdropStyle} onClick={onCancel} />
-      <div style={dialogStyle} onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        style={dialogStyle}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => { if (e.key === 'Escape') handleEscape(); }}
+      >
         <div style={headerStyle}>
-          <span>{isEdit ? `Edycja aparatu ${initialDevice?.id}` : 'Nowy aparat'}</span>
+          <div>
+            <div>{isEdit ? `Edycja aparatu ${initialDevice?.id}` : 'Nowy aparat'}</div>
+            {/* 3a: shown only when the caller passed one (every entry
+                point but Lista aparatow's own Dodaj/Edytuj) - see this
+                prop's own comment on DeviceFormDialogProps for why. */}
+            {sourceContext && <div style={sourceContextStyle}>{sourceContext}</div>}
+          </div>
           <button onClick={onCancel} title="Anuluj" style={closeButtonStyle}>x</button>
         </div>
 
@@ -557,6 +624,11 @@ const headerStyle: React.CSSProperties = {
 };
 
 const closeButtonStyle: React.CSSProperties = { background: 'transparent', border: 'none', cursor: 'pointer' };
+// 3a: a lighter, non-bold second header line - the title above it
+// already carries fontWeight: 'bold' from headerStyle, this one
+// deliberately does not, so the two read as "what" then "where from",
+// not two equally-weighted titles.
+const sourceContextStyle: React.CSSProperties = { fontWeight: 'normal', fontSize: `${FONT_SIZE_SMALL}px`, marginTop: '2px' };
 const bodyStyle: React.CSSProperties = { overflowY: 'auto', flex: 1 };
 const inputStyle: React.CSSProperties = { width: '100%', fontSize: 'var(--scada-font-size-base)' };
 const errorStyle: React.CSSProperties = { color: COLOR_ALARM, fontSize: `${FONT_SIZE_SMALL}px` };

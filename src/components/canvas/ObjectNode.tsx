@@ -14,7 +14,36 @@ import { snapValue } from '../../utils/GridSnap';
 import { getObjectTerminals } from '../../utils/Terminals';
 import { computeResizeFromAnchor, getActiveResizeAnchor, setActiveResizeAnchor } from '../../utils/ResizeHandles';
 import { isAltKeyDown } from '../../utils/CanvasInputState';
+import { describeObject } from '../../utils/ObjectDisplay';
 import type { DragKey, GroupDragApi } from './types';
+
+// feat/device-form-from-canvas: double-click on a symbol opens its own
+// device's configuration form - a THIRD, separate double-click meaning
+// on the canvas, alongside Canvas.tsx's own wire-finish (attached to
+// the Stage) and ObjectLabelRenderer.tsx's own edit-in-place (attached
+// to the label's own, structurally unrelated Group - labels render in
+// a completely separate pass/Konva subtree, see Canvas.tsx's own
+// "Layer 6, labels" comment, so a click there never reaches this
+// handler at all). The one real overlap to guard is the wire tool: a
+// double-click that lands on a symbol WHILE the wire tool is armed
+// must still finish the wire, not open a form - checked first, and
+// deliberately conservative (skips this handler whenever the tool is
+// armed at all, not only mid-polyline, since Canvas.tsx's own
+// drawingPointsRef is a local ref this component has no access to
+// anyway - erring towards "let the existing, tested behavior win"
+// rather than trying to special-case "armed but not yet started").
+// oxlint-disable-next-line react/only-export-components -- kept beside the component it belongs to, for testability without rendering Konva (same convention ObjectLabelRenderer.tsx's own resolveObjectLabelText/measureLabelLine already use).
+export function handleSymbolDblClick(e: { cancelBubble: boolean }, obj: SynopticObject) {
+  if (useStore.getState().isDrawingConnection) return;
+  e.cancelBubble = true;
+  if (!obj.deviceId) {
+    useStore.getState().addMessage(
+      `[INFO] Symbol ${describeObject(obj)} nie jest powiazany z zadnym aparatem - przypisz go w polu 'Aparat' w panelu Properties.`
+    );
+    return;
+  }
+  useStore.getState().openDeviceForm(obj.deviceId, `Schemat, symbol ${describeObject(obj)}`);
+}
 
 // isSelected is no longer a prop here (commit 5) - the Transformer that
 // used to read it moved out to its own top-level pass (
@@ -66,6 +95,8 @@ export const ObjectNode = ({ obj, onSelect, onChange, gridSize, onShapeRef, grou
         visible={obj.visible !== false}
         onClick={onSelect}
         onTap={onSelect}
+        onDblClick={(e) => handleSymbolDblClick(e, obj)}
+        onDblTap={(e) => handleSymbolDblClick(e, obj)}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onDragStart={() => {
