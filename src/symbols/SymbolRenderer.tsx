@@ -83,6 +83,12 @@ import { WaterSelectorValveSymbol } from './site/WaterSelectorValveSymbol';
 import { CheckValveSymbol } from './site/CheckValveSymbol';
 import { WaterFilterSymbol } from './site/WaterFilterSymbol';
 import { HydroforSymbol } from './site/HydroforSymbol';
+import { FlowMeterSymbol } from './site/FlowMeterSymbol';
+import { WaterMeterSymbol } from './site/WaterMeterSymbol';
+import { PressureSwitchSymbol } from './site/PressureSwitchSymbol';
+import { RainSensorSymbol } from './site/RainSensorSymbol';
+import { SprinklerHeadSymbol } from './site/SprinklerHeadSymbol';
+import { DripLineSymbol } from './site/DripLineSymbol';
 
 export interface SymbolProps {
   obj: SynopticObject;
@@ -314,6 +320,18 @@ export const SymbolRenderer: React.FC<{ obj: SynopticObject }> = ({ obj }) => {
       return <WaterFilterSymbol obj={obj} state={state} />;
     case 'site.hydrofor':
       return <HydroforSymbol obj={obj} state={state} />;
+    case 'site.flow_meter':
+      return <FlowMeterSymbol obj={obj} state={state} />;
+    case 'site.water_meter':
+      return <WaterMeterSymbol obj={obj} state={state} />;
+    case 'site.pressure_switch':
+      return <PressureSwitchSymbol obj={obj} state={state} />;
+    case 'site.rain_sensor':
+      return <RainSensorSymbol obj={obj} state={state} />;
+    case 'site.sprinkler_head':
+      return <SprinklerHeadSymbol obj={obj} state={state} />;
+    case 'site.drip_line':
+      return <DripLineSymbol obj={obj} state={state} />;
     default:
       return <GenericSymbol obj={obj} state={state} />;
   }

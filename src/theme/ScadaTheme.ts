@@ -309,6 +309,12 @@ export const SITE_LEVER_ARROW_WIDTH = 3.5;     // zawor3/zawor3sel's own lever a
 export const SITE_OBJECT_PIPE_WIDTH = 13;
 export const SITE_TANK_WINDOW_BG = '#F4F4EC'; // tank2's own external level window background
 
+// feat/water-management commit 5.
+export const SITE_LCD_BACKGROUND = '#101418';  // przeplyw2/wodomierz2's own digital readout background
+export const SITE_GAUGE_NEEDLE = '#C01818';    // presostat's own manometer needle
+export const SITE_LED_ON_BLUE = '#3898FF';     // czujnik_deszczu's own led() color override
+export const SITE_SPRAY_BLUE = '#5898FF';      // zraszacz's own water arcs (distinct from SITE_WATER_SPRAY - a different reference file's own literal value)
+
 // ---- Bridge into CSS -----------------------------------------------------
 // CSS cannot import a TypeScript module, so the interface chrome (panels,
 // toolbar, property fields) reads these values through CSS custom

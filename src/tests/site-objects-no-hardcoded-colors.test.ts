@@ -31,6 +31,12 @@ import waterSelectorValveSource from '../symbols/site/WaterSelectorValveSymbol.t
 import checkValveSource from '../symbols/site/CheckValveSymbol.tsx?raw';
 import waterFilterSource from '../symbols/site/WaterFilterSymbol.tsx?raw';
 import hydroforSource from '../symbols/site/HydroforSymbol.tsx?raw';
+import flowMeterSource from '../symbols/site/FlowMeterSymbol.tsx?raw';
+import waterMeterSource from '../symbols/site/WaterMeterSymbol.tsx?raw';
+import pressureSwitchSource from '../symbols/site/PressureSwitchSymbol.tsx?raw';
+import rainSensorSource from '../symbols/site/RainSensorSymbol.tsx?raw';
+import sprinklerHeadSource from '../symbols/site/SprinklerHeadSymbol.tsx?raw';
+import dripLineSource from '../symbols/site/DripLineSymbol.tsx?raw';
 
 const HEX_COLOR_PATTERN = /#[0-9A-Fa-f]{3,8}\b/g;
 
@@ -58,7 +64,13 @@ const sources: Record<string, string> = {
   'WaterSelectorValveSymbol.tsx': waterSelectorValveSource,
   'CheckValveSymbol.tsx': checkValveSource,
   'WaterFilterSymbol.tsx': waterFilterSource,
-  'HydroforSymbol.tsx': hydroforSource
+  'HydroforSymbol.tsx': hydroforSource,
+  'FlowMeterSymbol.tsx': flowMeterSource,
+  'WaterMeterSymbol.tsx': waterMeterSource,
+  'PressureSwitchSymbol.tsx': pressureSwitchSource,
+  'RainSensorSymbol.tsx': rainSensorSource,
+  'SprinklerHeadSymbol.tsx': sprinklerHeadSource,
+  'DripLineSymbol.tsx': dripLineSource
 };
 
 describe('7. no TEREN symbol component hard-codes a hex color', () => {

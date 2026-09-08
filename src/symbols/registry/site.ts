@@ -285,5 +285,80 @@ export const siteSymbols: Record<string, SymbolDefinition> = {
     allowedStates: ['ZALACZONY', 'WYLACZONY'],
     defaultState: 'WYLACZONY',
     terminals: [{ id: 'WYLOT', side: 'LEFT', medium: 'WATER' }]
+  },
+
+  // feat/water-management commit 5 - the remaining 6 of 12 objects.
+  'site.flow_meter': {
+    type: 'site.flow_meter',
+    label: 'Przeplywomierz',
+    category: 'TEREN',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [
+      { id: 'WLOT', side: 'LEFT', medium: 'WATER' },
+      { id: 'WYLOT', side: 'RIGHT', medium: 'WATER' }
+    ]
+  },
+  'site.water_meter': {
+    type: 'site.water_meter',
+    label: 'Wodomierz',
+    category: 'TEREN',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [
+      { id: 'WLOT', side: 'LEFT', medium: 'WATER' },
+      { id: 'WYLOT', side: 'RIGHT', medium: 'WATER' }
+    ]
+  },
+  'site.pressure_switch': {
+    type: 'site.pressure_switch',
+    label: 'Presostat',
+    category: 'TEREN',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [
+      { id: 'WLOT', side: 'LEFT', medium: 'WATER' },
+      { id: 'WYLOT', side: 'RIGHT', medium: 'WATER' }
+    ]
+  },
+  'site.rain_sensor': {
+    type: 'site.rain_sensor',
+    label: 'Czujnik deszczu',
+    category: 'TEREN',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [{ id: 'ZASILANIE', side: 'BOTTOM', medium: 'ELECTRICAL' }]
+  },
+  'site.sprinkler_head': {
+    type: 'site.sprinkler_head',
+    label: 'Zraszacz',
+    category: 'TEREN',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [{ id: 'WODA', side: 'BOTTOM', medium: 'WATER' }]
+  },
+  // Adjustable size, like the two site-objects-2d SURFACES
+  // (GrassSymbol.tsx/ConcreteRoadSymbol.tsx's own header comments) -
+  // but deliberately NOT isSurface: nothing in this task asks other
+  // objects to draw above a drip line the way they do above grass.
+  'site.drip_line': {
+    type: 'site.drip_line',
+    label: 'Linia kroplujaca',
+    category: 'TEREN',
+    defaultWidth: 192,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [{ id: 'WLOT', side: 'LEFT', medium: 'WATER' }]
   }
 };
