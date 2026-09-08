@@ -149,6 +149,27 @@ export const LOCATION_PICKER_MIN_WIDTH = 96;   // never narrower, even for a one
 export const LOCATION_PICKER_MAX_WIDTH = 160;  // never wider, even for a very long code
 export const SELECT_ARROW_ALLOWANCE = 24;      // room for the native dropdown arrow beside the text
 
+// feat/site-objects-2d: docs/EPW_rysunki_referencja.py's own canvas is
+// 160x120 (its W,H) - describing the reference DRAWING's own
+// proportions, not literally the symbol's declared size in the
+// library. terminal-centering.test.ts's own pre-existing invariant
+// (feat/editing-and-signal-panel commit 1) requires every visible
+// symbol's defaultWidth/defaultHeight to be an EVEN GRID_SIZE multiple
+// (32, 64, 96, 128...), so a terminal's own edge-midpoint always lands
+// on a grid node - 120 fails that (120/32 = 3.75), 160 alone would not
+// have failed, but every one of these 16 objects needs a real terminal
+// on at least one edge whose OTHER dimension is 120. Found live, this
+// exact conflict was raised and resolved with the user: every site
+// object's own DECLARED size is 128x96 - the identical 4:3 ratio as
+// 160x120 (128/96 = 160/120), so nothing about the reference's own
+// proportions is distorted - reached by drawing every shape at the
+// reference's own literal 160x120 coordinates, then wrapping that
+// whole drawing in one outer Group scaled by exactly this factor (the
+// same scaleX/scaleY mechanism this app's own resize-by-handle already
+// uses for every other symbol) rather than recalculating any
+// coordinate by hand.
+export const SITE_CANVAS_SCALE = 0.8; // 128/160 = 96/120
+
 // ---- Site objects (feat/site-objects-2d) - banded shading -----------------
 // A retro-industrial 90s SCADA HMI look, extended (not replaced - see this
 // file's own header) to flat 2D site objects: buildings, gates, lighting,
@@ -199,6 +220,22 @@ export const SITE_OUTLINE_WIDTH = 2.5;         // default kontur
 export const SITE_OUTLINE_WIDTH_MEDIUM = 2;    // most circ() calls, several rect() overrides
 export const SITE_OUTLINE_WIDTH_THIN = 1.8;    // oczyszczalnia's own inner circles
 export const SITE_OUTLINE_WIDTH_THINNEST = 1.5; // zlacze's own terminal rows
+export const SITE_TEXTURE_LINE_WIDTH = 1.6;    // magazyn's cladding lines, brama's gate-leaf slats
+
+// Bespoke triads/colors docs/EPW_rysunki_referencja.py defines INLINE
+// (its own sh(...) calls outside the header section, or a single raw
+// hex) rather than from the eleven named sets above - each used by
+// exactly one object, added here (not the object's own component file)
+// for the same reason the eleven above are: GRANICE's "every color
+// from ScadaTheme, never hand-written in the component" applies to
+// these exactly as much as to the named ones.
+export const SITE_BRICK_DIM: SiteShadeTriad = { base: '#8C6050', light: '#B08878', dark: '#5C3828' }; // dom's own roof, WYLACZONY
+export const SITE_WOOD: SiteShadeTriad = { base: '#8C6038', light: '#B08050', dark: '#5C3820' };      // dom's own door
+export const SITE_CHIMNEY: SiteShadeTriad = { base: '#909090', light: '#C0C0C0', dark: '#585858' };   // dom's own chimney
+export const SITE_METAL_TEXTURE = '#707070';   // magazyn's own corrugated-wall cladding lines
+export const SITE_PANEL_TEXTURE = '#404448';   // magazyn's own rolling-door panel lines
+export const SITE_WATER_DIM: SiteShadeTriad = { base: '#5C6470', light: '#8C94A0', dark: '#3C4450' }; // oczyszczalnia's own chamber, WYLACZONY
+export const SITE_RIB_LINE = '#606060';        // studzienka's own radial ribbing
 
 // ---- Bridge into CSS -----------------------------------------------------
 // CSS cannot import a TypeScript module, so the interface chrome (panels,

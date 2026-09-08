@@ -118,7 +118,7 @@ export function bandedCircle(
 }
 
 export interface GlowOptions {
-  /** Defaults to COLOR_LAMP_LIT - docs/EPW_rysunki_referencja.py's own C.glow() default ('#FFE800') is that exact value, reused here rather than duplicated. */
+  /** Defaults to COLOR_LAMP_LIT - docs/EPW_rysunki_referencja.py's own C.glow() default is that exact same value, reused here rather than duplicated as a literal. */
   color?: string;
 }
 
