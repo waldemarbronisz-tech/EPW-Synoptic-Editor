@@ -247,6 +247,15 @@ export const SITE_ALARM_RAY_WIDTH = 5;         // kogut's own radiating alarm ra
 export const SITE_HORN_LIT: SiteShadeTriad = { base: '#D8D8D0', light: '#F8F8F0', dark: '#A0A098' }; // tuba's own horn, ZALACZONY
 export const SITE_WATER_SPRAY = '#60A0FF';     // slupek_podl's own watering arcs
 
+// Commit 4 (trawa/droga - the two SURFACE objects): trawa's own
+// WYLACZONY (yellowed) grass triad - docs/EPW_rysunki_referencja.py's
+// own trawa(on): `g = GRASS if on else sh('#8C9440','#B0B860','#5C6428')`.
+// droga has no bespoke color of its own at all - it reuses SITE_CONC
+// (Commit 1) for its slab surface and COLOR_WHITE (pre-existing) for
+// its lane-marking dashes, plus one new joint-line color below.
+export const SITE_GRASS_DIM: SiteShadeTriad = { base: '#8C9440', light: '#B0B860', dark: '#5C6428' }; // trawa's own texture+fill, WYLACZONY
+export const SITE_ROAD_JOINT = '#A0A098';      // droga's own expansion-joint lines and center line
+
 // ---- Bridge into CSS -----------------------------------------------------
 // CSS cannot import a TypeScript module, so the interface chrome (panels,
 // toolbar, property fields) reads these values through CSS custom

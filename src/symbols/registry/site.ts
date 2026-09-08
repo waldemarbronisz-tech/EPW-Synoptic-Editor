@@ -168,5 +168,35 @@ export const siteSymbols: Record<string, SymbolDefinition> = {
     allowedStates: ['ZALACZONY', 'WYLACZONY'],
     defaultState: 'WYLACZONY',
     terminals: [{ id: 'WODA', side: 'BOTTOM', medium: 'WATER' }]
+  },
+  // Commit 4 - the two SURFACES. Both isSurface:true (background pass,
+  // Canvas.tsx) and terminals: [] (WYMAGANIA WSPOLNE: "Nie maja
+  // zaciskow" - explicit empty list, not merely omitted, same as every
+  // other entry here declaring its own terminals rather than leaving
+  // the field undefined). defaultWidth/defaultHeight are only a
+  // starting point, not a fixed drawing size the way they are for the
+  // other 14 - a surface is explicitly meant to be resized afterward
+  // (GrassSymbol.tsx/ConcreteRoadSymbol.tsx's own header comments).
+  'site.grass': {
+    type: 'site.grass',
+    label: 'Trawa',
+    category: 'TEREN',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [],
+    isSurface: true
+  },
+  'site.concrete_road': {
+    type: 'site.concrete_road',
+    label: 'Droga betonowa',
+    category: 'TEREN',
+    defaultWidth: 192,
+    defaultHeight: 96,
+    allowedStates: [],
+    defaultState: '',
+    terminals: [],
+    isSurface: true
   }
 };

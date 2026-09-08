@@ -75,6 +75,8 @@ import { CableJunctionSymbol } from './site/CableJunctionSymbol';
 import { AlarmBeaconSymbol } from './site/AlarmBeaconSymbol';
 import { AlarmHornSymbol } from './site/AlarmHornSymbol';
 import { GardenSprinklerSymbol } from './site/GardenSprinklerSymbol';
+import { GrassSymbol } from './site/GrassSymbol';
+import { ConcreteRoadSymbol } from './site/ConcreteRoadSymbol';
 
 export interface SymbolProps {
   obj: SynopticObject;
@@ -290,6 +292,10 @@ export const SymbolRenderer: React.FC<{ obj: SynopticObject }> = ({ obj }) => {
       return <AlarmHornSymbol obj={obj} state={state} />;
     case 'site.garden_sprinkler':
       return <GardenSprinklerSymbol obj={obj} state={state} />;
+    case 'site.grass':
+      return <GrassSymbol obj={obj} state={state} />;
+    case 'site.concrete_road':
+      return <ConcreteRoadSymbol obj={obj} state={state} />;
     default:
       return <GenericSymbol obj={obj} state={state} />;
   }

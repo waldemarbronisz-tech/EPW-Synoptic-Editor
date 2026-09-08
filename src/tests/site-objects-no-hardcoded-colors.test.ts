@@ -22,6 +22,9 @@ import cableJunctionSource from '../symbols/site/CableJunctionSymbol.tsx?raw';
 import alarmBeaconSource from '../symbols/site/AlarmBeaconSymbol.tsx?raw';
 import alarmHornSource from '../symbols/site/AlarmHornSymbol.tsx?raw';
 import gardenSprinklerSource from '../symbols/site/GardenSprinklerSymbol.tsx?raw';
+import grassSource from '../symbols/site/GrassSymbol.tsx?raw';
+import concreteRoadSource from '../symbols/site/ConcreteRoadSymbol.tsx?raw';
+import surfaceGeometrySource from '../symbols/site/SurfaceGeometry.ts?raw';
 
 const HEX_COLOR_PATTERN = /#[0-9A-Fa-f]{3,8}\b/g;
 
@@ -40,7 +43,10 @@ const sources: Record<string, string> = {
   'CableJunctionSymbol.tsx': cableJunctionSource,
   'AlarmBeaconSymbol.tsx': alarmBeaconSource,
   'AlarmHornSymbol.tsx': alarmHornSource,
-  'GardenSprinklerSymbol.tsx': gardenSprinklerSource
+  'GardenSprinklerSymbol.tsx': gardenSprinklerSource,
+  'GrassSymbol.tsx': grassSource,
+  'ConcreteRoadSymbol.tsx': concreteRoadSource,
+  'SurfaceGeometry.ts': surfaceGeometrySource
 };
 
 describe('7. no TEREN symbol component hard-codes a hex color', () => {
