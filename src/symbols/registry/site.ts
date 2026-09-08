@@ -88,5 +88,85 @@ export const siteSymbols: Record<string, SymbolDefinition> = {
     allowedStates: ['ZALACZONY', 'WYLACZONY'],
     defaultState: 'WYLACZONY',
     terminals: [{ id: 'PRZYLACZE', side: 'BOTTOM', medium: 'WATER' }]
+  },
+  'site.lamp_post_double': {
+    type: 'site.lamp_post_double',
+    label: 'Slup oswietleniowy (2 oprawy)',
+    category: 'TEREN',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [{ id: 'ZASILANIE', side: 'BOTTOM', medium: 'ELECTRICAL' }]
+  },
+  'site.lamp_post_single': {
+    type: 'site.lamp_post_single',
+    label: 'Slup oswietleniowy (1 oprawa)',
+    category: 'TEREN',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [{ id: 'ZASILANIE', side: 'BOTTOM', medium: 'ELECTRICAL' }]
+  },
+  'site.halogen': {
+    type: 'site.halogen',
+    label: 'Halogen',
+    category: 'TEREN',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [{ id: 'ZASILANIE', side: 'BOTTOM', medium: 'ELECTRICAL' }]
+  },
+  'site.garden_light': {
+    type: 'site.garden_light',
+    label: 'Slupek oswietleniowy ogrodowy',
+    category: 'TEREN',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [{ id: 'ZASILANIE', side: 'BOTTOM', medium: 'ELECTRICAL' }]
+  },
+  'site.cable_junction': {
+    type: 'site.cable_junction',
+    label: 'Zlacze kablowe',
+    category: 'TEREN',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [{ id: 'ZASILANIE', side: 'BOTTOM', medium: 'ELECTRICAL' }]
+  },
+  'site.alarm_beacon': {
+    type: 'site.alarm_beacon',
+    label: 'Kogut alarmowy',
+    category: 'TEREN',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [{ id: 'ZASILANIE', side: 'BOTTOM', medium: 'ELECTRICAL' }]
+  },
+  'site.alarm_horn': {
+    type: 'site.alarm_horn',
+    label: 'Glosnik alarmowy',
+    category: 'TEREN',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [{ id: 'ZASILANIE', side: 'BOTTOM', medium: 'ELECTRICAL' }]
+  },
+  'site.garden_sprinkler': {
+    type: 'site.garden_sprinkler',
+    label: 'Slupek podlewania ogrodowego',
+    category: 'TEREN',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [{ id: 'WODA', side: 'BOTTOM', medium: 'WATER' }]
   }
 };

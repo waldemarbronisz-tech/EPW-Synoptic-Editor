@@ -15,6 +15,13 @@ import slidingGateSource from '../symbols/site/SlidingGateSymbol.tsx?raw';
 import rainTankSource from '../symbols/site/RainTankSymbol.tsx?raw';
 import sewagePlantSource from '../symbols/site/SewagePlantSymbol.tsx?raw';
 import waterManholeSource from '../symbols/site/WaterManholeSymbol.tsx?raw';
+import lampPostSource from '../symbols/site/LampPostSymbol.tsx?raw';
+import halogenSource from '../symbols/site/HalogenSymbol.tsx?raw';
+import gardenLightSource from '../symbols/site/GardenLightSymbol.tsx?raw';
+import cableJunctionSource from '../symbols/site/CableJunctionSymbol.tsx?raw';
+import alarmBeaconSource from '../symbols/site/AlarmBeaconSymbol.tsx?raw';
+import alarmHornSource from '../symbols/site/AlarmHornSymbol.tsx?raw';
+import gardenSprinklerSource from '../symbols/site/GardenSprinklerSymbol.tsx?raw';
 
 const HEX_COLOR_PATTERN = /#[0-9A-Fa-f]{3,8}\b/g;
 
@@ -26,7 +33,14 @@ const sources: Record<string, string> = {
   'SlidingGateSymbol.tsx': slidingGateSource,
   'RainTankSymbol.tsx': rainTankSource,
   'SewagePlantSymbol.tsx': sewagePlantSource,
-  'WaterManholeSymbol.tsx': waterManholeSource
+  'WaterManholeSymbol.tsx': waterManholeSource,
+  'LampPostSymbol.tsx': lampPostSource,
+  'HalogenSymbol.tsx': halogenSource,
+  'GardenLightSymbol.tsx': gardenLightSource,
+  'CableJunctionSymbol.tsx': cableJunctionSource,
+  'AlarmBeaconSymbol.tsx': alarmBeaconSource,
+  'AlarmHornSymbol.tsx': alarmHornSource,
+  'GardenSprinklerSymbol.tsx': gardenSprinklerSource
 };
 
 describe('7. no TEREN symbol component hard-codes a hex color', () => {

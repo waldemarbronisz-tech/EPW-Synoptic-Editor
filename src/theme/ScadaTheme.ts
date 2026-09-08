@@ -221,6 +221,8 @@ export const SITE_OUTLINE_WIDTH_MEDIUM = 2;    // most circ() calls, several rec
 export const SITE_OUTLINE_WIDTH_THIN = 1.8;    // oczyszczalnia's own inner circles
 export const SITE_OUTLINE_WIDTH_THINNEST = 1.5; // zlacze's own terminal rows
 export const SITE_TEXTURE_LINE_WIDTH = 1.6;    // magazyn's cladding lines, brama's gate-leaf slats
+export const SITE_CROSSBAR_WIDTH = 7;          // slup's own lamp-post crossbar
+export const SITE_CONNECTOR_WIDTH = 6;         // halogen's own connecting bar
 
 // Bespoke triads/colors docs/EPW_rysunki_referencja.py defines INLINE
 // (its own sh(...) calls outside the header section, or a single raw
@@ -236,6 +238,14 @@ export const SITE_METAL_TEXTURE = '#707070';   // magazyn's own corrugated-wall 
 export const SITE_PANEL_TEXTURE = '#404448';   // magazyn's own rolling-door panel lines
 export const SITE_WATER_DIM: SiteShadeTriad = { base: '#5C6470', light: '#8C94A0', dark: '#3C4450' }; // oczyszczalnia's own chamber, WYLACZONY
 export const SITE_RIB_LINE = '#606060';        // studzienka's own radial ribbing
+export const SITE_CROSSBAR_HIGHLIGHT = '#B0B0B0'; // slup's own crossbar highlight line
+export const SITE_RED_DIM: SiteShadeTriad = { base: '#8C3838', light: '#B06060', dark: '#5C2020' }; // kogut's own dome, WYLACZONY
+export const SITE_RED_DIM_HIGHLIGHT = '#A05858'; // kogut's own highlight arc, WYLACZONY
+export const SITE_ALARM_GLOW = '#FF3030';      // kogut's own glow tint (distinct from SITE_RED)
+export const SITE_ALARM_RAY = '#FF4040';       // kogut's own radiating alarm rays, ZALACZONY
+export const SITE_ALARM_RAY_WIDTH = 5;         // kogut's own radiating alarm rays, ZALACZONY
+export const SITE_HORN_LIT: SiteShadeTriad = { base: '#D8D8D0', light: '#F8F8F0', dark: '#A0A098' }; // tuba's own horn, ZALACZONY
+export const SITE_WATER_SPRAY = '#60A0FF';     // slupek_podl's own watering arcs
 
 // ---- Bridge into CSS -----------------------------------------------------
 // CSS cannot import a TypeScript module, so the interface chrome (panels,
