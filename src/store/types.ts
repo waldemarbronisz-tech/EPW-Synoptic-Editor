@@ -139,7 +139,14 @@ export interface SynopticConnection {
   points: WirePoint[]; // minimum 2, every point on a GRID_SIZE node, every segment horizontal or vertical
   medium: 'ELECTRICAL' | 'WATER' | 'VENTILATION';
   style: 'NORMAL' | 'BUS'; // BUS is a busbar/manifold: thicker, touchable anywhere along its length
-  state: 'LIVE' | 'DEAD';
+  // feat/water-management commit 2: no longer set by hand in Properties
+  // (that field is gone) and never read for drawing - NetResolver.ts's
+  // own computed net state (ACTIVE/INACTIVE, from whether the net
+  // touches an active source) decides the wire's color now. Left
+  // optional, purely so a file saved before this commit (with a real
+  // LIVE/DEAD value on every connection) still loads without error -
+  // ProjectSchema.ts's own validator accepts an absent value too.
+  state?: 'LIVE' | 'DEAD';
 }
 
 export interface Message {

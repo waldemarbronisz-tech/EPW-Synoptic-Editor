@@ -71,13 +71,15 @@ describe('VENTILATION as a third medium', () => {
   });
 
   // 4. a VENTILATION-medium wire draws in the ventilation color, not
-  // power's red or water's blue - and LIVE/DEAD still switches shade,
-  // unlike water (which has no energized/de-energized concept at all).
-  it('a ventilation wire draws with the ventilation color, switching on state', () => {
-    expect(getConductorCoreColor('VENTILATION', 'LIVE')).toBe(VENTILATION_ACTIVE);
-    expect(getConductorCoreColor('VENTILATION', 'DEAD')).toBe(VENTILATION_INACTIVE);
-    expect(getConductorCoreColor('VENTILATION', 'LIVE')).not.toBe(getConductorCoreColor('WATER', 'LIVE'));
-    expect(getConductorCoreColor('VENTILATION', 'LIVE')).not.toBe(getConductorCoreColor('ELECTRICAL', 'LIVE'));
+  // power's red or water's blue - and ACTIVE/INACTIVE (net state, feat/
+  // water-management commit 2 - no longer a manual per-connection
+  // setting) still switches shade, exactly like every other medium now
+  // (water included, which used to have no such split at all).
+  it('a ventilation wire draws with the ventilation color, switching on net state', () => {
+    expect(getConductorCoreColor('VENTILATION', 'ACTIVE')).toBe(VENTILATION_ACTIVE);
+    expect(getConductorCoreColor('VENTILATION', 'INACTIVE')).toBe(VENTILATION_INACTIVE);
+    expect(getConductorCoreColor('VENTILATION', 'ACTIVE')).not.toBe(getConductorCoreColor('WATER', 'ACTIVE'));
+    expect(getConductorCoreColor('VENTILATION', 'ACTIVE')).not.toBe(getConductorCoreColor('ELECTRICAL', 'ACTIVE'));
   });
 
   // 5. a boundary point with medium VENTILATION resolves a valid terminal

@@ -24,7 +24,13 @@ export const COLOR_DE_ENERGIZED = '#909090';      // bez napiecia
 export const COLOR_RUN = '#00A800';               // stan zalaczony
 export const COLOR_ALARM = '#D80000';             // stan alarmowy
 export const COLOR_LAMP_LIT = '#FFE800';          // lampa swiecaca
-export const COLOR_WATER = '#2848D8';             // woda
+export const COLOR_WATER = '#2848D8';             // woda aktywna
+// feat/water-management commit 2: water conductor color now depends on
+// net state too, the same ACTIVE/INACTIVE split every other medium
+// already had - previously water ignored state entirely and always
+// read as COLOR_WATER. Named INACTIVE (not e.g. COLOR_WATER_DEAD) to
+// match VENTILATION_ACTIVE/VENTILATION_INACTIVE's own naming below.
+export const COLOR_WATER_INACTIVE = '#C0C0C0';    // woda nieaktywna (jasnoszary)
 export const COLOR_WHITE = '#FFFFFF';             // biel
 
 // Ventilation (third medium, feat/media-and-proportions part B): gold

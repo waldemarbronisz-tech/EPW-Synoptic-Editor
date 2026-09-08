@@ -15,6 +15,7 @@ import { INDICATOR_DIODE_STATES } from '../symbols/scada/IndicatorDiodeSymbol';
 import { FONT_SIZE_BASE, FONT_SIZE_SMALL } from '../theme/ScadaTheme';
 import type { SynopticConnection, SynopticObject } from '../store';
 import { describeObject } from '../utils/ObjectDisplay';
+import { resolveNets } from '../project/NetResolver';
 
 // Internal-audit fix: these two wizards are only ever mounted after an
 // explicit "+ Wizard" click (see showMeterWizard/showSignalPanelWizard
@@ -76,6 +77,12 @@ export const PropertyInspector: React.FC = () => {
   const isSetpointPanelSelected = selectedSetpointPanelIds.length === 1;
   const selectedObj = isConnectionSelected || isMeterSelected || isSignalPanelSelected || isFrameSelected || isGroupCommandSelected || isSetpointPanelSelected ? null : objects.find(o => o.id === selectedIds[0]);
   const selectedConn = isConnectionSelected ? connections.find(c => c.id === selectedConnectionIds[0]) : null;
+  // feat/water-management commit 2: same computed value Canvas.tsx's
+  // own render already derives per wire (resolveNets) - resolved only
+  // when a connection is actually selected, not on every render.
+  const connNetState: 'ACTIVE' | 'INACTIVE' = selectedConn
+    ? (resolveNets(connections, objects, devices).find(n => n.connectionIds.includes(selectedConn.id))?.state ?? 'INACTIVE')
+    : 'INACTIVE';
   const selectedMeter = isMeterSelected ? meters.find(m => m.id === selectedMeterIds[0]) : null;
   const selectedSignalPanel = isSignalPanelSelected ? signalPanels.find(p => p.id === selectedSignalPanelIds[0]) : null;
   const selectedFrame = isFrameSelected ? frames.find(f => f.id === selectedFrameIds[0]) : null;
@@ -218,11 +225,15 @@ export const PropertyInspector: React.FC = () => {
               </select>
             </div>
             <div className="property-row">
+              {/* feat/water-management commit 2: State used to be a
+                  manual dropdown here (mandatory test 17: it no longer
+                  is) - a wire's state is now the RESULT of whether its
+                  net touches an active source (NetResolver.ts), never
+                  a setting. Shown read-only so it is still visible
+                  somewhere, computed exactly the same way Canvas.tsx's
+                  own render does. */}
               <label>State</label>
-              <select name="state" value={selectedConn.state} onChange={handleConnChange}>
-                <option value="LIVE">Live</option>
-                <option value="DEAD">Dead</option>
-              </select>
+              <input type="text" value={connNetState === 'ACTIVE' ? 'Active' : 'Inactive'} disabled />
             </div>
             <div className="property-row">
               <label>Points</label>

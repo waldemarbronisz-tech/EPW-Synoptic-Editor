@@ -17,8 +17,13 @@ import type { DragKey, GroupDragApi } from './types';
 // and moved without breaking orthogonality (WireDrawing.
 // reorthogonalizeAfterMove fixes up its two neighboring segments).
 // Alt+click on a segment (not a handle) inserts a brand new bend there.
-export const ConnectionNode = ({ conn, isSelected, onSelect, gridSize, onAltClickSegment, groupDrag }: {
+export const ConnectionNode = ({ conn, netState, isSelected, onSelect, gridSize, onAltClickSegment, groupDrag }: {
   conn: SynopticConnection,
+  // feat/water-management commit 2: computed once per Canvas render
+  // (resolveNets) and passed straight through to ConnectionLine - see
+  // that component's own ConnectionProps comment for why this replaced
+  // conn.state as the color source.
+  netState: 'ACTIVE' | 'INACTIVE',
   isSelected: boolean,
   onSelect: (multi: boolean) => void,
   gridSize: number,
@@ -70,6 +75,7 @@ export const ConnectionNode = ({ conn, isSelected, onSelect, gridSize, onAltClic
       >
         <ConnectionLine
           conn={conn}
+          netState={netState}
           isSelected={isSelected}
           onSelect={(e: any) => {
             if (e?.evt?.altKey) {

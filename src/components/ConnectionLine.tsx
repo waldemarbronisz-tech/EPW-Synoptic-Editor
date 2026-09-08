@@ -1,10 +1,18 @@
 import React from 'react';
 import { Group, Path } from 'react-konva';
 import type { SynopticConnection } from '../store';
-import { COLOR_DE_ENERGIZED, COLOR_ENERGIZED, COLOR_WATER, CONDUCTOR_OUTLINE, CONDUCTOR_WIDTH, COLOR_OUTLINE, COLOR_WHITE, BUSBAR_HEIGHT, VENTILATION_ACTIVE, VENTILATION_INACTIVE } from '../theme/ScadaTheme';
+import { COLOR_DE_ENERGIZED, COLOR_ENERGIZED, COLOR_WATER, COLOR_WATER_INACTIVE, CONDUCTOR_OUTLINE, CONDUCTOR_WIDTH, COLOR_OUTLINE, COLOR_WHITE, BUSBAR_HEIGHT, VENTILATION_ACTIVE, VENTILATION_INACTIVE } from '../theme/ScadaTheme';
 
 export interface ConnectionProps {
   conn: SynopticConnection;
+  // feat/water-management commit 2: a wire's own state is no longer a
+  // manual per-connection setting (Properties dropped that field
+  // entirely) - it is now the RESULT of whether its net touches an
+  // active source, computed once per Canvas render (resolveNets) and
+  // passed down here, same as junctionPoints already is. conn.state
+  // itself still exists in the data (optional, for a file saved before
+  // this commit), but is never read for drawing any more.
+  netState: 'ACTIVE' | 'INACTIVE';
   isSelected: boolean;
   // Receives the raw Konva event so a caller can tell an Alt+click
   // (insert a bend on this segment, per usterka B) apart from a plain
@@ -26,23 +34,23 @@ export function pathFromPoints(points: { x: number; y: number }[]): string {
 }
 
 /**
- * Color carries medium and state, and nothing else. Water does not have
- * an energized/de-energized concept - it always reads as water.
- * Ventilation does: LIVE/DEAD maps to a duct actually moving air versus
- * a stopped one, the gold pair from ScadaTheme.
+ * Color carries medium and net state, and nothing else - every medium
+ * now has its own ACTIVE/INACTIVE pair (feat/water-management commit
+ * 2 gave water the split it never had before; it used to always read
+ * as plain COLOR_WATER regardless of state).
  */
 // oxlint-disable-next-line react/only-export-components -- kept beside the component it belongs to; testable in isolation without a Konva/Stage tree.
-export function getConductorCoreColor(medium: SynopticConnection['medium'], state: SynopticConnection['state']): string {
-  if (medium === 'WATER') return COLOR_WATER;
-  if (medium === 'VENTILATION') return state === 'DEAD' ? VENTILATION_INACTIVE : VENTILATION_ACTIVE;
-  return state === 'DEAD' ? COLOR_DE_ENERGIZED : COLOR_ENERGIZED;
+export function getConductorCoreColor(medium: SynopticConnection['medium'], netState: 'ACTIVE' | 'INACTIVE'): string {
+  if (medium === 'WATER') return netState === 'ACTIVE' ? COLOR_WATER : COLOR_WATER_INACTIVE;
+  if (medium === 'VENTILATION') return netState === 'ACTIVE' ? VENTILATION_ACTIVE : VENTILATION_INACTIVE;
+  return netState === 'ACTIVE' ? COLOR_ENERGIZED : COLOR_DE_ENERGIZED;
 }
 
-export const ConnectionLine: React.FC<ConnectionProps> = ({ conn, isSelected, onSelect }) => {
+export const ConnectionLine: React.FC<ConnectionProps> = ({ conn, netState, isSelected, onSelect }) => {
   if (!conn.points || conn.points.length < 2) return null;
 
   const path = pathFromPoints(conn.points);
-  const coreColor = getConductorCoreColor(conn.medium, conn.state);
+  const coreColor = getConductorCoreColor(conn.medium, netState);
 
   // A busbar/manifold is just a much thicker wire (style BUS) - not a
   // symbol any more. Touchable anywhere along its length because
