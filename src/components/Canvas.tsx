@@ -13,6 +13,7 @@ import {
 } from '../utils/WireDrawing';
 import { resolveNets, getJunctionPoints } from '../project/NetResolver';
 import { describeObject } from '../utils/ObjectDisplay';
+import { attachAnchorsToNewPoints } from '../utils/WireAnchoring';
 import { isSymbolDeviceMissing } from '../project/DeviceBindingValidation';
 import { isSymbolInterlocked } from '../project/InterlockIndicator';
 import { WireNodeSymbol } from '../symbols/scada/WireNodeSymbol';
@@ -200,7 +201,12 @@ export const Canvas: React.FC = () => {
     // the toolbar's selector changes after mount - the same reason
     // drawingPointsRef exists instead of just closing over drawingPoints.
     const { drawingMedium: medium, drawingStyle: style } = useStore.getState();
-    useStore.getState().addConnection({ points, medium, style, state: 'LIVE' });
+    // feat/water-management commit 1: a point that landed exactly on a
+    // terminal at the moment of creation remembers it - checked once,
+    // here, against the object list as it stands right now (never
+    // re-checked later; see WireAnchoring.ts's own header).
+    const anchoredPoints = attachAnchorsToNewPoints(points, useStore.getState().objects);
+    useStore.getState().addConnection({ points: anchoredPoints, medium, style, state: 'LIVE' });
     useStore.getState().saveHistory();
 
     // Readable, UUID-free feedback: if the new wire actually touches a

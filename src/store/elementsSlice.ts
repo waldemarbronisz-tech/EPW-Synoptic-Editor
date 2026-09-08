@@ -1,6 +1,7 @@
 import type { StateCreator } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import type { AppState } from './appState';
+import { releaseAnchorsForDeletedObjects } from '../utils/WireAnchoring';
 
 // The seven drawing-surface collections (objects/connections/meters/
 // signalPanels/frames/groupCommands/setpointPanels) and their CRUD
@@ -148,22 +149,38 @@ export const createElementsSlice: StateCreator<AppState, [], [], ElementsSlice> 
   // like drawing a wire into empty space always could.
   deleteObjects: (ids, connIds = [], meterIds = [], signalPanelIds = [], frameIds = [], groupCommandIds = [], setpointPanelIds = []) => {
     if (ids.length === 0 && connIds.length === 0 && meterIds.length === 0 && signalPanelIds.length === 0 && frameIds.length === 0 && groupCommandIds.length === 0 && setpointPanelIds.length === 0) return;
-    set((state) => ({
-      objects: state.objects.filter(obj => !ids.includes(obj.id)),
-      selectedIds: state.selectedIds.filter(id => !ids.includes(id)),
-      connections: state.connections.filter(c => !connIds.includes(c.id)),
-      selectedConnectionIds: state.selectedConnectionIds.filter(id => !connIds.includes(id)),
-      meters: state.meters.filter(m => !meterIds.includes(m.id)),
-      selectedMeterIds: state.selectedMeterIds.filter(id => !meterIds.includes(id)),
-      signalPanels: state.signalPanels.filter(p => !signalPanelIds.includes(p.id)),
-      selectedSignalPanelIds: state.selectedSignalPanelIds.filter(id => !signalPanelIds.includes(id)),
-      frames: state.frames.filter(f => !frameIds.includes(f.id)),
-      selectedFrameIds: state.selectedFrameIds.filter(id => !frameIds.includes(id)),
-      groupCommands: state.groupCommands.filter(g => !groupCommandIds.includes(g.id)),
-      selectedGroupCommandIds: state.selectedGroupCommandIds.filter(id => !groupCommandIds.includes(id)),
-      setpointPanels: state.setpointPanels.filter(p => !setpointPanelIds.includes(p.id)),
-      selectedSetpointPanelIds: state.selectedSetpointPanelIds.filter(id => !setpointPanelIds.includes(id))
-    }));
+    // feat/water-management commit 1: deleting a symbol releases every
+    // wire endpoint anchored to one of its terminals - the point stays
+    // exactly where it was (a free end now), never silently left
+    // pointing at an object that no longer exists. `releasedCount`
+    // escapes the set() callback via this outer variable (zustand's own
+    // set() always runs its updater synchronously, so this is safe -
+    // no different from reading `get()` again right after) so the
+    // Messages notice below can fire only when something real happened.
+    let releasedCount = 0;
+    set((state) => {
+      const released = releaseAnchorsForDeletedObjects(state.connections, ids);
+      releasedCount = released.releasedCount;
+      return {
+        objects: state.objects.filter(obj => !ids.includes(obj.id)),
+        selectedIds: state.selectedIds.filter(id => !ids.includes(id)),
+        connections: released.connections.filter(c => !connIds.includes(c.id)),
+        selectedConnectionIds: state.selectedConnectionIds.filter(id => !connIds.includes(id)),
+        meters: state.meters.filter(m => !meterIds.includes(m.id)),
+        selectedMeterIds: state.selectedMeterIds.filter(id => !meterIds.includes(id)),
+        signalPanels: state.signalPanels.filter(p => !signalPanelIds.includes(p.id)),
+        selectedSignalPanelIds: state.selectedSignalPanelIds.filter(id => !signalPanelIds.includes(id)),
+        frames: state.frames.filter(f => !frameIds.includes(f.id)),
+        selectedFrameIds: state.selectedFrameIds.filter(id => !frameIds.includes(id)),
+        groupCommands: state.groupCommands.filter(g => !groupCommandIds.includes(g.id)),
+        selectedGroupCommandIds: state.selectedGroupCommandIds.filter(id => !groupCommandIds.includes(id)),
+        setpointPanels: state.setpointPanels.filter(p => !setpointPanelIds.includes(p.id)),
+        selectedSetpointPanelIds: state.selectedSetpointPanelIds.filter(id => !setpointPanelIds.includes(id))
+      };
+    });
+    if (releasedCount > 0) {
+      get().addMessage(`[INFO] Deleting the symbol released ${releasedCount} wire endpoint(s) - they now float free.`);
+    }
     get().saveHistory();
   },
 });

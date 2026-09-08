@@ -105,9 +105,22 @@ export interface CanvasState {
   panY: number;
 }
 
+// feat/water-management commit 1: a point that landed EXACTLY on a
+// symbol's terminal at the moment it was created remembers that
+// terminal here, so it can follow the symbol through a move/rotate
+// instead of being left behind (WireAnchoring.ts). Optional and
+// additive - a connection saved before this field existed simply has
+// no anchor on any of its points (free, exactly as it already
+// behaved) - no schema version bump.
+export interface WirePointAnchor {
+  symbolId: string;
+  terminalId: string;
+}
+
 export interface WirePoint {
   x: number;
   y: number;
+  anchor?: WirePointAnchor;
 }
 
 // Node-based connection model (schema v2): a connection is a freehand
