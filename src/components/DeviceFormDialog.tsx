@@ -446,6 +446,17 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
   // ad hoc per section render.
   const hasFieldError = (key: string) => (fieldErrors.get(key)?.length ?? 0) > 0;
   const feedbackHasError = hasFieldError('feedback.diClosed') || hasFieldError('feedback.diOpen');
+  // feat/water-management commit 4: `kind` is a purely descriptive
+  // label with no functional meaning at all (DeviceSchema.ts's own
+  // header comment) - checking its literal text to pick which LABEL
+  // this same, UNCHANGED diClosed/diOpen pair displays does not give it
+  // one; the underlying SWITCHED contract (feedback.diClosed/diOpen
+  // themselves) is completely untouched, only what this form calls
+  // them on screen. A three-way switching valve like site.
+  // water_selector_valve_switched has no real "closed" state at all -
+  // it always routes to one of its two branches - so "Pozycja A"/
+  // "Pozycja B" reads honestly where "diClosed"/"diOpen" would not.
+  const isThreeWayValve = kind.trim().toLowerCase() === 'zawor trojdrogowy';
   const commandHasError = hasFieldError('command.doClose') || hasFieldError('command.doOpen') || hasFieldError('command.pulseMs');
   const supervisionHasError = hasFieldError('supervision.confirmTimeoutMs');
   const extraInputsHasError = hasFieldError('extraInputs.diFault');
@@ -590,7 +601,7 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
               <label>Rodzaj</label>
               <input value={kind} onChange={e => setKind(e.target.value)} style={inputStyle} placeholder="contactor" list="device-kind-suggestions" />
               <datalist id="device-kind-suggestions">
-                <option value="contactor" /><option value="valve" /><option value="damper" /><option value="sensor" /><option value="vfd" />
+                <option value="contactor" /><option value="valve" /><option value="damper" /><option value="sensor" /><option value="vfd" /><option value="zawor trojdrogowy" />
               </datalist>
               <FieldErrors messages={fieldErrors.get('kind')} fieldKey="kind" />
             </div>
@@ -621,14 +632,14 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
                 </div>
                 {(switched.feedback.mode === 'DUAL' || switched.feedback.mode === 'SINGLE') && (
                   <div className="property-row" {...rowBlurProps('feedback.diClosed')}>
-                    <label>diClosed</label>
+                    <label>{isThreeWayValve ? 'Pozycja A' : 'diClosed'}</label>
                     <ChannelAddressPicker value={switched.feedback.diClosed} onChange={addr => patchSwitchedFeedback({ diClosed: addr })} expectedKind="DI" cards={cards} occupied={occupied} />
                     <FieldErrors messages={fieldErrors.get('feedback.diClosed')} fieldKey="feedback.diClosed" />
                   </div>
                 )}
                 {switched.feedback.mode === 'DUAL' && (
                   <div className="property-row" {...rowBlurProps('feedback.diOpen')}>
-                    <label>diOpen</label>
+                    <label>{isThreeWayValve ? 'Pozycja B' : 'diOpen'}</label>
                     <ChannelAddressPicker value={switched.feedback.diOpen} onChange={addr => patchSwitchedFeedback({ diOpen: addr })} expectedKind="DI" cards={cards} occupied={occupied} />
                     <FieldErrors messages={fieldErrors.get('feedback.diOpen')} fieldKey="feedback.diOpen" />
                   </div>

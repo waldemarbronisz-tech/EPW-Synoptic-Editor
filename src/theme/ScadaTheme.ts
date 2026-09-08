@@ -285,6 +285,30 @@ export const SITE_WATER_SPRAY = '#60A0FF';     // slupek_podl's own watering arc
 export const SITE_GRASS_DIM: SiteShadeTriad = { base: '#8C9440', light: '#B0B860', dark: '#5C6428' }; // trawa's own texture+fill, WYLACZONY
 export const SITE_ROAD_JOINT = '#A0A098';      // droga's own expansion-joint lines and center line
 
+// feat/water-management commit 4 - docs/EPW_gospodarka_wodna_
+// referencja.py's own palette (G/DG/BL/CO/GR/RD/YE/DK triads) matches
+// the SITE_* triads above almost exactly at every base tone (confirmed
+// by direct comparison: G=SITE_GREY, DG=SITE_DGREY, BL=SITE_BLUE (base/
+// dark exact, light off by one hex digit - not worth a second, near-
+// duplicate triad), CO=SITE_CONC, GR=SITE_GREEN, RD=SITE_RED,
+// YE=SITE_YELL, DK=SITE_DARK) - reused directly below, not redefined.
+// Only the handful of colors genuinely NEW to this reference (its own
+// `led()`/`val()` primitives, and the lever/pipe proportions its own
+// valve functions use) get new names here.
+export const SITE_LED_OFF = '#3C4048';         // led(): dioda wylaczona
+export const SITE_LED_ON_GREEN = '#00E838';    // led(): domyslny kolor zalaczony (zawor3 A/B, hydrofor)
+export const SITE_LED_ON_RED = '#E02020';      // led(): zawor3sel's own Z (zamkniety) position
+export const SITE_LED_HIGHLIGHT = '#C0FFC8';   // led(): mala poswiata na zalaczonej diodzie
+export const SITE_LEVER_WIDTH = 6;             // zawor3/zawor3sel's own lever handle bar
+export const SITE_LEVER_ARROW_WIDTH = 3.5;     // zawor3/zawor3sel's own lever arrowhead
+// pipe_seg's own default core width (w=13) for a water OBJECT's own
+// internal pipe stub - distinct from CONDUCTOR_WIDTH (8), which is the
+// MAIN CANVAS wire's own core: an object's internal geometry is drawn
+// at this reference's own literal 128x96 coordinates, a different
+// scale entirely from the schematic canvas proper.
+export const SITE_OBJECT_PIPE_WIDTH = 13;
+export const SITE_TANK_WINDOW_BG = '#F4F4EC'; // tank2's own external level window background
+
 // ---- Bridge into CSS -----------------------------------------------------
 // CSS cannot import a TypeScript module, so the interface chrome (panels,
 // toolbar, property fields) reads these values through CSS custom

@@ -1,19 +1,33 @@
 // feat/site-objects-2d: mandatory tests for the TEREN (site object)
 // category. Iterates the real registry (getSymbolsByCategory, same
 // "visible" filter the Object Library itself uses) rather than a
-// hand-picked list, so this file needs no changes across commits 2/3/4
-// as more of the 16 objects get registered - each grows this test's
-// own coverage automatically. site.concrete_road/site.grass (the two
-// SURFACES, commit 4) are the only two named explicitly, since their
-// own rules (no states; exactly two states) differ from every other
-// site object's.
+// hand-picked list, so this file needs no changes as more objects get
+// registered - each grows this test's own coverage automatically.
+// site.concrete_road/site.grass (the two SURFACES) are named
+// explicitly, since their own rules (no states; exactly two states)
+// differ from most other site objects. feat/water-management commit 4
+// added two more genuinely-three-state objects of its own (a 3-way
+// selector valve, and a tank whose three states are literal water
+// levels, not open/closed) alongside the original sliding gate - this
+// file's own "everything else has exactly two states" assumption
+// (from feat/site-objects-2d, when the gate was the only exception)
+// is updated here to match, not just left broken.
 
 import { describe, it, expect } from 'vitest';
 import { getSymbolsByCategory, getSymbolDefinition } from '../symbols/SymbolRegistry';
 
 const SURFACE_TYPES = ['site.concrete_road'];
 const NO_STATE_TYPES = ['site.concrete_road']; // 4. droga betonowa has no states at all
-const THREE_STATE_TYPES = ['site.sliding_gate']; // 3. brama has exactly three states
+// 3. brama has exactly three states, and specifically THESE three
+// (mandatory test 3, feat/site-objects-2d) - kept as its own list
+// since test 3 below asserts the exact state NAMES, not just the count.
+const THREE_STATE_TYPES = ['site.sliding_gate'];
+// site.water_selector_valve_3pos and site.rainwater_tank2 are also
+// genuinely three-state (feat/water-management commit 4), each with
+// its own different state names - not covered by test 3's own gate-
+// specific numbering, but exempted from test 5's "everything else has
+// exactly two" rule for the same reason the gate is.
+const OTHER_MULTI_STATE_TYPES = ['site.water_selector_valve_3pos', 'site.rainwater_tank2'];
 
 function siteSymbols() {
   const cats = getSymbolsByCategory();
@@ -55,9 +69,9 @@ describe('TEREN category - state counts (2, 3, 4, 5)', () => {
     if (def) expect(def.allowedStates).toEqual([]);
   });
 
-  it('5. every other TEREN symbol (not the gate, not a surface) has exactly two states', () => {
+  it('5. every other TEREN symbol (not the gate, not a surface, not one of the other genuinely multi-state objects) has exactly two states', () => {
     siteSymbols().forEach(def => {
-      if (THREE_STATE_TYPES.includes(def.type) || NO_STATE_TYPES.includes(def.type)) return;
+      if (THREE_STATE_TYPES.includes(def.type) || NO_STATE_TYPES.includes(def.type) || OTHER_MULTI_STATE_TYPES.includes(def.type)) return;
       expect(def.allowedStates.length).toBe(2);
     });
   });
