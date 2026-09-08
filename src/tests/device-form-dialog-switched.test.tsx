@@ -22,6 +22,16 @@ function select(labelText: string): HTMLSelectElement {
   return row(labelText).querySelector('select') as HTMLSelectElement;
 }
 
+// fix/device-form-polish commit 2: Zapisz is aria-disabled now, not
+// natively disabled (a genuinely disabled button never dispatches a
+// click at all, verified live - see raport.md - so it could never
+// reveal the form's errors on an attempted save the way this commit
+// requires). Same rule everywhere: a field's own error is hidden until
+// it has been left once (blur) or a save was attempted.
+function isSaveDisabled(): boolean {
+  return screen.getByRole('button', { name: 'Zapisz' }).getAttribute('aria-disabled') === 'true';
+}
+
 function makeSignal(overrides: Partial<SignalDevice> = {}): SignalDevice {
   return {
     id: 'KOT_STY1', designation: '-B1', name: 'Czujnik', behavior: 'SIGNAL', kind: 'sensor', publishToHa: false,
@@ -66,8 +76,7 @@ describe('DeviceFormDialog - SWITCHED section', () => {
     openAddSwitchedForm();
     fireEvent.change(select('Tryb'), { target: { value: 'DUAL' } });
 
-    const saveButton = screen.getByRole('button', { name: 'Zapisz' }) as HTMLButtonElement;
-    expect(saveButton.disabled).toBe(true);
+    expect(isSaveDisabled()).toBe(true);
   });
 
   it('test 5: SWITCHED SINGLE hides the diOpen field entirely', () => {
@@ -101,11 +110,12 @@ describe('DeviceFormDialog - SWITCHED section', () => {
 
     const timeoutInput = input('Timeout potwierdzenia (ms)');
     fireEvent.change(timeoutInput, { target: { value: '50' } });
-    expect((screen.getByRole('button', { name: 'Zapisz' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.blur(timeoutInput);
+    expect(isSaveDisabled()).toBe(true);
     expect(screen.getByText(/confirmTimeoutMs must be >= 100/)).toBeTruthy();
 
     fireEvent.change(timeoutInput, { target: { value: '100' } });
-    expect((screen.getByRole('button', { name: 'Zapisz' }) as HTMLButtonElement).disabled).toBe(false);
+    expect(isSaveDisabled()).toBe(false);
   });
 
   it('test 9: a channel already used by another device is unavailable (disabled) in the picker', () => {
@@ -156,10 +166,12 @@ describe('DeviceFormDialog - SWITCHED section', () => {
     const idRow = row('Id');
     fireEvent.change(idRow.querySelector('select')!, { target: { value: 'KOT' } });
     fireEvent.change(idRow.querySelector('input')!, { target: { value: 'KMG2' } });
-    fireEvent.change(input('Oznaczenie'), { target: { value: '-K1' } });
+    const designationInput = input('Oznaczenie');
+    fireEvent.change(designationInput, { target: { value: '-K1' } });
+    fireEvent.blur(designationInput);
 
     expect(screen.getByText(/Duplicate designation '-K1' in location 'KOT'/)).toBeTruthy();
-    expect((screen.getByRole('button', { name: 'Zapisz' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(isSaveDisabled()).toBe(true);
   });
 
   it('test 17: the same designation in two different locations is accepted (no error, once the rest of the device is valid)', () => {

@@ -49,12 +49,6 @@ function extractOwnFields(device: Device): DeviceOwnFields {
   return rest as unknown as DeviceOwnFields;
 }
 
-/** Small helper: a field's own error messages, rendered directly under it. */
-const FieldErrors: React.FC<{ messages?: string[] }> = ({ messages }) => {
-  if (!messages || messages.length === 0) return null;
-  return <>{messages.map((m, i) => <div key={i} style={errorStyle}>{m}</div>)}</>;
-};
-
 // fix/inline-device-creation commit 4: collapsible sections for the
 // SWITCHED form (by far the longest of the five - the only one this
 // commit restructures, per this commit's own "tidy up WITHOUT changing
@@ -161,6 +155,50 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
   // the location <select> below - see AddLocationDialog.tsx's own
   // header for the shared check/save path it uses.
   const [showAddLocation, setShowAddLocation] = useState(false);
+
+  // fix/device-form-polish commit 2: WHEN a field's own error message
+  // becomes visible - not WHICH rules exist (validateDeviceRegistry
+  // decides that alone, unchanged). A freshly opened ADD form used to
+  // greet the user with every field's error at once, before they had
+  // touched anything - true messages, wrong moment. A field's message
+  // now shows only once the user has left it (touchedFields, set from
+  // each row's own onBlur - see rowBlurProps below) or attempted to
+  // save (submitAttempted). An EDIT form of an ALREADY-INVALID device
+  // is a different situation (mandatory test 12): its errors are real,
+  // pre-existing problems with a saved device, not "the user hasn't
+  // gotten there yet" - submitAttempted starts true for isEdit so
+  // every one of its current errors shows immediately, exactly as it
+  // did before this fix (an EDIT form of a VALID device shows nothing
+  // either way, since there is nothing to show).
+  const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
+  const [submitAttempted, setSubmitAttempted] = useState(isEdit);
+  const touchField = (key: string) => {
+    setTouchedFields(prev => prev.has(key) ? prev : new Set(prev).add(key));
+  };
+  // React's onBlur bubbles (unlike the native DOM blur event) - one
+  // handler on each field's own .property-row catches focus leaving
+  // ANY control inside it (a plain input, or every select/button that
+  // make up a ChannelAddressPicker), without ChannelAddressPicker.tsx
+  // itself needing to know anything about touched-state at all.
+  const rowBlurProps = (key: string) => ({ onBlur: () => touchField(key) });
+
+  /**
+   * A field's own error messages, rendered directly under it - hidden
+   * until fieldKey has been touched (see rowBlurProps above) or a save
+   * was attempted while invalid, same rule for every field. Defined
+   * INSIDE this component (rather than at module scope, as it used to
+   * be) specifically so it can read touchedFields/submitAttempted
+   * directly, without threading them through every one of its ~25 call
+   * sites as extra props - it renders nothing stateful and holds no
+   * DOM identity worth preserving across renders, so re-creating this
+   * closure every render (an ordinary consequence of defining it here)
+   * has no observable cost.
+   */
+  const FieldErrors: React.FC<{ messages?: string[]; fieldKey: string }> = ({ messages, fieldKey }) => {
+    if (!messages || messages.length === 0) return null;
+    if (!touchedFields.has(fieldKey) && !submitAttempted) return null;
+    return <>{messages.map((m, i) => <div key={i} style={errorStyle}>{m}</div>)}</>;
+  };
 
   // fix/inline-device-creation commit 3: the mode switcher shown at the
   // top of the window only when this form was opened from a device-less
@@ -270,7 +308,18 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
   const canAttemptSave = behavior !== '' && commonFieldsFilled && (!hasFullForm || ownIssues.length === 0);
 
   const handleSave = () => {
-    if (!canAttemptSave) return;
+    // fix/device-form-polish commit 2: pressing Zapisz while the form
+    // is invalid reveals every current error at once (submitAttempted)
+    // instead of silently doing nothing - a real button press, verified
+    // live to actually fire: a genuinely `disabled` button in this
+    // browser never dispatches a click at all (confirmed directly, not
+    // assumed), which is why this button is aria-disabled rather than
+    // disabled below - see that prop's own comment for the full
+    // reasoning and the raport's own DOWOD point 6.
+    if (!canAttemptSave) {
+      setSubmitAttempted(true);
+      return;
+    }
     onSave(candidateDevice);
   };
 
@@ -463,7 +512,7 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
         ) : (
         <div style={bodyStyle} onKeyDown={handleFormKeyDown}>
           <div className="property-group">
-            <div className="property-row">
+            <div className="property-row" {...rowBlurProps('id')}>
               <label>Id</label>
               {isEdit ? (
                 <input value={id} readOnly disabled style={inputStyle} />
@@ -506,9 +555,9 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
                   onCancel={() => setShowAddLocation(false)}
                 />
               )}
-              <FieldErrors messages={fieldErrors.get('id')} />
+              <FieldErrors messages={fieldErrors.get('id')} fieldKey="id" />
             </div>
-            <div className="property-row">
+            <div className="property-row" {...rowBlurProps('designation')}>
               <label>Oznaczenie</label>
               <input
                 value={designation}
@@ -517,12 +566,12 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
                 style={inputStyle}
                 placeholder="-K1"
               />
-              <FieldErrors messages={fieldErrors.get('designation')} />
+              <FieldErrors messages={fieldErrors.get('designation')} fieldKey="designation" />
             </div>
-            <div className="property-row">
+            <div className="property-row" {...rowBlurProps('name')}>
               <label>Nazwa</label>
               <input value={name} onChange={e => setName(e.target.value)} style={inputStyle} placeholder="Stycznik grzalki" />
-              <FieldErrors messages={fieldErrors.get('name')} />
+              <FieldErrors messages={fieldErrors.get('name')} fieldKey="name" />
             </div>
             <div className="property-row">
               <label>Zachowanie</label>
@@ -537,13 +586,13 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
                 {BEHAVIORS.map(b => <option key={b} value={b}>{b}</option>)}
               </select>
             </div>
-            <div className="property-row">
+            <div className="property-row" {...rowBlurProps('kind')}>
               <label>Rodzaj</label>
               <input value={kind} onChange={e => setKind(e.target.value)} style={inputStyle} placeholder="contactor" list="device-kind-suggestions" />
               <datalist id="device-kind-suggestions">
                 <option value="contactor" /><option value="valve" /><option value="damper" /><option value="sensor" /><option value="vfd" />
               </datalist>
-              <FieldErrors messages={fieldErrors.get('kind')} />
+              <FieldErrors messages={fieldErrors.get('kind')} fieldKey="kind" />
             </div>
             <div className="property-row">
               <label>Publikuj do HA</label>
@@ -571,17 +620,17 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
                   </select>
                 </div>
                 {(switched.feedback.mode === 'DUAL' || switched.feedback.mode === 'SINGLE') && (
-                  <div className="property-row">
+                  <div className="property-row" {...rowBlurProps('feedback.diClosed')}>
                     <label>diClosed</label>
                     <ChannelAddressPicker value={switched.feedback.diClosed} onChange={addr => patchSwitchedFeedback({ diClosed: addr })} expectedKind="DI" cards={cards} occupied={occupied} />
-                    <FieldErrors messages={fieldErrors.get('feedback.diClosed')} />
+                    <FieldErrors messages={fieldErrors.get('feedback.diClosed')} fieldKey="feedback.diClosed" />
                   </div>
                 )}
                 {switched.feedback.mode === 'DUAL' && (
-                  <div className="property-row">
+                  <div className="property-row" {...rowBlurProps('feedback.diOpen')}>
                     <label>diOpen</label>
                     <ChannelAddressPicker value={switched.feedback.diOpen} onChange={addr => patchSwitchedFeedback({ diOpen: addr })} expectedKind="DI" cards={cards} occupied={occupied} />
-                    <FieldErrors messages={fieldErrors.get('feedback.diOpen')} />
+                    <FieldErrors messages={fieldErrors.get('feedback.diOpen')} fieldKey="feedback.diOpen" />
                   </div>
                 )}
                 {switched.feedback.mode === 'SINGLE' && (
@@ -593,10 +642,10 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
               </CollapsibleSection>
 
               <CollapsibleSection title="Wejscia dodatkowe" defaultExpanded={false} hasError={extraInputsHasError}>
-                <div className="property-row">
+                <div className="property-row" {...rowBlurProps('extraInputs.diFault')}>
                   <label>diFault</label>
                   <ChannelAddressPicker value={switched.extraInputs?.diFault} onChange={patchSwitchedExtraInput} expectedKind="DI" cards={cards} occupied={occupied} allowEmpty />
-                  <FieldErrors messages={fieldErrors.get('extraInputs.diFault')} />
+                  <FieldErrors messages={fieldErrors.get('extraInputs.diFault')} fieldKey="extraInputs.diFault" />
                 </div>
               </CollapsibleSection>
 
@@ -616,32 +665,32 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
                   </select>
                 </div>
                 <div style={hintStyle}>{outputHint}</div>
-                <div className="property-row">
+                <div className="property-row" {...rowBlurProps('command.doClose')}>
                   <label>doClose</label>
                   <ChannelAddressPicker value={switched.command.doClose} onChange={addr => patchSwitchedCommand({ doClose: addr ?? '' })} expectedKind="DO" cards={cards} occupied={occupied} />
-                  <FieldErrors messages={fieldErrors.get('command.doClose')} />
+                  <FieldErrors messages={fieldErrors.get('command.doClose')} fieldKey="command.doClose" />
                 </div>
                 {switched.command.outputCount === 2 && (
-                  <div className="property-row">
+                  <div className="property-row" {...rowBlurProps('command.doOpen')}>
                     <label>doOpen</label>
                     <ChannelAddressPicker value={switched.command.doOpen} onChange={addr => patchSwitchedCommand({ doOpen: addr })} expectedKind="DO" cards={cards} occupied={occupied} />
-                    <FieldErrors messages={fieldErrors.get('command.doOpen')} />
+                    <FieldErrors messages={fieldErrors.get('command.doOpen')} fieldKey="command.doOpen" />
                   </div>
                 )}
                 {switched.command.style === 'PULSE' && (
-                  <div className="property-row">
+                  <div className="property-row" {...rowBlurProps('command.pulseMs')}>
                     <label>Czas impulsu (ms)</label>
                     <input type="number" value={switched.command.pulseMs ?? ''} onChange={e => patchSwitchedCommand({ pulseMs: Number(e.target.value) })} style={inputStyle} />
-                    <FieldErrors messages={fieldErrors.get('command.pulseMs')} />
+                    <FieldErrors messages={fieldErrors.get('command.pulseMs')} fieldKey="command.pulseMs" />
                   </div>
                 )}
               </CollapsibleSection>
 
               <CollapsibleSection title="Nadzor (supervision)" defaultExpanded={false} hasError={supervisionHasError}>
-                <div className="property-row">
+                <div className="property-row" {...rowBlurProps('supervision.confirmTimeoutMs')}>
                   <label>Timeout potwierdzenia (ms)</label>
                   <input type="number" value={switched.supervision.confirmTimeoutMs} onChange={e => patchSwitchedSupervision({ confirmTimeoutMs: Number(e.target.value) })} style={inputStyle} />
-                  <FieldErrors messages={fieldErrors.get('supervision.confirmTimeoutMs')} />
+                  <FieldErrors messages={fieldErrors.get('supervision.confirmTimeoutMs')} fieldKey="supervision.confirmTimeoutMs" />
                 </div>
                 <div style={hintStyle}>Czas na potwierdzenie zmiany stanu przez wejscie zwrotne, zanim zglaszany jest alarm rozbieznosci (min. 100 ms).</div>
                 <div className="property-row">
@@ -705,10 +754,10 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
           {signal && (
             <div className="property-group">
               <div style={sectionTitleStyle}>Wejscie (feedback)</div>
-              <div className="property-row">
+              <div className="property-row" {...rowBlurProps('feedback.di')}>
                 <label>di</label>
                 <ChannelAddressPicker value={signal.feedback.di} onChange={addr => patchSignalFeedback({ di: addr ?? '' })} expectedKind="DI" cards={cards} occupied={occupied} />
-                <FieldErrors messages={fieldErrors.get('feedback.di')} />
+                <FieldErrors messages={fieldErrors.get('feedback.di')} fieldKey="feedback.di" />
               </div>
               <div className="property-row">
                 <label>Neguj (invert)</label>
@@ -721,10 +770,10 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
                   <option value="LOW">LOW</option>
                 </select>
               </div>
-              <div className="property-row">
+              <div className="property-row" {...rowBlurProps('debounceMs')}>
                 <label>Debounce (ms)</label>
                 <input type="number" value={signal.debounceMs} onChange={e => patchSignal({ debounceMs: Number(e.target.value) })} style={inputStyle} />
-                <FieldErrors messages={fieldErrors.get('debounceMs')} />
+                <FieldErrors messages={fieldErrors.get('debounceMs')} fieldKey="debounceMs" />
               </div>
             </div>
           )}
@@ -732,34 +781,34 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
           {measured && (
             <div className="property-group">
               <div style={sectionTitleStyle}>Pomiar</div>
-              <div className="property-row">
+              <div className="property-row" {...rowBlurProps('input')}>
                 <label>input</label>
                 <ChannelAddressPicker value={measured.input} onChange={addr => patchMeasured({ input: addr ?? '' })} expectedKind="AI" cards={cards} occupied={occupied} />
-                <FieldErrors messages={fieldErrors.get('input')} />
+                <FieldErrors messages={fieldErrors.get('input')} fieldKey="input" />
               </div>
-              <div className="property-row">
+              <div className="property-row" {...rowBlurProps('unit')}>
                 <label>Jednostka</label>
                 <input value={measured.unit} onChange={e => patchMeasured({ unit: e.target.value })} style={inputStyle} placeholder="°C" />
-                <FieldErrors messages={fieldErrors.get('unit')} />
+                <FieldErrors messages={fieldErrors.get('unit')} fieldKey="unit" />
               </div>
-              <div className="property-row">
+              <div className="property-row" {...rowBlurProps('rangeMin')}>
                 <label>Zakres min</label>
                 <input type="number" value={measured.rangeMin} onChange={e => patchMeasured({ rangeMin: Number(e.target.value) })} style={inputStyle} />
-                <FieldErrors messages={fieldErrors.get('rangeMin')} />
+                <FieldErrors messages={fieldErrors.get('rangeMin')} fieldKey="rangeMin" />
               </div>
-              <div className="property-row">
+              <div className="property-row" {...rowBlurProps('rangeMax')}>
                 <label>Zakres max</label>
                 <input type="number" value={measured.rangeMax} onChange={e => patchMeasured({ rangeMax: Number(e.target.value) })} style={inputStyle} />
-                <FieldErrors messages={fieldErrors.get('rangeMax')} />
+                <FieldErrors messages={fieldErrors.get('rangeMax')} fieldKey="rangeMax" />
               </div>
               <div className="property-row">
                 <label>Format</label>
                 <input value={measured.format} onChange={e => patchMeasured({ format: e.target.value })} style={inputStyle} placeholder="0.0" />
               </div>
-              <div className="property-row">
+              <div className="property-row" {...rowBlurProps('deadband')}>
                 <label>Strefa martwa (deadband)</label>
                 <input type="number" value={measured.deadband} onChange={e => patchMeasured({ deadband: Number(e.target.value) })} style={inputStyle} />
-                <FieldErrors messages={fieldErrors.get('deadband')} />
+                <FieldErrors messages={fieldErrors.get('deadband')} fieldKey="deadband" />
               </div>
               <div style={hintStyle}>
                 {/* getMeasuredPreviewValue only ever reads rangeMin/rangeMax
@@ -774,46 +823,52 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
           {modulated && (
             <div className="property-group">
               <div style={sectionTitleStyle}>Modulacja</div>
-              <div className="property-row">
+              <div className="property-row" {...rowBlurProps('setpointOutput')}>
                 <label>setpointOutput</label>
                 <ChannelAddressPicker value={modulated.setpointOutput} onChange={addr => patchModulated({ setpointOutput: addr ?? '' })} expectedKind="AO" cards={cards} occupied={occupied} />
-                <FieldErrors messages={fieldErrors.get('setpointOutput')} />
+                <FieldErrors messages={fieldErrors.get('setpointOutput')} fieldKey="setpointOutput" />
               </div>
-              <div className="property-row">
+              <div className="property-row" {...rowBlurProps('feedbackInput')}>
                 <label>feedbackInput</label>
                 <ChannelAddressPicker value={modulated.feedbackInput} onChange={addr => patchModulated({ feedbackInput: addr })} expectedKind="AI" cards={cards} occupied={occupied} allowEmpty />
-                <FieldErrors messages={fieldErrors.get('feedbackInput')} />
+                <FieldErrors messages={fieldErrors.get('feedbackInput')} fieldKey="feedbackInput" />
               </div>
-              <div className="property-row">
+              <div className="property-row" {...rowBlurProps('unit')}>
                 <label>Jednostka</label>
                 <input value={modulated.unit} onChange={e => patchModulated({ unit: e.target.value })} style={inputStyle} placeholder="%" />
-                <FieldErrors messages={fieldErrors.get('unit')} />
+                <FieldErrors messages={fieldErrors.get('unit')} fieldKey="unit" />
               </div>
-              <div className="property-row">
+              <div className="property-row" {...rowBlurProps('rangeMin')}>
                 <label>Zakres min</label>
                 <input type="number" value={modulated.rangeMin} onChange={e => patchModulated({ rangeMin: Number(e.target.value) })} style={inputStyle} />
-                <FieldErrors messages={fieldErrors.get('rangeMin')} />
+                <FieldErrors messages={fieldErrors.get('rangeMin')} fieldKey="rangeMin" />
               </div>
-              <div className="property-row">
+              <div className="property-row" {...rowBlurProps('rangeMax')}>
                 <label>Zakres max</label>
                 <input type="number" value={modulated.rangeMax} onChange={e => patchModulated({ rangeMax: Number(e.target.value) })} style={inputStyle} />
-                <FieldErrors messages={fieldErrors.get('rangeMax')} />
+                <FieldErrors messages={fieldErrors.get('rangeMax')} fieldKey="rangeMax" />
               </div>
-              <div className="property-row">
+              <div className="property-row" {...rowBlurProps('startupValue')}>
                 <label>Wartosc startowa</label>
                 <input type="number" value={modulated.startupValue} onChange={e => patchModulated({ startupValue: Number(e.target.value) })} style={inputStyle} />
-                <FieldErrors messages={fieldErrors.get('startupValue')} />
+                <FieldErrors messages={fieldErrors.get('startupValue')} fieldKey="startupValue" />
               </div>
-              <div className="property-row">
+              <div className="property-row" {...rowBlurProps('safeValue')}>
                 <label>Wartosc bezpieczna</label>
                 <input type="number" value={modulated.safeValue} onChange={e => patchModulated({ safeValue: Number(e.target.value) })} style={inputStyle} />
-                <FieldErrors messages={fieldErrors.get('safeValue')} />
+                <FieldErrors messages={fieldErrors.get('safeValue')} fieldKey="safeValue" />
               </div>
             </div>
           )}
 
           {selector && (
-            <div className="property-group">
+            // fix/device-form-polish commit 2: onBlur here (not on any
+            // one position row) - the 'positions' error is about the
+            // ARRAY as a whole (too few, or none with feedback), not
+            // any single position's own field, so it has no one natural
+            // row to attach to; blur bubbles up from whichever position
+            // row the user actually left, same as everywhere else.
+            <div className="property-group" {...rowBlurProps('positions')}>
               <div style={sectionTitleStyle}>Polozenia (positions)</div>
               <div style={warningStyle}>
                 Przelacznik jest odczytywany, nigdy sterowany zdalnie - obraca sie go recznie
@@ -829,9 +884,9 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
                 Co najmniej jedna pozycja musi miec przypisane wejscie. Pozycje bez
                 wejscia sa dozwolone - stan takiej pozycji wnioskuje sie z pozostalych.
               </div>
-              <FieldErrors messages={fieldErrors.get('positions')} />
+              <FieldErrors messages={fieldErrors.get('positions')} fieldKey="positions" />
               {selector.positions.map((position, i) => (
-                <div key={i} className="property-row">
+                <div key={i} className="property-row" {...rowBlurProps(`positions[${i}].feedback`)}>
                   <input
                     value={position.name}
                     onChange={e => patchSelectorPosition(i, { name: e.target.value })}
@@ -847,7 +902,7 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
                     allowEmpty
                   />
                   <button onClick={() => removeSelectorPosition(i)} disabled={selector.positions.length <= 2} title={selector.positions.length <= 2 ? 'Wymagane co najmniej 2 polozenia' : 'Usun to polozenie'}>x</button>
-                  <FieldErrors messages={fieldErrors.get(`positions[${i}].feedback`)} />
+                  <FieldErrors messages={fieldErrors.get(`positions[${i}].feedback`)} fieldKey={`positions[${i}].feedback`} />
                 </div>
               ))}
               <div className="property-row">
@@ -856,7 +911,10 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
             </div>
           )}
 
-          <FieldErrors messages={fieldErrors.get('_general')} />
+          {/* No onBlur wiring - a general, unattributable issue only
+              ever shows after an actual save attempt (submitAttempted),
+              never merely because some unrelated field was touched. */}
+          <FieldErrors messages={fieldErrors.get('_general')} fieldKey="_general" />
         </div>
         )}
 
@@ -871,7 +929,17 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
             </button>
           ) : (
             <>
-              <button onClick={handleSave} disabled={!canAttemptSave}>Zapisz</button>
+              {/* fix/device-form-polish commit 2: aria-disabled, not the
+                  native disabled attribute - verified live that a truly
+                  disabled button never dispatches a click at all (not
+                  even one that bubbles to an ancestor), so pressing it
+                  while invalid could never reveal the form's errors the
+                  way this commit requires. aria-disabled keeps the
+                  button semantically/visually inactive (saveButtonStyle
+                  below) while still receiving the click, so handleSave's
+                  own !canAttemptSave branch can react to an attempted
+                  save instead of the click silently doing nothing. */}
+              <button onClick={handleSave} aria-disabled={!canAttemptSave} style={saveButtonStyle(canAttemptSave)}>Zapisz</button>
               {/* fix/inline-device-creation commit 4: a separate sibling,
                   not text inside the button itself - the button's own
                   accessible name stays exactly "Zapisz" either way, so
@@ -929,6 +997,12 @@ const errorBadgeStyle: React.CSSProperties = {
   background: COLOR_ALARM, color: 'var(--scada-panel)', borderRadius: '9px',
   padding: '1px 7px', fontSize: `${FONT_SIZE_SMALL}px`, fontWeight: 'bold'
 };
+// fix/device-form-polish commit 2: the Zapisz button's own look when
+// aria-disabled - a real HTML disabled button gets this appearance for
+// free from the browser's own UA stylesheet; aria-disabled does not,
+// so it is reproduced here explicitly.
+const saveButtonStyle = (enabled: boolean): React.CSSProperties =>
+  enabled ? {} : { opacity: 0.5, cursor: 'not-allowed' };
 const warningStyle: React.CSSProperties = { padding: '0 12px 4px', fontSize: `${FONT_SIZE_SMALL}px` };
 const hintStyle: React.CSSProperties = { padding: '0 12px 4px', fontSize: `${FONT_SIZE_SMALL}px`, fontStyle: 'italic' };
 

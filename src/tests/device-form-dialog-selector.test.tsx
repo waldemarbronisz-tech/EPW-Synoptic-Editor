@@ -22,6 +22,13 @@ function makeSelector(overrides: Partial<SelectorDevice> = {}): SelectorDevice {
   };
 }
 
+// fix/device-form-polish commit 2: Zapisz is aria-disabled now, not
+// natively disabled - see device-form-dialog-switched.test.tsx's own
+// copy of this helper for the full reasoning.
+function isSaveDisabled(): boolean {
+  return screen.getByRole('button', { name: 'Zapisz' }).getAttribute('aria-disabled') === 'true';
+}
+
 function resetStore() {
   useStore.setState({
     locations: [{ code: 'KOT', description: 'Kotlownia' }],
@@ -36,7 +43,7 @@ describe('DeviceFormDialog - SELECTOR section', () => {
 
   it('a fully valid 3-position selector (edit mode) has no field errors and Save is enabled', () => {
     render(<DeviceFormDialog mode="edit" initialDevice={makeSelector()} onSave={() => {}} onCancel={() => {}} />);
-    expect((screen.getByRole('button', { name: 'Zapisz' }) as HTMLButtonElement).disabled).toBe(false);
+    expect(isSaveDisabled()).toBe(false);
   });
 
   it('renders one name field per position, pre-filled', () => {
@@ -54,7 +61,7 @@ describe('DeviceFormDialog - SELECTOR section', () => {
   it('adding a position with an empty name blocks Save and shows the empty-name error', () => {
     render(<DeviceFormDialog mode="edit" initialDevice={makeSelector()} onSave={() => {}} onCancel={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: '+ Dodaj polozenie' }));
-    expect((screen.getByRole('button', { name: 'Zapisz' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(isSaveDisabled()).toBe(true);
     expect(screen.getByText(/positions\[3\]\.name must not be empty/)).toBeTruthy();
   });
 
@@ -62,7 +69,7 @@ describe('DeviceFormDialog - SELECTOR section', () => {
     render(<DeviceFormDialog mode="edit" initialDevice={makeSelector()} onSave={() => {}} onCancel={() => {}} />);
     const nameInputs = screen.getAllByPlaceholderText('RECZNIE') as HTMLInputElement[];
     fireEvent.change(nameInputs[1], { target: { value: 'RECZNIE' } });
-    expect((screen.getByRole('button', { name: 'Zapisz' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(isSaveDisabled()).toBe(true);
     expect(screen.getByText(/duplicate position name/)).toBeTruthy();
   });
 
@@ -70,7 +77,7 @@ describe('DeviceFormDialog - SELECTOR section', () => {
     render(<DeviceFormDialog mode="edit" initialDevice={makeSelector()} onSave={() => {}} onCancel={() => {}} />);
     const removeButtons = screen.getAllByRole('button', { name: 'x' }).filter(b => !(b as HTMLButtonElement).disabled);
     fireEvent.click(removeButtons[0]);
-    expect((screen.getByRole('button', { name: 'Zapisz' }) as HTMLButtonElement).disabled).toBe(false);
+    expect(isSaveDisabled()).toBe(false);
   });
 
   it('saving calls onSave with the edited position name applied', () => {
