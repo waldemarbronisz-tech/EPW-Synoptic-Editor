@@ -32,13 +32,12 @@ import type { ResizeAnchor } from '../../utils/ResizeHandles';
 // and scada.boundary_point, which shares this same handle - both are
 // plain SynopticObject entries selected via selectedIds) that still
 // showed the free-rotation handle. FrameTransformerHandle and
-// WidthOnlyTransformerHandle below already set this false; a plan
-// object and the group command button never had a Transformer (and so
-// never had a rotate handle) to begin with - see this commit's own
-// completion report for the full inventory. A symbol only ever rotates
-// in 90-degree steps (Properties' own Rotation field, or the R key -
-// added to Canvas.tsx's keydown handler by this same commit, mirroring
-// PlanCanvas.tsx's existing R/Shift+R) so its terminals stay on grid
+// WidthOnlyTransformerHandle below already set this false; the group
+// command button never had a Transformer (and so never had a rotate
+// handle) to begin with - see this commit's own completion report for
+// the full inventory. A symbol only ever rotates in 90-degree steps
+// (Properties' own Rotation field, or the R key - added to Canvas.tsx's
+// keydown handler by this same commit) so its terminals stay on grid
 // nodes; a freehand drag of this handle could misalign them, the same
 // class of bug this whole engagement has already fixed once before.
 export const ObjectTransformerHandle = ({ node }: { node: any }) => {

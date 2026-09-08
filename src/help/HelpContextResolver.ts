@@ -13,7 +13,6 @@ export interface ContextualSelectionState {
   selectedMeterIds: string[];
   selectedSignalPanelIds: string[];
   selectedFrameIds: string[];
-  selectedPlanObjectIds: string[];
   objects: SynopticObject[];
 }
 
@@ -23,7 +22,6 @@ export function getContextualHelpTopic(state: ContextualSelectionState): string 
   if (state.selectedMeterIds.length > 0) return 'elem-meter';
   if (state.selectedSignalPanelIds.length > 0) return 'elem-signal-panel';
   if (state.selectedFrameIds.length > 0) return 'elem-frame-building';
-  if (state.selectedPlanObjectIds.length > 0) return 'plan-placing-objects';
 
   if (state.selectedIds.length > 0) {
     const obj = state.objects.find(o => o.id === state.selectedIds[0]);

@@ -6,8 +6,6 @@
 // help-content-operations.test.ts and is not repeated here.
 
 import { describe, it, expect } from 'vitest';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import { HELP_TOC, allTopicIds } from '../help/HelpToc';
 import { getTopicBody } from '../help/HelpContentRegistry';
 import { HELP_GLOSSARY } from '../help/HelpGlossary';
@@ -15,6 +13,10 @@ import { resolveLocalized } from '../i18n/HelpLanguage';
 import type { HelpLanguage } from '../i18n/HelpLanguage';
 import type { HelpBlock } from '../help/HelpTypes';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
+import menuBarSource from '../components/MenuBar.tsx?raw';
+import deviceSchemaSource from '../project/DeviceSchema.ts?raw';
+import deviceValidationSource from '../project/DeviceValidation.ts?raw';
+import netResolverSource from '../project/NetResolver.ts?raw';
 
 function blockText(block: HelpBlock): string {
   switch (block.kind) {
@@ -32,8 +34,8 @@ function fullTopicText(topicId: string, lang: HelpLanguage): string {
 describe('SPOJNOSC 1/5: every chapter in the TOC has content in Polish and English (mandatory tests 1, 2 - full)', () => {
   const allIds = allTopicIds();
 
-  it('has all 13 chapters and at least 40 topics total (sanity check on the TOC itself)', () => {
-    expect(HELP_TOC.length).toBe(13);
+  it('has all 12 chapters (chapter 8, the isometric PLAN screen, was removed in full - chore/remove-isometric-plan-mode) and at least 40 topics total (sanity check on the TOC itself)', () => {
+    expect(HELP_TOC.length).toBe(12);
     expect(allIds.length).toBeGreaterThanOrEqual(40);
   });
 
@@ -141,11 +143,18 @@ describe('SPOJNOSC 3/5: every glossary entry\'s term appears in the content of a
 });
 
 // ---- SPOJNOSC 4/5: every UI element this help describes actually exists ----
-
-const REPO_SRC = path.resolve(__dirname, '..');
-function readSource(relativePath: string): string {
-  return fs.readFileSync(path.join(REPO_SRC, relativePath), 'utf-8');
-}
+//
+// chore/remove-isometric-plan-mode: reads each source file via Vite's own
+// `?raw` suffix (same convention scada-symbols.test.ts/diode-colors.test.ts/
+// rotation-handle-removal.test.ts already use for exactly this "scan a
+// known source file's own text" need), not Node's `fs`/`path` - this
+// tsconfig's own "types" list (tsconfig.app.json) is deliberately just
+// ["vite/client"], so `node:fs`/`node:path`/`__dirname` do not resolve
+// here at all. Previously used `fs.readFileSync`/`__dirname` directly -
+// a pre-existing bug this task's own edits to this file happened to
+// surface (tsc -b's incremental cache had never actually re-diagnosed
+// this exact file before), fixed here rather than left in place, since
+// DOWOD UKONCZENIA requires a genuinely clean `tsc -b`.
 
 describe('SPOJNOSC 4/5: every UI element described in this help exists in the program', () => {
   it('every symbol type this help names by its registry id actually resolves in SymbolRegistry.ts', () => {
@@ -156,25 +165,21 @@ describe('SPOJNOSC 4/5: every UI element described in this help exists in the pr
   });
 
   it('every menu item this help names by its exact label exists in MenuBar.tsx', () => {
-    const menuBar = readSource('components/MenuBar.tsx');
     const labels = ['Rejestry projektu...', 'Lista aparatow...', 'Snap to Grid', 'Tematy pomocy...'];
     for (const label of labels) {
-      expect(menuBar.includes(label), `menu item '${label}' named in this help is not in MenuBar.tsx`).toBe(true);
+      expect(menuBarSource.includes(label), `menu item '${label}' named in this help is not in MenuBar.tsx`).toBe(true);
     }
   });
 
   it('every device field this help names by its exact path exists in DeviceSchema.ts', () => {
-    const deviceSchema = readSource('project/DeviceSchema.ts');
     const fields = ['feedback', 'command', 'supervision', 'safeState', 'switchCounter', 'publishToHa', 'confirmTimeoutMs', 'discrepancyAlarm', 'rangeMin', 'rangeMax', 'startupValue', 'safeValue', 'deadband'];
     for (const field of fields) {
-      expect(deviceSchema.includes(field), `device field '${field}' named in this help is not in DeviceSchema.ts`).toBe(true);
+      expect(deviceSchemaSource.includes(field), `device field '${field}' named in this help is not in DeviceSchema.ts`).toBe(true);
     }
   });
 
   it('every validation error code this help quotes exists in DeviceValidation.ts or NetResolver.ts', () => {
-    const deviceValidation = readSource('project/DeviceValidation.ts');
-    const netResolver = readSource('project/NetResolver.ts');
-    const combined = deviceValidation + netResolver;
+    const combined = deviceValidationSource + netResolverSource;
     const codes = [
       'DEVICE_DUPLICATE_DESIGNATION_IN_LOCATION', 'CHANNEL_ADDRESS_COLLISION',
       'MIXED_MEDIUM', 'DANGLING_NET', 'MULTIPLE_SOURCES',

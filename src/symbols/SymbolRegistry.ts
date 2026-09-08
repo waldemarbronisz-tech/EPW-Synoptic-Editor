@@ -53,6 +53,23 @@ export interface SymbolDefinition {
   isLine?: boolean;
   designationPrefix?: string;
   supportsDynamicPorts?: boolean;
+  // feat/site-objects-2d commit 4: a SURFACE (trawa/droga) - drawn in
+  // its own background pass in Canvas.tsx, below every wire and
+  // ordinary symbol (WYMAGANIA WSPOLNE's own "warstwa tla", mandatory
+  // test 9) - the project's own frame element (its own, separate
+  // elements/ file, deliberately never referenced from this registry -
+  // see frame-element.test.ts's own decoupling check) already draws
+  // first in that same position for the same "background graphic" reason;
+  // this flag gets a site object the identical draw-order treatment
+  // while staying a real object (not a separate array) so it still
+  // gets everything an ordinary symbol gets for free: selection, move,
+  // copy, 90-deg rotate, Aparat/device linkage. Adjustable size is not
+  // a new mechanism either - the object selection/resize handle already
+  // resizes ANY selected object unconditionally (Canvas.tsx); a
+  // surface's own component just reads that real size back out instead
+  // of drawing at a fixed reference size (see GrassSymbol.tsx's own
+  // header comment for the how/why).
+  isSurface?: boolean;
   // Object Library trim: symbol stays fully defined and placeable by an
   // already-saved project (old objects of this type still render,
   // still keep their terminals), it just does not appear as a draggable
@@ -69,6 +86,7 @@ import { instrumentationSymbols } from './registry/instrumentation';
 import { measurementsSymbols } from './registry/measurements';
 import { graphicsSymbols } from './registry/graphics';
 import { scadaSymbols } from './registry/scada';
+import { siteSymbols } from './registry/site';
 
 export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
   ...electricalSymbols,
@@ -78,7 +96,8 @@ export const SYMBOL_REGISTRY: Record<string, SymbolDefinition> = {
   ...instrumentationSymbols,
   ...measurementsSymbols,
   ...graphicsSymbols,
-  ...scadaSymbols
+  ...scadaSymbols,
+  ...siteSymbols
 };
 
 export const getSymbolDefinition = (type: string): SymbolDefinition | undefined => {

@@ -66,9 +66,7 @@ export class ProjectManager {
       devices: state.devices || [],
       locations: state.locations || [],
       cards: state.cards || [],
-      terrain: state.terrainTiles || {},
       kind: state.screenKind,
-      planObjects: state.planObjects || [],
       helpLanguage: state.helpLanguage
     };
     const validation = validateProjectSchema(proj);
@@ -81,6 +79,21 @@ export class ProjectManager {
   }
 
   private static loadProjectToStore(project: EPWProjectSchema, isDirty: boolean) {
+    // chore/remove-isometric-plan-mode 5e: `kind` is optional and additive
+    // (ProjectSchema.ts) and SCHEMATIC is now the only value this editor
+    // ever writes or recognizes - but a file saved by an earlier build
+    // may still literally contain `kind: "PLAN"`. That file must still
+    // LOAD (never rejected, no schema version bump), with its screen
+    // silently treated as SCHEMATIC instead - "silently" only from
+    // validateProjectSchema's point of view; a message is posted below,
+    // once loadProject's own caller has a chance to see it, so the
+    // conversion is not invisible to whoever opened the file. `project`
+    // is read here as `any` deliberately: EPWProjectSchema's own `kind`
+    // field is typed to the CURRENT, narrowed ScreenKind ('SCHEMATIC'
+    // only) - a raw loaded file has no such guarantee at runtime.
+    const rawKind = (project as any).kind;
+    const isLegacyPlanKind = rawKind === 'PLAN';
+
     useStore.setState({
       objects: project.objects,
       connections: project.connections || [],
@@ -92,12 +105,10 @@ export class ProjectManager {
       devices: project.devices || [],
       locations: project.locations || [],
       cards: project.cards || [],
-      terrainTiles: project.terrain || {},
-      // feat/isometric-engine commit 5: a file with no `kind` field at
-      // all (every file saved before this commit existed) loads as
-      // SCHEMATIC - the task's own explicit default.
-      screenKind: project.kind || 'SCHEMATIC',
-      planObjects: project.planObjects || [],
+      // A file with no `kind` field at all (every file saved before this
+      // concept existed) loads as SCHEMATIC, same as a legacy PLAN one -
+      // both simply fall back to the only value this field ever is now.
+      screenKind: 'SCHEMATIC',
       helpLanguage: project.helpLanguage || HELP_DEFAULT_LANGUAGE,
       projectName: project.project.name,
       projectMetadata: {
@@ -119,19 +130,25 @@ export class ProjectManager {
       },
       isDirty: isDirty,
       selectedIds: [],
-      selectedPlanObjectIds: [],
       history: [{
         objects: JSON.parse(JSON.stringify(project.objects)),
         connections: JSON.parse(JSON.stringify(project.connections || [])),
         meters: JSON.parse(JSON.stringify(project.meters || [])),
         signalPanels: JSON.parse(JSON.stringify(project.signalPanels || [])),
         frames: JSON.parse(JSON.stringify(project.frames || [])),
-        terrainTiles: JSON.parse(JSON.stringify(project.terrain || {})),
-        planObjects: JSON.parse(JSON.stringify(project.planObjects || [])),
         groupCommands: JSON.parse(JSON.stringify(project.groupCommands || [])),
         setpointPanels: JSON.parse(JSON.stringify(project.setpointPanels || []))
       }],
       historyIndex: 0
     });
+
+    // 5e: posted AFTER the state above lands, so it survives as a real
+    // Messages-panel entry rather than being immediately overwritten by
+    // whatever loadProject/newProject's own caller adds right after this
+    // returns (both already add their own "[INFO] Project loaded/created"
+    // message right after calling this).
+    if (isLegacyPlanKind) {
+      useStore.getState().addMessage('[INFO] This screen was saved as PLAN (the isometric plan mode), which no longer exists - converted to SCHEMATIC.');
+    }
   }
 }

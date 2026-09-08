@@ -35,41 +35,6 @@ export const COLOR_WHITE = '#FFFFFF';             // biel
 export const VENTILATION_ACTIVE = '#C89000';      // wentylacja aktywna
 export const VENTILATION_INACTIVE = '#8A7A50';    // wentylacja nieaktywna
 
-// Terrain tiles (PLAN screen, feat/isometric-engine commit 3): each type
-// has three tones - TOP (the diamond top face), LEFT and RIGHT (the two
-// visible side walls TerrainTile.ts extrudes below it, giving the tile
-// thickness). One light source from upper-left, same as every sprite in
-// public/sprites/iso/ is already painted with: the LEFT wall catches
-// that light and reads lighter than the top face, the RIGHT wall falls
-// into its own shadow and reads darker - never the other way round, for
-// every type below.
-export const TERRAIN_GRASS_TOP = '#5A9B4A';       // trawa
-export const TERRAIN_GRASS_LEFT = '#74B863';
-export const TERRAIN_GRASS_RIGHT = '#427238';
-export const TERRAIN_PAVING_TOP = '#A8A296';      // kostka brukowa
-export const TERRAIN_PAVING_LEFT = '#C2BCB0';
-export const TERRAIN_PAVING_RIGHT = '#868074';
-export const TERRAIN_SOIL_TOP = '#6B4A34';        // ziemia, grzadka
-export const TERRAIN_SOIL_LEFT = '#8A6448';
-export const TERRAIN_SOIL_RIGHT = '#4E3524';
-export const TERRAIN_GRAVEL_TOP = '#9C9488';      // zwir
-export const TERRAIN_GRAVEL_LEFT = '#B6AEA0';
-export const TERRAIN_GRAVEL_RIGHT = '#7A736A';
-export const TERRAIN_WATER_TOP = '#2E76C8';       // woda (oczko wodne na dzialce -
-export const TERRAIN_WATER_LEFT = '#4F94E0';      // deliberately its own set, not
-export const TERRAIN_WATER_RIGHT = '#1E5494';     // COLOR_WATER, which means the WATER medium's conductor on the schematic canvas, a different screen entirely
-
-// fix/iso-tiles-and-rotation commit 1: the line between two adjacent
-// painted tiles - grass next to paving, or two grass tiles side by side,
-// it makes no difference - is never the strong black COLOR_OUTLINE the
-// whole SLAB's own outer edge gets; a shared interior edge is still one
-// continuous piece of ground, not a seam. One neutral color for every
-// terrain type (this is a structural grid line, not a material
-// property, so it does not vary with what is painted on either side of
-// it) - clearly darker than every terrain TOP fill above (all of them
-// read lighter than this in practice), but far lighter than pure black.
-export const TERRAIN_TILE_DIVIDER = '#3C3C3C';
-
 // ---- Geometry ----
 
 // Conductor/symbol proportions derived directly from the grid (feat/
@@ -148,6 +113,113 @@ export const FONT_SIZE_TITLE = 14;  // tytuly miernika, panelu, ramki
 export const LOCATION_PICKER_MIN_WIDTH = 96;   // never narrower, even for a one-character code
 export const LOCATION_PICKER_MAX_WIDTH = 160;  // never wider, even for a very long code
 export const SELECT_ARROW_ALLOWANCE = 24;      // room for the native dropdown arrow beside the text
+
+// feat/site-objects-2d: docs/EPW_rysunki_referencja.py's own canvas is
+// 160x120 (its W,H) - describing the reference DRAWING's own
+// proportions, not literally the symbol's declared size in the
+// library. terminal-centering.test.ts's own pre-existing invariant
+// (feat/editing-and-signal-panel commit 1) requires every visible
+// symbol's defaultWidth/defaultHeight to be an EVEN GRID_SIZE multiple
+// (32, 64, 96, 128...), so a terminal's own edge-midpoint always lands
+// on a grid node - 120 fails that (120/32 = 3.75), 160 alone would not
+// have failed, but every one of these 16 objects needs a real terminal
+// on at least one edge whose OTHER dimension is 120. Found live, this
+// exact conflict was raised and resolved with the user: every site
+// object's own DECLARED size is 128x96 - the identical 4:3 ratio as
+// 160x120 (128/96 = 160/120), so nothing about the reference's own
+// proportions is distorted - reached by drawing every shape at the
+// reference's own literal 160x120 coordinates, then wrapping that
+// whole drawing in one outer Group scaled by exactly this factor (the
+// same scaleX/scaleY mechanism this app's own resize-by-handle already
+// uses for every other symbol) rather than recalculating any
+// coordinate by hand.
+export const SITE_CANVAS_SCALE = 0.8; // 128/160 = 96/120
+
+// ---- Site objects (feat/site-objects-2d) - banded shading -----------------
+// A retro-industrial 90s SCADA HMI look, extended (not replaced - see this
+// file's own header) to flat 2D site objects: buildings, gates, lighting,
+// tanks... Every shape gets three tones - a lighter BAND along its own top
+// (or left) edge, its own base fill everywhere else, a darker band along
+// its own bottom (or right) edge - hard-edged, never a gradient, never
+// blurred, never translucent in the shape itself (glow, below, is the one
+// deliberate exception - a genuine light source, not shape shading). A
+// round shape gets a light ARC upper-left and a shadow arc lower-right
+// instead of straight bands. Every shape keeps the same solid black
+// outline every other SCADA symbol already uses.
+//
+// Names and exact values below are taken VERBATIM from
+// docs/EPW_rysunki_referencja.py's own header section (its sh() calls -
+// base/light/dark, renamed here to base/light/dark for clarity, same
+// order) - this file is the single, permanent home for them; the Python
+// file itself is a geometry/color REFERENCE only, never executed, never
+// imported by anything in src/.
+export interface SiteShadeTriad {
+  readonly base: string;
+  readonly light: string;
+  readonly dark: string;
+}
+export const SITE_GREY: SiteShadeTriad  = { base: '#C0C0C0', light: '#F0F0F0', dark: '#808080' };
+export const SITE_DGREY: SiteShadeTriad = { base: '#909090', light: '#C8C8C8', dark: '#585858' };
+export const SITE_GREEN: SiteShadeTriad = { base: '#00B800', light: '#50E850', dark: '#007000' };
+export const SITE_RED: SiteShadeTriad   = { base: '#E00000', light: '#FF7070', dark: '#900000' };
+export const SITE_BLUE: SiteShadeTriad  = { base: '#2848D8', light: '#6080FF', dark: '#182C90' };
+export const SITE_TAN: SiteShadeTriad   = { base: '#C8A870', light: '#E8D0A0', dark: '#907040' };
+export const SITE_YELL: SiteShadeTriad  = { base: '#FFD800', light: '#FFF080', dark: '#B08800' };
+export const SITE_DARK: SiteShadeTriad  = { base: '#585C64', light: '#8C9098', dark: '#303438' };
+export const SITE_CONC: SiteShadeTriad  = { base: '#D0D0C8', light: '#F0F0E8', dark: '#9C9C94' };
+export const SITE_GRASS: SiteShadeTriad = { base: '#3C9430', light: '#68C050', dark: '#28641C' };
+export const SITE_BRICK: SiteShadeTriad = { base: '#B45838', light: '#E08860', dark: '#7C3820' };
+
+// Band/outline thicknesses (px) - every distinct value
+// docs/EPW_rysunki_referencja.py's own rect/vrect/circ calls use,
+// catalogued from that file directly (grep -oE "band=|ow=" across it) so
+// every site object component below can reach for the exact one it needs
+// instead of writing a literal of its own. The unsuffixed pair is each
+// primitive's own DEFAULT (matching the reference's own rect(...,band=4,
+// ow=2.5) default parameters).
+export const SITE_BAND_WIDTH = 4;              // default shading band
+export const SITE_BAND_WIDTH_NARROW = 3;       // window/door frames, posts, terminal rows...
+export const SITE_BAND_WIDTH_NARROWEST = 2;    // zlacze's own terminal block rows
+export const SITE_BAND_WIDTH_WIDE = 6;         // grass/road surface texture
+export const SITE_OUTLINE_WIDTH = 2.5;         // default kontur
+export const SITE_OUTLINE_WIDTH_MEDIUM = 2;    // most circ() calls, several rect() overrides
+export const SITE_OUTLINE_WIDTH_THIN = 1.8;    // oczyszczalnia's own inner circles
+export const SITE_OUTLINE_WIDTH_THINNEST = 1.5; // zlacze's own terminal rows
+export const SITE_TEXTURE_LINE_WIDTH = 1.6;    // magazyn's cladding lines, brama's gate-leaf slats
+export const SITE_CROSSBAR_WIDTH = 7;          // slup's own lamp-post crossbar
+export const SITE_CONNECTOR_WIDTH = 6;         // halogen's own connecting bar
+
+// Bespoke triads/colors docs/EPW_rysunki_referencja.py defines INLINE
+// (its own sh(...) calls outside the header section, or a single raw
+// hex) rather than from the eleven named sets above - each used by
+// exactly one object, added here (not the object's own component file)
+// for the same reason the eleven above are: GRANICE's "every color
+// from ScadaTheme, never hand-written in the component" applies to
+// these exactly as much as to the named ones.
+export const SITE_BRICK_DIM: SiteShadeTriad = { base: '#8C6050', light: '#B08878', dark: '#5C3828' }; // dom's own roof, WYLACZONY
+export const SITE_WOOD: SiteShadeTriad = { base: '#8C6038', light: '#B08050', dark: '#5C3820' };      // dom's own door
+export const SITE_CHIMNEY: SiteShadeTriad = { base: '#909090', light: '#C0C0C0', dark: '#585858' };   // dom's own chimney
+export const SITE_METAL_TEXTURE = '#707070';   // magazyn's own corrugated-wall cladding lines
+export const SITE_PANEL_TEXTURE = '#404448';   // magazyn's own rolling-door panel lines
+export const SITE_WATER_DIM: SiteShadeTriad = { base: '#5C6470', light: '#8C94A0', dark: '#3C4450' }; // oczyszczalnia's own chamber, WYLACZONY
+export const SITE_RIB_LINE = '#606060';        // studzienka's own radial ribbing
+export const SITE_CROSSBAR_HIGHLIGHT = '#B0B0B0'; // slup's own crossbar highlight line
+export const SITE_RED_DIM: SiteShadeTriad = { base: '#8C3838', light: '#B06060', dark: '#5C2020' }; // kogut's own dome, WYLACZONY
+export const SITE_RED_DIM_HIGHLIGHT = '#A05858'; // kogut's own highlight arc, WYLACZONY
+export const SITE_ALARM_GLOW = '#FF3030';      // kogut's own glow tint (distinct from SITE_RED)
+export const SITE_ALARM_RAY = '#FF4040';       // kogut's own radiating alarm rays, ZALACZONY
+export const SITE_ALARM_RAY_WIDTH = 5;         // kogut's own radiating alarm rays, ZALACZONY
+export const SITE_HORN_LIT: SiteShadeTriad = { base: '#D8D8D0', light: '#F8F8F0', dark: '#A0A098' }; // tuba's own horn, ZALACZONY
+export const SITE_WATER_SPRAY = '#60A0FF';     // slupek_podl's own watering arcs
+
+// Commit 4 (trawa/droga - the two SURFACE objects): trawa's own
+// WYLACZONY (yellowed) grass triad - docs/EPW_rysunki_referencja.py's
+// own trawa(on): `g = GRASS if on else sh('#8C9440','#B0B860','#5C6428')`.
+// droga has no bespoke color of its own at all - it reuses SITE_CONC
+// (Commit 1) for its slab surface and COLOR_WHITE (pre-existing) for
+// its lane-marking dashes, plus one new joint-line color below.
+export const SITE_GRASS_DIM: SiteShadeTriad = { base: '#8C9440', light: '#B0B860', dark: '#5C6428' }; // trawa's own texture+fill, WYLACZONY
+export const SITE_ROAD_JOINT = '#A0A098';      // droga's own expansion-joint lines and center line
 
 // ---- Bridge into CSS -----------------------------------------------------
 // CSS cannot import a TypeScript module, so the interface chrome (panels,

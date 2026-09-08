@@ -6,8 +6,6 @@ import { createSelectionSlice } from './store/selectionSlice';
 import { createClipboardSlice } from './store/clipboardSlice';
 import { createHistorySlice } from './store/historySlice';
 import { createLayoutSlice } from './store/layoutSlice';
-import { createTerrainSlice } from './store/terrainSlice';
-import { createPlanSlice } from './store/planSlice';
 import { createDeviceRegistrySlice } from './store/deviceRegistrySlice';
 import { createHelpSlice } from './store/helpSlice';
 import { createDeviceFormSlice } from './store/deviceFormSlice';
@@ -45,8 +43,6 @@ export const useStore = create<AppState>()((...a) => ({
   ...createClipboardSlice(...a),
   ...createHistorySlice(...a),
   ...createLayoutSlice(...a),
-  ...createTerrainSlice(...a),
-  ...createPlanSlice(...a),
   ...createDeviceRegistrySlice(...a),
   ...createHelpSlice(...a),
   ...createDeviceFormSlice(...a),

@@ -62,6 +62,21 @@ import {
   ScadaMeterAdapter,
   ScadaBoundaryPointAdapter
 } from './scada/ScadaSymbolAdapters';
+import { HouseSymbol } from './site/HouseSymbol';
+import { WarehouseSymbol } from './site/WarehouseSymbol';
+import { SlidingGateSymbol } from './site/SlidingGateSymbol';
+import { RainTankSymbol } from './site/RainTankSymbol';
+import { SewagePlantSymbol } from './site/SewagePlantSymbol';
+import { WaterManholeSymbol } from './site/WaterManholeSymbol';
+import { LampPostDoubleSymbol, LampPostSingleSymbol } from './site/LampPostSymbol';
+import { HalogenSymbol } from './site/HalogenSymbol';
+import { GardenLightSymbol } from './site/GardenLightSymbol';
+import { CableJunctionSymbol } from './site/CableJunctionSymbol';
+import { AlarmBeaconSymbol } from './site/AlarmBeaconSymbol';
+import { AlarmHornSymbol } from './site/AlarmHornSymbol';
+import { GardenSprinklerSymbol } from './site/GardenSprinklerSymbol';
+import { GrassSymbol } from './site/GrassSymbol';
+import { ConcreteRoadSymbol } from './site/ConcreteRoadSymbol';
 
 export interface SymbolProps {
   obj: SynopticObject;
@@ -249,6 +264,38 @@ export const SymbolRenderer: React.FC<{ obj: SynopticObject }> = ({ obj }) => {
       return <ScadaMeterAdapter obj={obj} state={state} />;
     case 'scada.boundary_point':
       return <ScadaBoundaryPointAdapter obj={obj} state={state} />;
+    case 'site.house':
+      return <HouseSymbol obj={obj} state={state} />;
+    case 'site.warehouse':
+      return <WarehouseSymbol obj={obj} state={state} />;
+    case 'site.sliding_gate':
+      return <SlidingGateSymbol obj={obj} state={state} />;
+    case 'site.rain_tank':
+      return <RainTankSymbol obj={obj} state={state} />;
+    case 'site.sewage_plant':
+      return <SewagePlantSymbol obj={obj} state={state} />;
+    case 'site.water_manhole':
+      return <WaterManholeSymbol obj={obj} state={state} />;
+    case 'site.lamp_post_double':
+      return <LampPostDoubleSymbol obj={obj} state={state} />;
+    case 'site.lamp_post_single':
+      return <LampPostSingleSymbol obj={obj} state={state} />;
+    case 'site.halogen':
+      return <HalogenSymbol obj={obj} state={state} />;
+    case 'site.garden_light':
+      return <GardenLightSymbol obj={obj} state={state} />;
+    case 'site.cable_junction':
+      return <CableJunctionSymbol obj={obj} state={state} />;
+    case 'site.alarm_beacon':
+      return <AlarmBeaconSymbol obj={obj} state={state} />;
+    case 'site.alarm_horn':
+      return <AlarmHornSymbol obj={obj} state={state} />;
+    case 'site.garden_sprinkler':
+      return <GardenSprinklerSymbol obj={obj} state={state} />;
+    case 'site.grass':
+      return <GrassSymbol obj={obj} state={state} />;
+    case 'site.concrete_road':
+      return <ConcreteRoadSymbol obj={obj} state={state} />;
     default:
       return <GenericSymbol obj={obj} state={state} />;
   }

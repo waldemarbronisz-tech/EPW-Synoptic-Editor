@@ -10,13 +10,13 @@ export const HELP_CONTENT_CORE: HelpContentMap = {
   // ==================== CHAPTER 1 - INTRODUCTION ====================
   'intro-what': {
     pl: [
-      { kind: 'p', text: 'EPW-Synoptic-Editor tworzy i waliduje pliki projektu dla dwoch rodzajow ekranow: schematu elektrycznego/wodnego/wentylacyjnego oraz planu izometrycznego dzialki. To narzedzie EDYCYJNE - dziala offline, na pliku na dysku, i nie ma pojecia o zadnym zywym stanie instalacji.' },
+      { kind: 'p', text: 'EPW-Synoptic-Editor tworzy i waliduje pliki projektu dla ekranu schematu elektrycznego/wodnego/wentylacyjnego: symbole, przewody, mierniki, panele sygnalizacyjne. To narzedzie EDYCYJNE - dziala offline, na pliku na dysku, i nie ma pojecia o zadnym zywym stanie instalacji.' },
       { kind: 'p', text: 'Edytor NIE wykonuje logiki sterowania, NIE odpytuje sterownikow po Modbusie ani zadnym innym protokole, i NIE wie, czy stycznik jest aktualnie zalaczony. Wszystko, co widac na ekranie podczas edycji - stan diody, wartosc na mierniku - to podglad ustawiony recznie w polu `Editor Preview`, nie odczyt z prawdziwego urzadzenia.' },
       { kind: 'p', text: 'Efektem pracy w tym edytorze jest plik projektu (rozszerzenie `.epwsyn`) zawierajacy geometrie ekranu i liste aparatow. Ten plik dopiero PRZEZNACZONY jest do uruchomienia w [[intro-platform|EPW-OS]] - zobacz rozdzial 10 po szczegoly, co dzis faktycznie dziala na tej sciezce.' },
       { kind: 'note', text: 'Zasada, ktora wraca w kazdym rozdziale tej pomocy: jesli czegos nie widac wprost w programie albo w pliku projektu, to tego nie ma. Ten tekst opisuje kod takim, jaki jest.' },
     ],
     en: [
-      { kind: 'p', text: 'EPW-Synoptic-Editor creates and validates project files for two kinds of screens: an electrical/water/ventilation schematic, and an isometric plot plan. It is an EDITING tool - it runs offline, against a file on disk, and has no notion of any live plant state.' },
+      { kind: 'p', text: 'EPW-Synoptic-Editor creates and validates project files for an electrical/water/ventilation schematic screen: symbols, wires, meters, signal panels. It is an EDITING tool - it runs offline, against a file on disk, and has no notion of any live plant state.' },
       { kind: 'p', text: 'The editor does NOT execute control logic, does NOT poll controllers over Modbus or any other protocol, and does NOT know whether a contactor is currently energized. Everything shown on screen while editing - a lit diode, a value on a meter - is a preview set by hand in the `Editor Preview` field, not a reading from a real device.' },
       { kind: 'p', text: 'The output of working in this editor is a project file (`.epwsyn`) holding the screen geometry and the device list. That file is INTENDED to run on [[intro-platform|EPW-OS]] - see chapter 10 for exactly what that path actually does today.' },
       { kind: 'note', text: 'A rule that comes back in every chapter of this help: if something is not plainly visible in the program or in the project file, it does not exist. This text describes the code as it actually is.' },
@@ -58,32 +58,26 @@ export const HELP_CONTENT_CORE: HelpContentMap = {
   },
   'intro-screens': {
     pl: [
-      { kind: 'p', text: 'Projekt ma jeden z dwoch rodzajow ekranu, ustalony raz przy tworzeniu (`File > New` albo `File > New Plan...`) i zapisany w pliku jako pole `kind`:' },
-      { kind: 'table', headers: ['Rodzaj', 'Do czego sluzy', 'Rozdzial'], rows: [
-        ['SCHEMATIC', 'Schemat elektryczny/wodny/wentylacyjny: symbole, przewody, mierniki, panele sygnalizacyjne.', '[[sch-node-model|5]]'],
-        ['PLAN', 'Rzut izometryczny dzialki: teren, budynki, obiekty na kaflach.', '[[plan-purpose|8]]'],
-      ] },
-      { kind: 'p', text: 'Rodzaj ekranu nie zmienia sie w trakcie pracy nad projektem - to inny plik dla schematu i inny dla planu. Kanwa (`Canvas.tsx`) i kanwa izometryczna (`PlanCanvas.tsx`) to dwa oddzielne, przelaczane komponenty; wiekszosc mechanizmow opisanych w tej pomocy (zaznaczanie, kopiowanie, historia cofniec) dziala niezaleznie na kazdym z nich.' },
+      { kind: 'p', text: 'Kazdy projekt to ekran SCHEMATIC: symbole, przewody, mierniki, panele sygnalizacyjne (rozdzial [[sch-node-model|5]]). Zapisywany jest w pliku jako pole `kind`, ale SCHEMATIC to dzis jedyna wartosc, jaka to pole moze mieć w NOWO zapisanym pliku.' },
+      { kind: 'p', text: 'Wczesniejsza wersja tego edytora miala tez drugi rodzaj ekranu, PLAN (rzut izometryczny dzialki, wlasna kanwa, wlasna biblioteka obiektow na kaflach) - zostal on calkowicie usuniety. Pole `kind` zostalo w formacie pliku wylacznie po to, zeby STARY plik zapisany z `kind: "PLAN"` wciaz dalo sie otworzyc: taki plik wczytuje sie normalnie, jego ekran jest cicho konwertowany na SCHEMATIC, a w panelu Messages pojawia sie o tym informacja - plik NIE jest odrzucany, a numer wersji schematu (`schema_version`) sie nie zmienia.' },
+      { kind: 'p', text: 'Plik bez pola `kind` w ogole (kazdy plik zapisany, zanim ten koncept powstal) wczytuje sie jako SCHEMATIC bez zadnego komunikatu - to byl, i nadal jest, jedyny sensowny domyslny rodzaj ekranu.' },
     ],
     en: [
-      { kind: 'p', text: 'A project has one of two screen kinds, fixed once when it is created (`File > New` or `File > New Plan...`) and saved in the file as the `kind` field:' },
-      { kind: 'table', headers: ['Kind', 'What it is for', 'Chapter'], rows: [
-        ['SCHEMATIC', 'Electrical/water/ventilation schematic: symbols, wires, meters, signal panels.', '[[sch-node-model|5]]'],
-        ['PLAN', 'Isometric plot plan: terrain, buildings, tile-based objects.', '[[plan-purpose|8]]'],
-      ] },
-      { kind: 'p', text: 'The screen kind does not change while working on a project - it is a different file for a schematic than for a plan. The schematic canvas (`Canvas.tsx`) and the isometric canvas (`PlanCanvas.tsx`) are two separate, switched components; most mechanisms this help describes (selection, copying, undo history) work independently on each.' },
+      { kind: 'p', text: 'Every project is a SCHEMATIC screen: symbols, wires, meters, signal panels (chapter [[sch-node-model|5]]). It is saved in the file as the `kind` field, but SCHEMATIC is now the only value that field can have in a NEWLY saved file.' },
+      { kind: 'p', text: 'An earlier version of this editor also had a second screen kind, PLAN (an isometric plot plan, with its own canvas and its own library of tile-based objects) - it has been removed entirely. The `kind` field stays in the file format only so an OLDER file saved with `kind: "PLAN"` still opens: such a file loads normally, its screen is silently converted to SCHEMATIC, and a notice about that appears in the Messages panel - the file is NOT rejected, and the schema version number (`schema_version`) does not change.' },
+      { kind: 'p', text: 'A file with no `kind` field at all (every file saved before this concept existed) loads as SCHEMATIC with no message at all - that was, and still is, the only sensible default screen kind.' },
     ],
   },
 
   // ==================== CHAPTER 2 - GETTING STARTED ====================
   'start-new-project': {
     pl: [
-      { kind: 'p', text: 'Menu `File > New` tworzy pusty projekt SCHEMATIC (prosi o nazwe). `File > New Plan...` tworzy pusty projekt PLAN. Oba zaczynaja od zera: bez lokalizacji, kart, aparatow ani obiektow - te trzeba dodac recznie, w kolejnosci opisanej w [[start-order|2.2]].' },
-      { kind: 'p', text: 'Jesli w otwartym projekcie sa niezapisane zmiany, `New`/`New Plan...`/`Open...` pytaja o potwierdzenie przed ich utrata (standardowe okno przegladarki, nie da sie go dostosowac tresciowo).' },
+      { kind: 'p', text: 'Menu `File > New` tworzy pusty projekt SCHEMATIC (prosi o nazwe). Zaczyna od zera: bez lokalizacji, kart, aparatow ani obiektow - te trzeba dodac recznie, w kolejnosci opisanej w [[start-order|2.2]].' },
+      { kind: 'p', text: 'Jesli w otwartym projekcie sa niezapisane zmiany, `New`/`Open...` pytaja o potwierdzenie przed ich utrata (standardowe okno przegladarki, nie da sie go dostosowac tresciowo).' },
     ],
     en: [
-      { kind: 'p', text: '`File > New` creates an empty SCHEMATIC project (asks for a name). `File > New Plan...` creates an empty PLAN project. Both start from nothing: no locations, cards, devices or objects - those must be added by hand, in the order described in [[start-order|2.2]].' },
-      { kind: 'p', text: 'If the open project has unsaved changes, `New`/`New Plan...`/`Open...` ask for confirmation before discarding them (the browser\'s own standard dialog - its wording cannot be customized).' },
+      { kind: 'p', text: '`File > New` creates an empty SCHEMATIC project (asks for a name). It starts from nothing: no locations, cards, devices or objects - those must be added by hand, in the order described in [[start-order|2.2]].' },
+      { kind: 'p', text: 'If the open project has unsaved changes, `New`/`Open...` ask for confirmation before discarding them (the browser\'s own standard dialog - its wording cannot be customized).' },
     ],
   },
   'start-order': {
@@ -101,12 +95,12 @@ export const HELP_CONTENT_CORE: HelpContentMap = {
   'start-save-open': {
     pl: [
       { kind: 'p', text: '`File > Save` i `Save As...` zapisuja caly stan projektu do jednego pliku `.epwsyn` (format JSON, pole `format: "EPW_SYNOPTIC"`) przez natywny mechanizm zapisu pliku przegladarki. `File > Open...` czyta taki plik z powrotem.' },
-      { kind: 'p', text: 'Zapisywane jest wszystko: metadane projektu, konfiguracja kanwy, obiekty i przewody, mierniki i panele sygnalizacyjne, ramki, lokalizacje/karty/aparaty, teren i obiekty planu (dla projektu PLAN), rodzaj ekranu oraz wybrany jezyk pomocy. Szczegoly zawartosci pliku sa w [[file-contents|10.1]].' },
+      { kind: 'p', text: 'Zapisywane jest wszystko: metadane projektu, konfiguracja kanwy, obiekty i przewody, mierniki i panele sygnalizacyjne, ramki, lokalizacje/karty/aparaty, rodzaj ekranu oraz wybrany jezyk pomocy. Szczegoly zawartosci pliku sa w [[file-contents|10.1]].' },
       { kind: 'p', text: 'Wczytanie pliku ze zbyt nowa wersja schematu (pole `schema_version` wieksze niz obslugiwana) jest odrzucane z komunikatem bledu zamiast czesciowego, nieprzewidywalnego wczytania - zobacz [[file-versioning|10.2]].' },
     ],
     en: [
       { kind: 'p', text: '`File > Save` and `Save As...` write the whole project state to one `.epwsyn` file (JSON, `format: "EPW_SYNOPTIC"`) through the browser\'s own native file-save mechanism. `File > Open...` reads such a file back.' },
-      { kind: 'p', text: 'Everything is saved: project metadata, canvas configuration, objects and wires, meters and signal panels, frames, locations/cards/devices, terrain and plan objects (for a PLAN project), the screen kind, and the chosen help language. Full file contents are covered in [[file-contents|10.1]].' },
+      { kind: 'p', text: 'Everything is saved: project metadata, canvas configuration, objects and wires, meters and signal panels, frames, locations/cards/devices, the screen kind, and the chosen help language. Full file contents are covered in [[file-contents|10.1]].' },
       { kind: 'p', text: 'Loading a file with a schema version newer than what this build supports (`schema_version` field) is rejected with an error rather than a partial, unpredictable load - see [[file-versioning|10.2]].' },
     ],
   },

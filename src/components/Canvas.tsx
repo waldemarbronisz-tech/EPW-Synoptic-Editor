@@ -294,11 +294,9 @@ export const Canvas: React.FC = () => {
         useStore.getState().setDrawingMedium('VENTILATION');
       } else if (e.key.toLowerCase() === 'r') {
         // fix/inline-device-creation commit 1: R rotates the current
-        // selection 90 degrees clockwise, Shift+R counter-clockwise -
-        // same convention PlanCanvas.tsx's own R/Shift+R already uses
-        // for plan objects. Added alongside this commit's own removal
-        // of the free-rotation handle (rotateEnabled on
-        // ObjectTransformerHandle) so rotation stays fully reachable
+        // selection 90 degrees clockwise, Shift+R counter-clockwise.
+        // Added alongside this commit's own removal of the free-rotation
+        // handle (rotateEnabled on ObjectTransformerHandle) so rotation stays fully reachable
         // without it - Toolbar's Rotate Left/Right buttons and
         // Properties' own Rotation field both already called
         // rotateSelected; this is simply a third, keyboard, path to the
@@ -811,6 +809,29 @@ export const Canvas: React.FC = () => {
               background Layer above. A symbol placed inside a frame's
               own bounds draws later in this same Layer, so it is
               visible above the frame, per that same requirement. */}
+          {/* feat/site-objects-2d commit 4: SURFACE objects (trawa,
+              droga - SymbolDefinition.isSurface) are real objects[]
+              entries, not a separate array like frames - but they must
+              still draw in this same "warstwa podkladu" position,
+              BELOW every wire and ordinary symbol (mandatory test 9;
+              PRZED ZGLOSZENIEM point 6, "a symbol placed on the grass
+              must appear above it"), exactly like FrameElementNode
+              just above. Drawn here, in registration (array) order -
+              not sorted by zIndex, the same "first drawn = furthest
+              back" rule frames themselves already follow - and then
+              excluded from the ordinary objects.map pass below so
+              nothing renders twice. */}
+          {objects.filter((obj) => getSymbolDefinition(obj.type)?.isSurface).map((obj) => (
+            <ObjectNode
+              key={obj.id}
+              obj={obj}
+              onSelect={(e: any) => selectObjects([obj.id], !!e?.evt?.shiftKey)}
+              onChange={(newAttrs) => updateObject(obj.id, newAttrs)}
+              gridSize={gridSize}
+              onShapeRef={registerObjectShapeRef}
+              groupDrag={groupDrag}
+            />
+          ))}
           {frames.map((frame) => (
             <FrameElementNode
               key={frame.id}
@@ -885,7 +906,7 @@ export const Canvas: React.FC = () => {
               ))}
             </>
           )}
-          {[...objects].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)).map((obj) => (
+          {[...objects].filter((obj) => !getSymbolDefinition(obj.type)?.isSurface).sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)).map((obj) => (
             <ObjectNode
               key={obj.id}
               obj={obj}

@@ -11,6 +11,7 @@ export type ProjectSlice = Pick<AppState,
   | 'projectMetadata' | 'canvasConfig' | 'projectName' | 'fileName' | 'fileHandle'
   | 'isDirty' | 'messages' | 'devices'
   | 'setProjectName' | 'setFileName' | 'setFileHandle' | 'setDirty' | 'addMessage' | 'setCanvasState'
+  | 'screenKind' | 'setScreenKind'
 >;
 
 export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = (set) => ({
@@ -31,6 +32,15 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
   isDirty: false,
   messages: [],
   devices: [] as Device[],
+
+  // chore/remove-isometric-plan-mode: SCHEMATIC is the only value left -
+  // see appState.ts's own comment on this field for why it stays at
+  // all. Previously lived in its own planSlice.ts, alongside the now-
+  // removed isometric PLAN mode's placed-object/terrain state; folded
+  // in here since it is genuinely project-level metadata, same as
+  // projectName/canvasConfig above.
+  screenKind: 'SCHEMATIC',
+  setScreenKind: (kind) => set({ screenKind: kind }),
 
   setProjectName: (name) => set({ projectName: name, isDirty: true }),
   setFileName: (name) => set({ fileName: name }),
