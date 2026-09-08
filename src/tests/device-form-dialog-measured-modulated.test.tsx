@@ -14,6 +14,12 @@ function row(labelText: string): HTMLElement {
 function input(labelText: string): HTMLInputElement {
   return row(labelText).querySelector('input') as HTMLInputElement;
 }
+// fix/device-form-polish commit 2: Zapisz is aria-disabled now, not
+// natively disabled - see device-form-dialog-switched.test.tsx's own
+// copy of this helper for the full reasoning.
+function isSaveDisabled(): boolean {
+  return screen.getByRole('button', { name: 'Zapisz' }).getAttribute('aria-disabled') === 'true';
+}
 
 function makeMeasured(overrides: Partial<MeasuredDevice> = {}): MeasuredDevice {
   return {
@@ -57,15 +63,22 @@ describe('DeviceFormDialog - MEASURED section', () => {
 
   it('test 12: rangeMin greater than rangeMax is rejected - Save disabled, field error shown', () => {
     render(<DeviceFormDialog mode="edit" initialDevice={makeMeasured()} onSave={() => {}} onCancel={() => {}} />);
-    fireEvent.change(input('Zakres min'), { target: { value: '200' } });
-    expect((screen.getByRole('button', { name: 'Zapisz' }) as HTMLButtonElement).disabled).toBe(true);
+    // mode="edit" - submitAttempted starts true (mandatory test 12: an
+    // edit form of an already-invalid device shows its errors right
+    // away), so this NEWLY introduced error is visible immediately,
+    // touched or not - the blur below is not what reveals it here, just
+    // documents the same interaction a real user would do regardless.
+    const rangeMinInput = input('Zakres min');
+    fireEvent.change(rangeMinInput, { target: { value: '200' } });
+    fireEvent.blur(rangeMinInput);
+    expect(isSaveDisabled()).toBe(true);
     // Shown under both rangeMin and rangeMax (MEASURED_INVALID_RANGE maps to both).
     expect(screen.getAllByText(/rangeMin must be less than rangeMax/).length).toBe(2);
   });
 
   it('a fully valid MEASURED device (edit mode) has no field errors and Save is enabled', () => {
     render(<DeviceFormDialog mode="edit" initialDevice={makeMeasured()} onSave={() => {}} onCancel={() => {}} />);
-    expect((screen.getByRole('button', { name: 'Zapisz' }) as HTMLButtonElement).disabled).toBe(false);
+    expect(isSaveDisabled()).toBe(false);
   });
 
   it('shows a live mid-range preview formatted with the unit', () => {
@@ -80,8 +93,10 @@ describe('DeviceFormDialog - MODULATED section', () => {
 
   it('test 13: startupValue outside rangeMin..rangeMax is rejected - Save disabled, field error shown', () => {
     render(<DeviceFormDialog mode="edit" initialDevice={makeModulated()} onSave={() => {}} onCancel={() => {}} />);
-    fireEvent.change(input('Wartosc startowa'), { target: { value: '150' } });
-    expect((screen.getByRole('button', { name: 'Zapisz' }) as HTMLButtonElement).disabled).toBe(true);
+    const startupInput = input('Wartosc startowa');
+    fireEvent.change(startupInput, { target: { value: '150' } });
+    fireEvent.blur(startupInput);
+    expect(isSaveDisabled()).toBe(true);
     expect(screen.getByText(/startupValue must be within rangeMin..rangeMax/)).toBeTruthy();
   });
 
@@ -101,6 +116,6 @@ describe('DeviceFormDialog - MODULATED section', () => {
 
   it('a fully valid MODULATED device (edit mode) has no field errors and Save is enabled', () => {
     render(<DeviceFormDialog mode="edit" initialDevice={makeModulated()} onSave={() => {}} onCancel={() => {}} />);
-    expect((screen.getByRole('button', { name: 'Zapisz' }) as HTMLButtonElement).disabled).toBe(false);
+    expect(isSaveDisabled()).toBe(false);
   });
 });

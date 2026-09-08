@@ -40,6 +40,13 @@ function makeSwitched(overrides: Partial<SwitchedDevice> = {}): SwitchedDevice {
   };
 }
 
+// fix/device-form-polish commit 2: Zapisz is aria-disabled now, not
+// natively disabled - see device-form-dialog-switched.test.tsx's own
+// copy of this helper for the full reasoning.
+function isSaveDisabled(): boolean {
+  return screen.getByRole('button', { name: 'Zapisz' }).getAttribute('aria-disabled') === 'true';
+}
+
 function resetStore() {
   useStore.setState({
     objects: [], devices: [], messages: [], locations: [{ code: 'KOT', description: 'Kotlownia' }], cards: [],
@@ -105,7 +112,7 @@ describe('10/11/12. behavior suggestion from the symbol\'s own type (SymbolBehav
       />
     );
     expect(screen.getByText('-- wybierz --')).toBeTruthy();
-    expect((screen.getByRole('button', { name: 'Zapisz' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(isSaveDisabled()).toBe(true);
   });
 });
 

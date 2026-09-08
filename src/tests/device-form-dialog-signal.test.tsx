@@ -16,6 +16,12 @@ function input(labelText: string): HTMLInputElement {
 function select(labelText: string): HTMLSelectElement {
   return row(labelText).querySelector('select') as HTMLSelectElement;
 }
+// fix/device-form-polish commit 2: Zapisz is aria-disabled now, not
+// natively disabled - see device-form-dialog-switched.test.tsx's own
+// copy of this helper for the full reasoning.
+function isSaveDisabled(): boolean {
+  return screen.getByRole('button', { name: 'Zapisz' }).getAttribute('aria-disabled') === 'true';
+}
 
 function makeSignal(overrides: Partial<SignalDevice> = {}): SignalDevice {
   return {
@@ -42,13 +48,15 @@ describe('DeviceFormDialog - SIGNAL section', () => {
 
   it('a fully valid SIGNAL device (edit mode) has no field errors and Save is enabled', () => {
     render(<DeviceFormDialog mode="edit" initialDevice={makeSignal()} onSave={() => {}} onCancel={() => {}} />);
-    expect((screen.getByRole('button', { name: 'Zapisz' }) as HTMLButtonElement).disabled).toBe(false);
+    expect(isSaveDisabled()).toBe(false);
   });
 
   it('SIGNAL debounceMs -1 is rejected: Save disabled and a field error is shown', () => {
     render(<DeviceFormDialog mode="edit" initialDevice={makeSignal()} onSave={() => {}} onCancel={() => {}} />);
-    fireEvent.change(input('Debounce (ms)'), { target: { value: '-1' } });
-    expect((screen.getByRole('button', { name: 'Zapisz' }) as HTMLButtonElement).disabled).toBe(true);
+    const debounceInput = input('Debounce (ms)');
+    fireEvent.change(debounceInput, { target: { value: '-1' } });
+    fireEvent.blur(debounceInput);
+    expect(isSaveDisabled()).toBe(true);
     expect(screen.getByText(/debounceMs must be >= 0/)).toBeTruthy();
   });
 
