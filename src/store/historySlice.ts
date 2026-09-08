@@ -12,18 +12,16 @@ const MAX_HISTORY = 100;
 export type HistorySlice = Pick<AppState, 'history' | 'historyIndex' | 'saveHistory' | 'undo' | 'redo'>;
 
 export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = (set, get) => ({
-  history: [{ objects: [], connections: [], meters: [], signalPanels: [], frames: [], terrainTiles: {}, planObjects: [], groupCommands: [], setpointPanels: [] }],
+  history: [{ objects: [], connections: [], meters: [], signalPanels: [], frames: [], groupCommands: [], setpointPanels: [] }],
   historyIndex: 0,
 
   saveHistory: () => {
-    const { objects, connections, meters, signalPanels, frames, terrainTiles, planObjects, groupCommands, setpointPanels, history, historyIndex } = get();
+    const { objects, connections, meters, signalPanels, frames, groupCommands, setpointPanels, history, historyIndex } = get();
     const objectsJson = JSON.stringify(objects);
     const connectionsJson = JSON.stringify(connections);
     const metersJson = JSON.stringify(meters);
     const signalPanelsJson = JSON.stringify(signalPanels);
     const framesJson = JSON.stringify(frames);
-    const terrainTilesJson = JSON.stringify(terrainTiles);
-    const planObjectsJson = JSON.stringify(planObjects);
     const groupCommandsJson = JSON.stringify(groupCommands);
     const setpointPanelsJson = JSON.stringify(setpointPanels);
 
@@ -38,8 +36,6 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
       JSON.stringify(lastEntry.meters || []) === metersJson &&
       JSON.stringify(lastEntry.signalPanels || []) === signalPanelsJson &&
       JSON.stringify(lastEntry.frames || []) === framesJson &&
-      JSON.stringify(lastEntry.terrainTiles || {}) === terrainTilesJson &&
-      JSON.stringify(lastEntry.planObjects || []) === planObjectsJson &&
       JSON.stringify(lastEntry.groupCommands || []) === groupCommandsJson &&
       JSON.stringify(lastEntry.setpointPanels || []) === setpointPanelsJson
     ) {
@@ -53,8 +49,6 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
       meters: JSON.parse(metersJson),
       signalPanels: JSON.parse(signalPanelsJson),
       frames: JSON.parse(framesJson),
-      terrainTiles: JSON.parse(terrainTilesJson),
-      planObjects: JSON.parse(planObjectsJson),
       groupCommands: JSON.parse(groupCommandsJson),
       setpointPanels: JSON.parse(setpointPanelsJson)
     });
@@ -80,8 +74,6 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
         meters: JSON.parse(JSON.stringify(prevState.meters || [])),
         signalPanels: JSON.parse(JSON.stringify(prevState.signalPanels || [])),
         frames: JSON.parse(JSON.stringify(prevState.frames || [])),
-        terrainTiles: JSON.parse(JSON.stringify(prevState.terrainTiles || {})),
-        planObjects: JSON.parse(JSON.stringify(prevState.planObjects || [])),
         groupCommands: JSON.parse(JSON.stringify(prevState.groupCommands || [])),
         setpointPanels: JSON.parse(JSON.stringify(prevState.setpointPanels || [])),
         selectedIds: [],
@@ -91,7 +83,6 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
         selectedFrameIds: [],
         selectedGroupCommandIds: [],
         selectedSetpointPanelIds: [],
-        selectedPlanObjectIds: [],
         isDirty: true
       });
     }
@@ -108,8 +99,6 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
         meters: JSON.parse(JSON.stringify(nextState.meters || [])),
         signalPanels: JSON.parse(JSON.stringify(nextState.signalPanels || [])),
         frames: JSON.parse(JSON.stringify(nextState.frames || [])),
-        terrainTiles: JSON.parse(JSON.stringify(nextState.terrainTiles || {})),
-        planObjects: JSON.parse(JSON.stringify(nextState.planObjects || [])),
         groupCommands: JSON.parse(JSON.stringify(nextState.groupCommands || [])),
         setpointPanels: JSON.parse(JSON.stringify(nextState.setpointPanels || [])),
         selectedIds: [],
@@ -119,7 +108,6 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
         selectedFrameIds: [],
         selectedGroupCommandIds: [],
         selectedSetpointPanelIds: [],
-        selectedPlanObjectIds: [],
         isDirty: true
       });
     }

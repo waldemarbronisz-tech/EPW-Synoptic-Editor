@@ -13,7 +13,7 @@ import { searchHelp } from '../help/HelpSearch';
 function resetStore() {
   useStore.setState({
     objects: [], connections: [], meters: [], signalPanels: [], frames: [],
-    selectedIds: [], selectedConnectionIds: [], selectedMeterIds: [], selectedSignalPanelIds: [], selectedFrameIds: [], selectedPlanObjectIds: [],
+    selectedIds: [], selectedConnectionIds: [], selectedMeterIds: [], selectedSignalPanelIds: [], selectedFrameIds: [],
     helpLanguage: 'pl',
   });
 }

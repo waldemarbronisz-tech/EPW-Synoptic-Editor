@@ -1,90 +1,14 @@
-// feat/help-system commit 5 - full content for chapters 8-12, Polish and
-// English. Checked against IsoGrid.ts, TerrainTile.ts, PlanObject.ts,
-// public/sprites/iso/manifest.json, historySlice.ts, CanvasView.ts,
-// Canvas.tsx/PlanCanvas.tsx's own keydown handlers, and ProjectSchema.ts/
-// Migrations.ts/ProjectV2Schema.ts.
-//
-// 8.3 and 8.5 were updated after feat/iso-tiles-and-rotation was merged
-// into main (a branch-inventory follow-up task): at the time this file
-// was first written, that branch was still unmerged, so plan objects
-// had no rotation field at all and terrain tiles always drew their own
-// walls regardless of neighbors - both chapters said so directly. Now
-// that the merge landed, they describe the real mechanism instead: a
-// four-way Rotation field whose 180/270 values only appear once a
-// sprite's manifest entry has its own rear view (none do yet, so every
-// object today still only rotates between 0 and 90 in practice), and
-// terrain walls that only draw at an actually-painted edge, not between
-// two painted neighbors.
+// feat/help-system commit 5 - full content for chapters 9-12, Polish and
+// English (originally 8-12; chapter 8, the isometric PLAN screen, was
+// removed in full by chore/remove-isometric-plan-mode along with the
+// mode itself - see HelpToc.ts's own comment on the resulting gap in
+// chapter numbering). Checked against historySlice.ts, CanvasView.ts,
+// Canvas.tsx's own keydown handler, and ProjectSchema.ts/Migrations.ts/
+// ProjectV2Schema.ts.
 
 import type { HelpContentMap } from './HelpContentRegistry';
 
 export const HELP_CONTENT_OPERATIONS: HelpContentMap = {
-  // ==================== CHAPTER 8 - PLAN SCREEN ====================
-  'plan-purpose': {
-    pl: [
-      { kind: 'p', text: 'Ekran planu pokazuje rzut izometryczny dzialki: teren, budynki, obiekty zewnetrzne (latarnie, brama, oczyszczalnia). Sluzy do pokazania GDZIE fizycznie znajduje sie sprzet na dzialce - nie JAK jest okablowany.' },
-      { kind: 'p', text: 'Kluczowa roznica wobec schematu ([[sch-node-model|5.1]]): na planie NIE MA przewodow ani sieci - obiekty planu nie maja zaciskow i nie da sie ich ze soba polaczyc. Nie maja tez rotacji ani skali - jedyna ich geometria to komorka siatki (gx, gy) i ktory sprite/stan z manifestu je rysuje.' },
-    ],
-    en: [
-      { kind: 'p', text: 'The plan screen shows an isometric view of the plot: terrain, buildings, outdoor objects (light poles, a gate, a septic tank). It exists to show WHERE hardware physically sits on the plot - not HOW it is wired.' },
-      { kind: 'p', text: 'The key difference from the schematic ([[sch-node-model|5.1]]): the plan has NO wires and no nets at all - plan objects have no terminals and cannot be connected to one another. They also have no rotation or scale - their only geometry is a grid cell (gx, gy) and which sprite/state from the manifest draws them.' },
-    ],
-  },
-  'plan-projection-grid': {
-    pl: [
-      { kind: 'p', text: 'Rzut jest dimetryczny 2:1 (kafel 128x64 pikseli), z jedna komorka siatki odpowiadajaca 8 metrom w rzeczywistosci (`ISO_METERS_PER_TILE` w `IsoGrid.ts`). Kazdy kafel to diament na ekranie; jego srodek odpowiada wspolrzednym siatki (gx, gy).' },
-      { kind: 'p', text: 'Zaznaczenie kafla pod kursorem uzywa zaokraglenia do najblizszej komorki (`screenToTileRounded`), a nie obciecia w dol - diamenty kafli sa wysrodkowane na calkowitych wspolrzednych, nie zaczepione za rog, wiec obciecie dawaloby zly kafel przy kazdym kliknieciu blisko krawedzi.' },
-    ],
-    en: [
-      { kind: 'p', text: 'The projection is a 2:1 dimetric view (a 128x64 pixel tile), with one grid cell corresponding to 8 real-world meters (`ISO_METERS_PER_TILE` in `IsoGrid.ts`). Every tile is a diamond on screen; its center corresponds to grid coordinates (gx, gy).' },
-      { kind: 'p', text: 'Picking the tile under the cursor rounds to the nearest cell (`screenToTileRounded`), not floors it - tile diamonds are centered on integer coordinates, not corner-anchored, so flooring would pick the wrong tile for every click near an edge.' },
-    ],
-  },
-  'plan-terrain-painting': {
-    pl: [
-      { kind: 'p', text: 'Teren maluje sie narzedziem pedzla z toolbara, wybierajac jeden z pieciu typow (trawa, kostka brukowa, ziemia, zwir, woda) i przeciagajac po kaflach. Mapa terenu jest RZADKA - kafel niepomalowany po prostu nie istnieje w danych (nie jest zapisany jako "pusty typ"), wiec dzialka pokazuje sie jako wyspa na tle, a nie jako wypelniajacy caly ekran prostokat.' },
-      { kind: 'p', text: 'Kazdy pomalowany kafel jest rysowany jako diament plus dwie sciany boczne wytloczone w dol o stala wysokosc - ale sciana rysuje sie TYLKO wtedy, gdy sasiedni kafel w tym kierunku NIE jest pomalowany (liczy sie sama OBECNOSC sasiada, nie jego typ). Dzieki temu dwa sasiadujace kafle, niezaleznie od typu, tworza jedna ciagla plyte bez szwu miedzy nimi - sciana pojawia sie tylko na FAKTYCZNEJ krawedzi pomalowanego obszaru.' },
-    ],
-    en: [
-      { kind: 'p', text: 'Terrain is painted with the toolbar\'s brush tool, choosing one of five types (grass, paving, soil, gravel, water) and dragging across tiles. The terrain map is SPARSE - an unpainted tile simply does not exist in the data (it is not stored as an "empty type"), so the plot shows as an island on the background, not a rectangle filling the whole screen.' },
-      { kind: 'p', text: 'Every painted tile is drawn as a diamond plus two side walls extruded downward by a fixed height - but a wall is drawn ONLY when the neighboring tile in that direction is NOT painted (what matters is the neighbor\'s mere PRESENCE, not its type). Two adjacent tiles, regardless of type, therefore form one continuous slab with no seam between them - a wall only ever appears at the actual edge of the painted area.' },
-    ],
-  },
-  'plan-placing-objects': {
-    pl: [
-      { kind: 'p', text: 'Obiekty wstawia sie przeciagajac je z biblioteki na kafel siatki. Kazdy obiekt ma wlasny WYMIAR W KAFLACH (footprint), zdefiniowany w manifescie sprite\'ow (np. dom jednorodzinny zajmuje 2x2 kafle, hala magazynowa 3x2) - to pole jest tylko do odczytu we Properties, nie da sie go zmienic recznie.' },
-      { kind: 'p', text: 'Umieszczenie obiektu NIE wymaga, zeby stal na pomalowanym terenie - siatka planu istnieje niezaleznie od tego, co jest namalowane; obiekt postawiony poza namalowanym terenem po prostu wyglada, jakby stal w powietrzu nad tlem, bo nic pod nim nie jest narysowane (patrz [[ts-object-outside-terrain|rozdzial 11]]).' },
-    ],
-    en: [
-      { kind: 'p', text: 'Objects are placed by dragging them from the library onto a grid tile. Every object has its own SIZE IN TILES (footprint), defined in the sprite manifest (e.g. a house occupies 2x2 tiles, a warehouse 3x2) - this field is read-only in Properties, it cannot be changed by hand.' },
-      { kind: 'p', text: 'Placing an object does NOT require it to stand on painted terrain - the plan grid exists independently of what is painted; an object placed off the painted terrain simply looks like it is standing in mid-air over the background, because nothing is drawn underneath it (see [[ts-object-outside-terrain|chapter 11]]).' },
-    ],
-  },
-  'plan-rotation': {
-    pl: [
-      { kind: 'p', text: 'Zaznaczony obiekt planu ma we Properties pole Rotation z czterema mozliwymi wartosciami: 0, 90, 180, 270 stopni. Obroty 0 i 90 rysuja PRZEDNI widok sprite\'a (90 stopni to ten sam obrazek odbity poziomo w lustrze - odwrocenie lewo-prawo wystarcza, zeby pokazac cwiartke obrotu plaskiego, jednowidokowego obiektu).' },
-      { kind: 'p', text: 'Obroty 180 i 270 wymagaja natomiast TYLNEGO widoku sprite\'a (270 to ten tylny widok odbity w lustrze) - zadne lustrzane odbicie nie potrafi wyliczyc tylu budynku z jego frontu, skoro tyl ma wlasny uklad okien/drzwi/komina. Dlatego 180/270 sa dostepne w rozwijanym polu Rotation WYLACZNIE wtedy, gdy wpis danego stanu sprite\'a w manifescie ma wlasny widok tylny (`fileBack`) - lista dostepnych obrotow jest wiec wprost zalezna od danych w manifescie, nigdy sztywna.' },
-      { kind: 'note', text: 'Stan biezacy manifestu (`public/sprites/iso/manifest.json`): ZADEN z dostarczonych sprite\'ow nie ma jeszcze zdefiniowanego widoku tylnego - w praktyce kazdy obiekt na planie oferuje dzis tylko dwa obroty (0 i 90), mimo ze mechanizm obslugujacy wszystkie cztery jest juz w pelni gotowy. Czwarty i trzeci obrot pojawia sie automatycznie, gdy tylko ktorys sprite dostanie wlasny plik widoku tylnego w manifescie - bez zadnej zmiany w kodzie.' },
-    ],
-    en: [
-      { kind: 'p', text: 'A selected plan object has a Rotation field in Properties with four possible values: 0, 90, 180, 270 degrees. Rotations 0 and 90 both draw the sprite\'s FRONT view (90 is that same image mirrored horizontally - a left/right flip is enough to show a quarter turn of a flat, single-view object).' },
-      { kind: 'p', text: 'Rotations 180 and 270 instead need the sprite\'s REAR view (270 is that rear view mirrored) - no mirror flip can derive a building\'s back from its front, since the back has its own window/door/chimney layout. So 180/270 only appear in the Rotation dropdown when that sprite state\'s own manifest entry has its own rear view (fileBack) - the list of available rotations is directly data-driven from the manifest, never fixed.' },
-      { kind: 'note', text: 'Current state of the manifest (public/sprites/iso/manifest.json): NONE of the shipped sprites has a rear view defined yet - in practice every plan object today only offers two rotations (0 and 90), even though the mechanism supporting all four is fully built. The third and fourth rotation appear automatically the moment any sprite gets its own rear-view file in the manifest - with no code change needed.' },
-    ],
-  },
-  'plan-object-states': {
-    pl: [
-      { kind: 'p', text: 'Kazdy obiekt planu ma pole State, ktore wybiera JEDEN z nazwanych stanow zdefiniowanych dla jego sprite\'a w manifescie - lista dostepnych wartosci w rozwijanym polu Properties pochodzi wprost z kluczy tego sprite\'a w manifescie, nigdy z listy stalej w kodzie.' },
-      { kind: 'p', text: 'Przyklady z biezacego manifestu: latarnia dwuramienna (`light.pole_double`) ma stany OFF/ON (zgaszona/swiecaca); brama przesuwna (`gate.sliding`) ma stany CLOSED/MOVING/OPEN (zamknieta/w ruchu/otwarta). Wiekszosc pozostalych obiektow (budynki, zbiornik) ma tylko jeden stan, DEFAULT - dla nich pole State nie ma praktycznego znaczenia.' },
-      { kind: 'p', text: 'Podobnie jak stan podgladu na schemacie ([[sym-states-preview|6.3]]), to reczne ustawienie projektowe - edytor nie wie, czy brama jest naprawde otwarta, tylko pokazuje wybrany stan.' },
-    ],
-    en: [
-      { kind: 'p', text: 'Every plan object has a State field that picks ONE of the named states defined for its sprite in the manifest - the list of available values in the Properties dropdown comes directly from that sprite\'s own keys in the manifest, never from a fixed list in the code.' },
-      { kind: 'p', text: 'Examples from the current manifest: the double light pole (`light.pole_double`) has OFF/ON states; the sliding gate (`gate.sliding`) has CLOSED/MOVING/OPEN states. Most other objects (buildings, the tank) have only one state, DEFAULT - for those, the State field has no practical effect.' },
-      { kind: 'p', text: 'Same as the schematic\'s own preview state ([[sym-states-preview|6.3]]), this is a manual design-time setting - the editor does not know whether a gate is actually open, it only shows whichever state was chosen.' },
-    ],
-  },
-
   // ==================== CHAPTER 9 - WORKING WITH THE EDITOR ====================
   'edit-selection': {
     pl: [
@@ -120,12 +44,12 @@ export const HELP_CONTENT_OPERATIONS: HelpContentMap = {
   },
   'edit-undo-redo': {
     pl: [
-      { kind: 'p', text: 'Historia cofniec obejmuje LACZNIE obiekty, przewody, mierniki, panele sygnalizacyjne, ramki, teren i obiekty planu jako JEDEN migawkowy zapis na kazde wywolanie zapisu historii - nie osobna historie dla kazdego typu elementu. Limit to 100 wpisow.' },
+      { kind: 'p', text: 'Historia cofniec obejmuje LACZNIE obiekty, przewody, mierniki, panele sygnalizacyjne i ramki jako JEDEN migawkowy zapis na kazde wywolanie zapisu historii - nie osobna historie dla kazdego typu elementu. Limit to 100 wpisow.' },
       { kind: 'p', text: 'JEDNO dzialanie w historii to: jedno przeciagniecie (od nacisniecia do puszczenia przycisku myszy), jedno nacisniecie strzalki, jedna operacja z menu (Wytnij/Wklej/Usun), jedno zakonczone rysowanie przewodu. Proba zapisu, w ktorej nic sie faktycznie nie zmienilo (np. klikniecie w pole i wyjscie bez edycji), jest pomijana, zeby nie zaśmiecac historii pustymi wpisami.' },
       { kind: 'p', text: 'Rejestry projektu (lokalizacje, karty, aparaty) oraz wybrany jezyk pomocy NIE naleza do tej historii cofniec - sa to ustawienia projektu, a nie tresc rysunku; ich zmiany nie da sie cofnac przez Ctrl+Z z poziomu menu Edit.' },
     ],
     en: [
-      { kind: 'p', text: 'Undo history covers objects, wires, meters, signal panels, frames, terrain and plan objects TOGETHER as ONE combined snapshot per history-save call - not a separate history per element type. The limit is 100 entries.' },
+      { kind: 'p', text: 'Undo history covers objects, wires, meters, signal panels and frames TOGETHER as ONE combined snapshot per history-save call - not a separate history per element type. The limit is 100 entries.' },
       { kind: 'p', text: 'ONE action in the history is: one drag (from mouse-down to mouse-up), one arrow-key press, one menu operation (Copy/Paste/Delete), one finished wire drawing. An attempt to save history where nothing actually changed (e.g. clicking into a field and leaving without editing it) is skipped, so it does not clutter the history with empty entries.' },
       { kind: 'p', text: 'The project registries (locations, cards, devices) and the chosen help language are NOT part of this undo history - they are project settings, not drawing content; their changes cannot be undone through the Edit menu\'s undo.' },
     ],
@@ -164,12 +88,12 @@ export const HELP_CONTENT_OPERATIONS: HelpContentMap = {
   // ==================== CHAPTER 10 - FILE FORMAT ====================
   'file-contents': {
     pl: [
-      { kind: 'p', text: 'Plik projektu (`.epwsyn`, JSON) ma pole `format: "EPW_SYNOPTIC"` i `schema_version`. Zawiera: metadane projektu, konfiguracje kanwy, tablice `objects` i `connections`, opcjonalnie `meters`, `signalPanels`, `frames`, `devices`, `locations`, `cards`, `terrain` (mapa terenu planu), `planObjects`, `kind` (rodzaj ekranu) i `helpLanguage` (jezyk pomocy).' },
+      { kind: 'p', text: 'Plik projektu (`.epwsyn`, JSON) ma pole `format: "EPW_SYNOPTIC"` i `schema_version`. Zawiera: metadane projektu, konfiguracje kanwy, tablice `objects` i `connections`, opcjonalnie `meters`, `signalPanels`, `frames`, `devices`, `locations`, `cards`, `kind` (rodzaj ekranu - dzis zawsze SCHEMATIC, patrz [[intro-screens|1.4]]) i `helpLanguage` (jezyk pomocy).' },
       { kind: 'p', text: 'Kazde z pol opcjonalnych zostalo dodane w ten sam sposob: dopisane jako nowe pole bez podnoszenia numeru wersji schematu, bo starszy plik po prostu nie ma tego pola i wczytuje sie z sensowna wartoscia domyslna (pusta tablica/mapa, jezyk polski) zamiast bledu.' },
       { kind: 'note', text: 'W repozytorium istnieje TAKZE drugi, niezalezny format o nazwie EPW_PROJECT (plik `ProjectV2Schema.ts`), z zupelnie innym modelem (wiele ekranow w jednym pliku, polaczenia oparte na portach zamiast na wezlach). Nic w dzialajacym edytorze go dzis nie zapisuje ani nie odczytuje - to wylacznie definicje typow i walidator, przygotowanie pod przyszla architekture, nie aktywny format.' },
     ],
     en: [
-      { kind: 'p', text: 'The project file (`.epwsyn`, JSON) has a `format: "EPW_SYNOPTIC"` field and a `schema_version`. It contains: project metadata, canvas configuration, `objects` and `connections` arrays, and optionally `meters`, `signalPanels`, `frames`, `devices`, `locations`, `cards`, `terrain` (the plan\'s terrain map), `planObjects`, `kind` (the screen kind) and `helpLanguage` (the help language).' },
+      { kind: 'p', text: 'The project file (`.epwsyn`, JSON) has a `format: "EPW_SYNOPTIC"` field and a `schema_version`. It contains: project metadata, canvas configuration, `objects` and `connections` arrays, and optionally `meters`, `signalPanels`, `frames`, `devices`, `locations`, `cards`, `kind` (the screen kind - always SCHEMATIC today, see [[intro-screens|1.4]]) and `helpLanguage` (the help language).' },
       { kind: 'p', text: 'Every optional field was added the same way: appended as a new field without bumping the schema version, because an older file simply has none of it and loads with a sensible default (an empty array/map, Polish) instead of an error.' },
       { kind: 'note', text: 'A SECOND, independent format called EPW_PROJECT also exists in this repository (`ProjectV2Schema.ts`), with a completely different model (multiple screens in one file, port-based rather than node-based connections). Nothing in the running editor writes or reads it today - it is type definitions and a validator only, groundwork for a future architecture, not an active format.' },
     ],
@@ -364,40 +288,27 @@ export const HELP_CONTENT_OPERATIONS: HelpContentMap = {
       { kind: 'p', text: 'FIX: read the exact error text in the Messages panel - each of the three cases has its own, specific message. A file with too new a version needs a newer editor build; a wrong format is not a file from this program at all.' },
     ],
   },
-  'ts-object-outside-terrain': {
-    pl: [
-      { kind: 'p', text: 'OBJAW: obiekt na ekranie planu wyglada, jakby stal w powietrzu, bez terenu pod nim.' },
-      { kind: 'p', text: 'PRZYCZYNA: umieszczenie obiektu NIE wymaga pomalowanego terenu pod nim - siatka planu i mapa terenu sa od siebie niezalezne ([[plan-placing-objects|8.4]]). To nie jest blad ani ograniczenie - po prostu nic nie jest narysowane pod obiektem, bo ten kafel nie zostal pomalowany.' },
-      { kind: 'p', text: 'CO ZROBIC: wybierz narzedzie pedzla terenu i pomaluj kafle pod obiektem (i wokol niego) wlasciwym typem terenu.' },
-    ],
-    en: [
-      { kind: 'p', text: 'SYMPTOM: an object on the plan screen looks like it is standing in mid-air, with no terrain underneath it.' },
-      { kind: 'p', text: 'CAUSE: placing an object does NOT require painted terrain underneath it - the plan grid and the terrain map are independent of each other ([[plan-placing-objects|8.4]]). This is not a bug or a restriction - nothing is simply drawn under the object because that tile was never painted.' },
-      { kind: 'p', text: 'FIX: pick the terrain brush tool and paint the tiles under (and around) the object with the right terrain type.' },
-    ],
-  },
-
   // ==================== CHAPTER 12 - KEYBOARD SHORTCUTS ====================
   'shortcuts-all': {
     pl: [
-      { kind: 'p', text: 'Ponizsza lista jest wyciagnieta wprost z obslugi klawiatury w kodzie (`Canvas.tsx`, `PlanCanvas.tsx`, `App.tsx`, `HelpWindow.tsx`) - nie z pamieci. Jesli jakis skrot wydaje sie oczywisty, a nie jest tu wymieniony (np. Ctrl+Z/Ctrl+Y dla cofania/ponawiania), to znaczy, ze w tej wersji edytora dziala WYLACZNIE z menu Edit, nie z klawiatury - sprawdzone wprost w kodzie, nie zalozone.' },
+      { kind: 'p', text: 'Ponizsza lista jest wyciagnieta wprost z obslugi klawiatury w kodzie (`Canvas.tsx`, `App.tsx`, `HelpWindow.tsx`) - nie z pamieci. Jesli jakis skrot wydaje sie oczywisty, a nie jest tu wymieniony (np. Ctrl+Z/Ctrl+Y dla cofania/ponawiania), to znaczy, ze w tej wersji edytora dziala WYLACZNIE z menu Edit, nie z klawiatury - sprawdzone wprost w kodzie, nie zalozone.' },
       { kind: 'heading', text: 'Zaznaczanie' },
       { kind: 'table', headers: ['Skrot', 'Dzialanie', 'Gdzie'], rows: [
         ['Ctrl/Cmd+A', 'Zaznacz wszystko na biezacym ekranie', 'Schemat'],
         ['Shift+klik', 'Dodaj/usun z zaznaczenia', 'Schemat'],
-        ['Escape', 'Wyczysc zaznaczenie (jesli nic innego nie jest w toku)', 'Schemat i plan'],
+        ['Escape', 'Wyczysc zaznaczenie (jesli nic innego nie jest w toku)', 'Schemat'],
       ] },
       { kind: 'heading', text: 'Edycja' },
       { kind: 'table', headers: ['Skrot', 'Dzialanie', 'Gdzie'], rows: [
         ['Ctrl/Cmd+C', 'Kopiuj zaznaczenie', 'Schemat'],
         ['Ctrl/Cmd+V', 'Wklej (przesuniete o jedno oczko)', 'Schemat'],
         ['Ctrl/Cmd+D', 'Powiel zaznaczenie w miejscu', 'Schemat'],
-        ['Delete / Backspace', 'Usun zaznaczenie', 'Schemat i plan'],
+        ['Delete / Backspace', 'Usun zaznaczenie', 'Schemat'],
         ['Strzalki', 'Przesun zaznaczenie o jedno oczko (dziesiec z Shift)', 'Schemat'],
       ] },
       { kind: 'heading', text: 'Widok' },
       { kind: 'table', headers: ['Skrot', 'Dzialanie', 'Gdzie'], rows: [
-        ['Spacja (przytrzymana)', 'Tryb przewijania (reka)', 'Schemat i plan'],
+        ['Spacja (przytrzymana)', 'Tryb przewijania (reka)', 'Schemat'],
         ['Ctrl/Cmd+0', 'Przywroc powiekszenie 100%', 'Schemat'],
         ['Ctrl/Cmd+9', 'Dopasuj widok do calej zawartosci', 'Schemat'],
       ] },
@@ -409,12 +320,6 @@ export const HELP_CONTENT_OPERATIONS: HelpContentMap = {
         ['Alt+klik na przewodzie', 'Wstaw punkt zalamania', 'Schemat'],
         ['Alt (przytrzymany, podczas przeciagania)', 'Chwilowo wylacz przyciaganie do siatki', 'Schemat'],
       ] },
-      { kind: 'heading', text: 'Tryb planu' },
-      { kind: 'table', headers: ['Skrot', 'Dzialanie'], rows: [
-        ['Delete / Backspace', 'Usun zaznaczone obiekty planu'],
-        ['Escape', 'Wyczysc zaznaczenie obiektow planu'],
-        ['Spacja (przytrzymana)', 'Tryb przewijania (reka)'],
-      ] },
       { kind: 'heading', text: 'Pomoc' },
       { kind: 'table', headers: ['Skrot', 'Dzialanie'], rows: [
         ['F1', 'Otworz pomoc na rozdziale zwiazanym z biezacym zaznaczeniem'],
@@ -422,24 +327,24 @@ export const HELP_CONTENT_OPERATIONS: HelpContentMap = {
       ] },
     ],
     en: [
-      { kind: 'p', text: 'The list below is pulled directly from the keyboard handling in the code (`Canvas.tsx`, `PlanCanvas.tsx`, `App.tsx`, `HelpWindow.tsx`) - not from memory. If a shortcut seems obvious and is not listed here (e.g. Ctrl+Z/Ctrl+Y for undo/redo), that means this editor version only offers it from the Edit menu, not the keyboard - checked directly in the code, not assumed.' },
+      { kind: 'p', text: 'The list below is pulled directly from the keyboard handling in the code (`Canvas.tsx`, `App.tsx`, `HelpWindow.tsx`) - not from memory. If a shortcut seems obvious and is not listed here (e.g. Ctrl+Z/Ctrl+Y for undo/redo), that means this editor version only offers it from the Edit menu, not the keyboard - checked directly in the code, not assumed.' },
       { kind: 'heading', text: 'Selection' },
       { kind: 'table', headers: ['Shortcut', 'Action', 'Where'], rows: [
         ['Ctrl/Cmd+A', 'Select everything on the current screen', 'Schematic'],
         ['Shift+click', 'Add/remove from the selection', 'Schematic'],
-        ['Escape', 'Clear selection (if nothing else is in progress)', 'Schematic and plan'],
+        ['Escape', 'Clear selection (if nothing else is in progress)', 'Schematic'],
       ] },
       { kind: 'heading', text: 'Editing' },
       { kind: 'table', headers: ['Shortcut', 'Action', 'Where'], rows: [
         ['Ctrl/Cmd+C', 'Copy the selection', 'Schematic'],
         ['Ctrl/Cmd+V', 'Paste (offset by one grid cell)', 'Schematic'],
         ['Ctrl/Cmd+D', 'Duplicate the selection in place', 'Schematic'],
-        ['Delete / Backspace', 'Delete the selection', 'Schematic and plan'],
+        ['Delete / Backspace', 'Delete the selection', 'Schematic'],
         ['Arrow keys', 'Move the selection by one grid cell (ten with Shift)', 'Schematic'],
       ] },
       { kind: 'heading', text: 'View' },
       { kind: 'table', headers: ['Shortcut', 'Action', 'Where'], rows: [
-        ['Space (held)', 'Pan mode (hand cursor)', 'Schematic and plan'],
+        ['Space (held)', 'Pan mode (hand cursor)', 'Schematic'],
         ['Ctrl/Cmd+0', 'Reset zoom to 100%', 'Schematic'],
         ['Ctrl/Cmd+9', 'Fit the view to all content', 'Schematic'],
       ] },
@@ -450,12 +355,6 @@ export const HELP_CONTENT_OPERATIONS: HelpContentMap = {
         ['Backspace (while drawing)', 'Undo the last wire point', 'Schematic'],
         ['Alt+click on a wire', 'Insert a bend point', 'Schematic'],
         ['Alt (held, while dragging)', 'Temporarily disable snap-to-grid', 'Schematic'],
-      ] },
-      { kind: 'heading', text: 'Plan mode' },
-      { kind: 'table', headers: ['Shortcut', 'Action'], rows: [
-        ['Delete / Backspace', 'Delete selected plan objects'],
-        ['Escape', 'Clear the plan selection'],
-        ['Space (held)', 'Pan mode (hand cursor)'],
       ] },
       { kind: 'heading', text: 'Help' },
       { kind: 'table', headers: ['Shortcut', 'Action'], rows: [

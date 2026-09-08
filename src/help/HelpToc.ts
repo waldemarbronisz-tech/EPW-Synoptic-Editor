@@ -5,6 +5,17 @@
 // short, honest placeholder, never a crash), which is exactly the state
 // most topics are in until commits 3-5 fill their content in. The ids
 // below never change once a content commit starts writing to them.
+//
+// chore/remove-isometric-plan-mode: chapter 8 (the isometric PLAN
+// screen) has been removed in full, along with the mode itself - its
+// own 6 topics are gone, not merely emptied. Chapters 9-13 deliberately
+// keep their own existing ids/numbers unchanged rather than shifting
+// down to fill the gap: every cross-reference elsewhere in this help
+// embeds a chapter/topic NUMBER directly in its own label text (e.g.
+// `[[file-contents|10.1]]`), and renumbering every one of those to
+// match would be its own large, error-prone rewrite that this task
+// never asked for - a numbering gap after a removed chapter is a
+// normal, honest way to show it is gone, not a defect to paper over.
 
 import type { HelpChapterMeta, HelpTopicMeta } from './HelpTypes';
 
@@ -15,7 +26,7 @@ export const HELP_TOC: HelpChapterMeta[] = [
       { id: 'intro-what', title: { pl: '1.1 Czym jest EPW-Synoptic-Editor', en: '1.1 What EPW-Synoptic-Editor Is' } },
       { id: 'intro-platform', title: { pl: '1.2 Miejsce w platformie EPW', en: '1.2 Place in the EPW Platform' } },
       { id: 'intro-principle', title: { pl: '1.3 Zasada nadrzedna: ekran informuje, sprzet chroni', en: '1.3 Governing Principle: the Screen Informs, the Hardware Protects' } },
-      { id: 'intro-screens', title: { pl: '1.4 Dwa rodzaje ekranow: schemat i plan', en: '1.4 Two Screen Kinds: Schematic and Plan' } },
+      { id: 'intro-screens', title: { pl: '1.4 Rodzaj ekranu i pole kind', en: '1.4 Screen Kind and the kind Field' } },
     ],
   },
   {
@@ -83,17 +94,6 @@ export const HELP_TOC: HelpChapterMeta[] = [
     ],
   },
   {
-    id: 'ch8', title: { pl: '8. Ekran planu', en: '8. Plan Screen' },
-    topics: [
-      { id: 'plan-purpose', title: { pl: '8.1 Do czego sluzy i czym rozni sie od schematu', en: '8.1 What It Is For and How It Differs From the Schematic' } },
-      { id: 'plan-projection-grid', title: { pl: '8.2 Rzut izometryczny i siatka', en: '8.2 Isometric Projection and the Grid' } },
-      { id: 'plan-terrain-painting', title: { pl: '8.3 Malowanie terenu', en: '8.3 Painting Terrain' } },
-      { id: 'plan-placing-objects', title: { pl: '8.4 Wstawianie obiektow, wymiar w kaflach', en: '8.4 Placing Objects, Sizing in Tiles' } },
-      { id: 'plan-rotation', title: { pl: '8.5 Obroty obiektow i skad wynikaja dostepne obroty', en: '8.5 Object Rotation and Where the Available Rotations Come From' } },
-      { id: 'plan-object-states', title: { pl: '8.6 Stany obiektow', en: '8.6 Object States' } },
-    ],
-  },
-  {
     id: 'ch9', title: { pl: '9. Praca z edytorem', en: '9. Working With the Editor' },
     topics: [
       { id: 'edit-selection', title: { pl: '9.1 Zaznaczanie: klikniecie, ramka, Shift, Ctrl+A', en: '9.1 Selection: Click, Box, Shift, Ctrl+A' } },
@@ -130,7 +130,6 @@ export const HELP_TOC: HelpChapterMeta[] = [
       { id: 'ts-designation-duplicate', title: { pl: 'Nie da sie zapisac aparatu - duplikat oznaczenia', en: 'A Device Cannot Be Saved - Duplicate Designation' } },
       { id: 'ts-wire-diagonal-rejected', title: { pl: 'Przewod nie chce isc po skosie', en: 'A Wire Will Not Go Diagonally' } },
       { id: 'ts-project-wont-open', title: { pl: 'Plik projektu nie chce sie otworzyc', en: 'A Project File Will Not Open' } },
-      { id: 'ts-object-outside-terrain', title: { pl: 'Obiekt na planie stoi w powietrzu, poza namalowanym terenem', en: 'A Plan Object Stands Off the Painted Terrain' } },
     ],
   },
   {

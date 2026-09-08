@@ -11,8 +11,6 @@ import type { GroupCommandElement } from '../elements/GroupCommandElement';
 import type { SetpointPanelElement } from '../elements/SetpointElement';
 import type { Device, LocationEntry, CardEntry } from '../project/DeviceSchema';
 import type { CanvasState, DeviceCreateOrAssignRequest, DeviceFormRequest, HistorySnapshot, Message, ScreenKind, SynopticConnection, SynopticObject } from './types';
-import type { TerrainTileType } from '../iso/TerrainTile';
-import type { PlanObject } from '../iso/PlanObject';
 import type { HelpLanguage } from '../i18n/HelpLanguage';
 
 export interface AppState {
@@ -219,43 +217,17 @@ export interface AppState {
   // Rotation
   rotateSelected: (direction: 'cw' | 'ccw') => void;
 
-  // PLAN screen terrain (feat/isometric-engine commit 3): a sparse map,
-  // one entry per PAINTED tile only - an unpainted tile is simply absent,
-  // not stored with some "empty" type, so the canvas shows the plot as
-  // an island on the background, not a rectangle filling the screen.
-  terrainTiles: Record<string, TerrainTileType>;
-  // Sets/overwrites one tile - called for every tile the paint tool's
-  // drag crosses. Deliberately does NOT call saveHistory itself (a drag
-  // can cross many tiles); commitTerrainStroke below does that once, so
-  // one whole mousedown-to-mouseup drag is one undo entry, never one per
-  // tile painted.
-  paintTerrainTile: (gx: number, gy: number, type: TerrainTileType) => void;
-  commitTerrainStroke: () => void;
-
-  // Screen mode (feat/isometric-engine commit 5): SCHEMATIC (default) is
-  // every screen this editor already knew how to draw, completely
-  // unchanged; PLAN is the new isometric mode. See planSlice.ts's own
-  // header for why PLAN objects get their own separate selection/CRUD
-  // rather than joining the schematic one.
+  // Screen kind (chore/remove-isometric-plan-mode): SCHEMATIC is the
+  // only value left - the earlier isometric PLAN mode (its own canvas,
+  // terrain paint tool, placed objects) has been removed entirely. The
+  // field itself stays (rather than being deleted outright) because the
+  // project file format's own `kind` field is optional and additive
+  // (ProjectSchema.ts) and this is still where its live value lives -
+  // see project/ProjectManager.ts for how a legacy file saved with
+  // `kind: "PLAN"` still loads, converted to SCHEMATIC with a message,
+  // rather than being rejected.
   screenKind: ScreenKind;
   setScreenKind: (kind: ScreenKind) => void;
-
-  planObjects: PlanObject[];
-  selectedPlanObjectIds: string[];
-  addPlanObject: (obj: Omit<PlanObject, 'id'>) => void;
-  updatePlanObject: (id: string, updates: Partial<PlanObject>) => void;
-  deletePlanObjects: (ids: string[]) => void;
-  selectPlanObjects: (ids: string[], multi?: boolean) => void;
-  clearPlanSelection: () => void;
-  movePlanObjectTo: (id: string, gx: number, gy: number) => void;
-  terrainPaintTool: TerrainTileType | null;
-  setTerrainPaintTool: (type: TerrainTileType | null) => void;
-  manifestVersion: number;
-  bumpManifestVersion: () => void;
-  // fix/iso-tiles-and-rotation commit 3: rotates every object in `ids`
-  // together as one undo entry - see planSlice.ts's own comment for why
-  // available rotations are re-read per object rather than assumed.
-  rotatePlanObjects: (ids: string[], direction: 'cw' | 'ccw') => void;
 
   // feat/help-system commit 1: which language the Help window's own
   // content shows in - see helpSlice.ts's own header for why this lives

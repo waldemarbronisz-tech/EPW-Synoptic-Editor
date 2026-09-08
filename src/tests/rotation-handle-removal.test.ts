@@ -1,8 +1,8 @@
 // fix/inline-device-creation commit 1: removes the free-rotation handle
-// from every selection Transformer, in both SCHEMATIC and PLAN mode - a
-// symbol only rotates in 90-degree steps (Properties' own Rotation
-// field, or the R key) to keep its terminals on grid nodes, and a free
-// drag of the rotate handle could misalign them.
+// from every selection Transformer - a symbol only rotates in 90-degree
+// steps (Properties' own Rotation field, or the R key) to keep its
+// terminals on grid nodes, and a free drag of the rotate handle could
+// misalign them.
 //
 // Konva cannot actually render in this project's jsdom test environment
 // (no `canvas` npm package installed - see this file's own spike, kept
@@ -17,7 +17,6 @@ import { useStore } from '../store';
 
 import transformerHandlesSource from '../components/canvas/TransformerHandles.tsx?raw';
 import groupCommandNodeSource from '../components/GroupCommandElementNode.tsx?raw';
-import planCanvasSource from '../components/PlanCanvas.tsx?raw';
 import canvasSource from '../components/Canvas.tsx?raw';
 
 // Pulls one exported component's own body out of the file's source so
@@ -58,14 +57,10 @@ describe('1. rotateEnabled is false on every schematic-mode selection Transforme
   });
 });
 
-describe('2. the two element kinds with no Transformer at all (przycisk komendy grupowej, obiekt planu) never had a rotate handle to begin with', () => {
+describe('2. the one element kind with no Transformer at all (przycisk komendy grupowej) never had a rotate handle to begin with', () => {
   it('GroupCommandElementNode draws its own selection as a plain dashed shape, no Konva Transformer', () => {
     expect(groupCommandNodeSource).not.toMatch(/react-konva'[\s\S]*?Transformer/);
     expect(groupCommandNodeSource).not.toContain('<Transformer');
-  });
-
-  it('PlanCanvas draws a plan object\'s selection outline as a plain dashed Rect, no Konva Transformer', () => {
-    expect(planCanvasSource).not.toContain('<Transformer');
   });
 });
 
@@ -85,7 +80,7 @@ describe('3. rotation stays available with the free-rotation handle gone: Proper
     expect(useStore.getState().objects[0].rotation).toBe(90);
   });
 
-  it('Canvas.tsx\'s own keydown handler still binds R/Shift+R to rotateSelected (mirroring PlanCanvas.tsx\'s existing R-key convention for plan objects), unguarded by the wire/frame tool state so it works for a plain selection', () => {
+  it('Canvas.tsx\'s own keydown handler still binds R/Shift+R to rotateSelected, unguarded by the wire/frame tool state so it works for a plain selection', () => {
     expect(canvasSource).toMatch(/e\.key\.toLowerCase\(\) === 'r'[\s\S]{0,900}rotateSelected\(e\.shiftKey \? 'ccw' : 'cw'\)/);
   });
 

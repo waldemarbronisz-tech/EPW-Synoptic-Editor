@@ -6,14 +6,13 @@ import {
   BringToFront, SendToBack, AlignLeft, AlignCenter, AlignRight,
   AlignVerticalSpaceAround, AlignHorizontalSpaceAround,
   Lock, Unlock, RotateCcw, RotateCw, PenLine, Zap, Droplet, Wind, Gauge, CircleDot,
-  Square, Home, MousePointer2, Power, SlidersHorizontal
+  Square, Home, Power, SlidersHorizontal
 } from 'lucide-react';
-import { COLOR_ENERGIZED, COLOR_WATER, VENTILATION_ACTIVE, COLOR_WHITE, COLOR_RUN, COLOR_OUTLINE } from '../theme/ScadaTheme';
+import { COLOR_ENERGIZED, COLOR_WATER, VENTILATION_ACTIVE, COLOR_WHITE, COLOR_RUN } from '../theme/ScadaTheme';
 import { METER_DEFAULT_FONT_SIZE } from '../meter/MeterElement';
 import { SIGNAL_PANEL_DEFAULT_FONT_SIZE } from '../elements/SignalPanelElement';
 import { GROUP_COMMAND_DEFAULT_WIDTH } from '../elements/GroupCommandElement';
 import { SETPOINT_DEFAULT_FONT_SIZE } from '../elements/SetpointElement';
-import { TERRAIN_TILE_TYPES, getTerrainTileColors } from '../iso/TerrainTile';
 
 // One icon/color pair per medium - reused by both the toolbar buttons
 // below and nothing else, so this stays local rather than joining
@@ -35,65 +34,8 @@ export const Toolbar: React.FC = () => {
     addSignalPanel, selectedSignalPanelIds, selectSignalPanels,
     selectedFrameIds, isDrawingFrame, drawingFrameVariant, setDrawingFrameMode,
     addGroupCommand, selectedGroupCommandIds, selectGroupCommands,
-    addSetpointPanel, selectedSetpointPanelIds, selectSetpointPanels,
-    screenKind, terrainPaintTool, setTerrainPaintTool, selectedPlanObjectIds, deletePlanObjects
+    addSetpointPanel, selectedSetpointPanelIds, selectSetpointPanels
   } = useStore();
-
-  // feat/isometric-engine commit 5: every wire/SCADA-symbol/busbar/
-  // boundary-point control below (the whole rest of this toolbar) has no
-  // meaning on a PLAN screen - there is no wiring at all, no z-order
-  // (depth is automatic, from grid position), no rotate/scale, no lock.
-  // Rather than disable each one individually, PLAN mode gets its own
-  // small, complete toolbar instead: undo/redo, the select/move tool,
-  // the terrain palette (commit 3's own paint tool, armed here), and
-  // delete - the only actions the PLAN screen actually has.
-  if (screenKind === 'PLAN') {
-    return (
-      <div className="toolbar">
-        <div className="toolbar-group">
-          <button title="Undo" onClick={undo}><Undo size={16} /></button>
-          <button title="Redo" onClick={redo}><Redo size={16} /></button>
-        </div>
-
-        <div className="toolbar-divider" />
-
-        <div className="toolbar-group">
-          <button
-            title="Zaznacz / przesuń"
-            onClick={() => setTerrainPaintTool(null)}
-            style={{ backgroundColor: terrainPaintTool === null ? COLOR_RUN : 'transparent', color: terrainPaintTool === null ? COLOR_WHITE : undefined }}
-          >
-            <MousePointer2 size={16} />
-          </button>
-        </div>
-
-        <div className="toolbar-divider" />
-
-        <div className="toolbar-group">
-          {TERRAIN_TILE_TYPES.map(type => (
-            <button
-              key={type}
-              title={`Maluj: ${type}`}
-              onClick={() => setTerrainPaintTool(type)}
-              style={{
-                backgroundColor: getTerrainTileColors(type).top,
-                outline: terrainPaintTool === type ? `2px solid ${COLOR_WHITE}` : `1px solid ${COLOR_OUTLINE}`,
-                outlineOffset: -2
-              }}
-            >
-              &nbsp;
-            </button>
-          ))}
-        </div>
-
-        <div className="toolbar-divider" />
-
-        <div className="toolbar-group">
-          <button title="Delete" onClick={() => deletePlanObjects(selectedPlanObjectIds)}><Trash2 size={16} /></button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="toolbar">

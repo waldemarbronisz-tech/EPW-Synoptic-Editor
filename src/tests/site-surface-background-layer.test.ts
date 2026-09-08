@@ -16,9 +16,12 @@
 // checking the flag IS checking the real mechanism, not a proxy for it.
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
-import { join } from 'path';
 import { getSymbolDefinition, getSymbolsByCategory } from '../symbols/SymbolRegistry';
+// Read via Vite's own `?raw` suffix (same convention scada-symbols.test.ts/
+// rotation-handle-removal.test.ts already use for scanning a known source
+// file's own text), not Node's `fs`/`path`/`__dirname` - this tsconfig's
+// own "types" list (tsconfig.app.json) has no Node globals at all.
+import canvasSource from '../components/Canvas.tsx?raw';
 
 describe('9. grass and concrete road lie in the background layer', () => {
   it('site.grass and site.concrete_road are both marked isSurface', () => {
@@ -33,7 +36,6 @@ describe('9. grass and concrete road lie in the background layer', () => {
   });
 
   it('Canvas.tsx actually reads isSurface to draw a background pass before every wire/ordinary symbol, and excludes it from the ordinary pass', () => {
-    const canvasSource = readFileSync(join(__dirname, '../components/Canvas.tsx'), 'utf-8');
     // The background pass (drawn before frames.map/connections.map).
     expect(canvasSource).toMatch(/objects\.filter\(\(obj\) => getSymbolDefinition\(obj\.type\)\?\.isSurface\)\.map/);
     // The ordinary pass explicitly excludes surfaces so nothing draws twice.

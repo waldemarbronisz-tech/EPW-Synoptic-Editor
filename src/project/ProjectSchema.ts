@@ -5,8 +5,6 @@ import type { FrameElement } from '../elements/FrameElement';
 import type { GroupCommandElement } from '../elements/GroupCommandElement';
 import type { SetpointPanelElement } from '../elements/SetpointElement';
 import type { Device, LocationEntry, CardEntry } from './DeviceSchema';
-import type { TerrainTileType } from '../iso/TerrainTile';
-import type { PlanObject } from '../iso/PlanObject';
 import type { ScreenKind } from '../store';
 import type { HelpLanguage } from '../i18n/HelpLanguage';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
@@ -63,22 +61,19 @@ export interface EPWProjectSchema {
   // no locations/cards, not an invalid one). No schema version bump.
   locations?: LocationEntry[];
   cards?: CardEntry[];
-  // feat/isometric-engine commit 3: the PLAN screen's painted terrain -
-  // same treatment as meters/signalPanels/frames/devices above: optional
-  // and additive, keyed by "gx,gy" (TerrainTile.ts's own terrainKey), one
-  // entry per painted tile only. An older project file simply has no
-  // terrain (loads as an empty map), not an invalid one - no schema
-  // version bump.
-  terrain?: Record<string, TerrainTileType>;
-  // feat/isometric-engine commit 5: which screen kind this project is.
-  // Optional and additive: a file with no `kind` field at all - every
-  // file saved before this commit existed - is SCHEMATIC, exactly as it
-  // already behaved with no such concept in the format at all. No schema
-  // version bump (same reasoning as every other optional field above).
+  // Which screen kind this project is. Optional and additive: a file
+  // with no `kind` field at all - every file saved before this concept
+  // existed - is SCHEMATIC, exactly as it already behaved with no such
+  // concept in the format at all. chore/remove-isometric-plan-mode:
+  // SCHEMATIC is now the ONLY value this field is ever written with, or
+  // that a NEW file will ever contain - the isometric PLAN mode this
+  // field used to also allow has been removed entirely. The field
+  // itself is deliberately kept (not deleted, and no schema version
+  // bump) so an OLDER file saved with `kind: "PLAN"` still loads rather
+  // than being rejected - see project/ProjectManager.ts's own loading
+  // code for where that legacy value is converted to SCHEMATIC, with a
+  // Messages-panel notice.
   kind?: ScreenKind;
-  // feat/isometric-engine commit 5: the PLAN screen's placed objects -
-  // same optional/additive treatment as terrain above.
-  planObjects?: PlanObject[];
   // feat/help-system commit 1: which language the Help window shows -
   // same optional/additive treatment as every field above (an older
   // file simply has no saved choice, defaulting to Polish - see

@@ -10,15 +10,15 @@ import type { SignalPanelElement } from '../elements/SignalPanelElement';
 import type { FrameElement } from '../elements/FrameElement';
 import type { GroupCommandElement } from '../elements/GroupCommandElement';
 import type { SetpointPanelElement } from '../elements/SetpointElement';
-import type { TerrainTileType } from '../iso/TerrainTile';
-import type { PlanObject } from '../iso/PlanObject';
 
-// feat/isometric-engine commit 5: which of the two screen kinds a
-// project is - SCHEMATIC (default, every existing screen) or PLAN (the
-// new isometric mode). Lives here, not in planSlice.ts, so appState.ts
-// can import it from the same leaf module it already reads every other
-// field type from, rather than reaching into a sibling slice file.
-export type ScreenKind = 'SCHEMATIC' | 'PLAN';
+// chore/remove-isometric-plan-mode: SCHEMATIC is the only screen kind
+// left - PLAN (the isometric mode) has been removed entirely (see
+// project/ProjectManager.ts's own comment for how a legacy file with
+// `kind: "PLAN"` still loads, converted). The type stays a union of one
+// value, rather than being inlined as a bare string, so every existing
+// call site (screenKind/setScreenKind, ProjectSchema.ts's own `kind`
+// field) keeps its own explicit, self-documenting type unchanged.
+export type ScreenKind = 'SCHEMATIC';
 
 export interface SynopticObject {
   zIndex?: number;
@@ -142,21 +142,11 @@ export interface HistorySnapshot {
   meters: MeterElement[];
   signalPanels: SignalPanelElement[];
   frames: FrameElement[];
-  // feat/isometric-engine commit 3: the PLAN screen's painted terrain,
-  // same treatment as every element kind above - optional so every
-  // snapshot taken before this field existed (and every schematic-mode
-  // snapshot, which never touches it) still satisfies this interface;
-  // historySlice.ts's own undo/redo fall back to {} for it exactly the
-  // way it already falls back to [] for meters/signalPanels/frames.
-  terrainTiles?: Record<string, TerrainTileType>;
-  // feat/isometric-engine commit 5: the PLAN screen's placed objects -
-  // same optional/additive treatment as terrainTiles above.
-  planObjects?: PlanObject[];
-  // feat/control-elements commit 2: the group command button - same
-  // optional/additive treatment as terrainTiles/planObjects above
+  // feat/control-elements commit 2: the group command button - optional
   // (added well after meters/signalPanels/frames became mandatory
-  // fields here, so it follows their later, optional convention
-  // instead of joining them as a required one).
+  // fields here, so it follows the later, optional convention every
+  // field added since then uses, rather than joining them as a
+  // required one).
   groupCommands?: GroupCommandElement[];
   // feat/selector-symbol-setpoint-alarm: the setpoint panel - same
   // optional/additive treatment as groupCommands above.
