@@ -29,7 +29,8 @@ import { AddLocationDialog } from './AddLocationDialog';
 import { AssignExistingDeviceList } from './AssignExistingDeviceList';
 import { suggestBehaviorForSymbolType } from '../project/SymbolBehaviorMapping';
 import { suggestNextDeviceIdSuffix, suggestNextDesignation, deriveKindFromSymbolType } from '../project/DeviceCreationSuggestions';
-import { FONT_SIZE_SMALL, COLOR_ALARM } from '../theme/ScadaTheme';
+import { FONT_SIZE_SMALL, COLOR_ALARM, FONT_VALUE } from '../theme/ScadaTheme';
+import { computeCodePickerWidth } from '../utils/CodePickerWidth';
 
 const BEHAVIORS: DeviceBehavior[] = ['SWITCHED', 'SIGNAL', 'MEASURED', 'MODULATED', 'SELECTOR'];
 // Commit 3 gave SWITCHED/SIGNAL a real, field-level-validated form;
@@ -123,6 +124,16 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
   const devices = useStore(s => s.devices);
   const objects = useStore(s => s.objects);
   const isEdit = mode === 'edit';
+
+  // fix/device-form-polish commit 1: computed from the registry's own
+  // content (utils/CodePickerWidth.ts), not a literal here - the Id
+  // field's own location <select> used to render at a few pixels wide
+  // (index.css's own ".property-row select" gives every select/input in
+  // a property row flex:1/min-width:0, and with three other flex
+  // siblings in that same row - the + button, the "_" separator, the
+  // suffix input - it collapsed almost to nothing). Recomputed on every
+  // render so adding a new, longer-coded location widens it immediately.
+  const locationPickerWidth = computeCodePickerWidth(locations.map(l => l.code));
 
   const initialSplit = initialDevice ? splitId(initialDevice.id) : { code: locations[0]?.code ?? '', suffix: '' };
   const [locationCode, setLocationCode] = useState(initialSplit.code);
@@ -458,7 +469,22 @@ export const DeviceFormDialog: React.FC<DeviceFormDialogProps> = ({ mode, initia
                 <input value={id} readOnly disabled style={inputStyle} />
               ) : (
                 <div style={{ display: 'flex', gap: '4px' }}>
-                  <select value={locationCode} onChange={e => handleLocationChange(e.target.value)} style={inputStyle}>
+                  {/* fix/device-form-polish commit 1: flex:'none' escapes
+                      index.css's own ".property-row select" (flex:1,
+                      min-width:0) - without it this select would still
+                      collapse toward zero against its three flex
+                      siblings below (the + button, "_", the suffix
+                      input) regardless of the explicit width here.
+                      textAlign/fontFamily made explicit rather than
+                      relying only on that same global rule (which
+                      already sets fontFamily to FONT_VALUE, but not
+                      textAlign) to keep this element's own readability
+                      self-contained. */}
+                  <select
+                    value={locationCode}
+                    onChange={e => handleLocationChange(e.target.value)}
+                    style={{ ...inputStyle, width: locationPickerWidth, flex: 'none', textAlign: 'left', fontFamily: FONT_VALUE }}
+                  >
                     <option value="">-</option>
                     {locations.map(l => <option key={l.code} value={l.code}>{l.code}</option>)}
                   </select>

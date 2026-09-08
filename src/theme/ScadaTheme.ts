@@ -134,6 +134,21 @@ export const FONT_SIZE_BASE = 13;   // opisy wierszy, etykiety, teksty na plotni
 export const FONT_SIZE_SMALL = 11;  // druga linia etykiety, opisy pomocnicze
 export const FONT_SIZE_TITLE = 14;  // tytuly miernika, panelu, ramki
 
+// ---- HTML form chrome geometry --------------------------------------------
+// fix/device-form-polish commit 1: the location-code <select> in
+// DeviceFormDialog.tsx's own Id field used to render at a few pixels
+// wide - a global CSS rule (index.css's own ".property-row select")
+// gives every select/input in a property row flex:1/min-width:0, so
+// with three other flex siblings in that same row (the + button, the
+// literal "_" separator, the suffix input) it collapsed to almost
+// nothing, its selected code entirely unreadable. Its own width is now
+// computed from the registry's actual content (utils/CodePickerWidth.ts)
+// instead, clamped between these two - GRANICE's own rule for this fix
+// is explicit that no width may be a literal in the component itself.
+export const LOCATION_PICKER_MIN_WIDTH = 96;   // never narrower, even for a one-character code
+export const LOCATION_PICKER_MAX_WIDTH = 160;  // never wider, even for a very long code
+export const SELECT_ARROW_ALLOWANCE = 24;      // room for the native dropdown arrow beside the text
+
 // ---- Bridge into CSS -----------------------------------------------------
 // CSS cannot import a TypeScript module, so the interface chrome (panels,
 // toolbar, property fields) reads these values through CSS custom
