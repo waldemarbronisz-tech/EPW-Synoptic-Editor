@@ -149,6 +149,57 @@ export const LOCATION_PICKER_MIN_WIDTH = 96;   // never narrower, even for a one
 export const LOCATION_PICKER_MAX_WIDTH = 160;  // never wider, even for a very long code
 export const SELECT_ARROW_ALLOWANCE = 24;      // room for the native dropdown arrow beside the text
 
+// ---- Site objects (feat/site-objects-2d) - banded shading -----------------
+// A retro-industrial 90s SCADA HMI look, extended (not replaced - see this
+// file's own header) to flat 2D site objects: buildings, gates, lighting,
+// tanks... Every shape gets three tones - a lighter BAND along its own top
+// (or left) edge, its own base fill everywhere else, a darker band along
+// its own bottom (or right) edge - hard-edged, never a gradient, never
+// blurred, never translucent in the shape itself (glow, below, is the one
+// deliberate exception - a genuine light source, not shape shading). A
+// round shape gets a light ARC upper-left and a shadow arc lower-right
+// instead of straight bands. Every shape keeps the same solid black
+// outline every other SCADA symbol already uses.
+//
+// Names and exact values below are taken VERBATIM from
+// docs/EPW_rysunki_referencja.py's own header section (its sh() calls -
+// base/light/dark, renamed here to base/light/dark for clarity, same
+// order) - this file is the single, permanent home for them; the Python
+// file itself is a geometry/color REFERENCE only, never executed, never
+// imported by anything in src/.
+export interface SiteShadeTriad {
+  readonly base: string;
+  readonly light: string;
+  readonly dark: string;
+}
+export const SITE_GREY: SiteShadeTriad  = { base: '#C0C0C0', light: '#F0F0F0', dark: '#808080' };
+export const SITE_DGREY: SiteShadeTriad = { base: '#909090', light: '#C8C8C8', dark: '#585858' };
+export const SITE_GREEN: SiteShadeTriad = { base: '#00B800', light: '#50E850', dark: '#007000' };
+export const SITE_RED: SiteShadeTriad   = { base: '#E00000', light: '#FF7070', dark: '#900000' };
+export const SITE_BLUE: SiteShadeTriad  = { base: '#2848D8', light: '#6080FF', dark: '#182C90' };
+export const SITE_TAN: SiteShadeTriad   = { base: '#C8A870', light: '#E8D0A0', dark: '#907040' };
+export const SITE_YELL: SiteShadeTriad  = { base: '#FFD800', light: '#FFF080', dark: '#B08800' };
+export const SITE_DARK: SiteShadeTriad  = { base: '#585C64', light: '#8C9098', dark: '#303438' };
+export const SITE_CONC: SiteShadeTriad  = { base: '#D0D0C8', light: '#F0F0E8', dark: '#9C9C94' };
+export const SITE_GRASS: SiteShadeTriad = { base: '#3C9430', light: '#68C050', dark: '#28641C' };
+export const SITE_BRICK: SiteShadeTriad = { base: '#B45838', light: '#E08860', dark: '#7C3820' };
+
+// Band/outline thicknesses (px) - every distinct value
+// docs/EPW_rysunki_referencja.py's own rect/vrect/circ calls use,
+// catalogued from that file directly (grep -oE "band=|ow=" across it) so
+// every site object component below can reach for the exact one it needs
+// instead of writing a literal of its own. The unsuffixed pair is each
+// primitive's own DEFAULT (matching the reference's own rect(...,band=4,
+// ow=2.5) default parameters).
+export const SITE_BAND_WIDTH = 4;              // default shading band
+export const SITE_BAND_WIDTH_NARROW = 3;       // window/door frames, posts, terminal rows...
+export const SITE_BAND_WIDTH_NARROWEST = 2;    // zlacze's own terminal block rows
+export const SITE_BAND_WIDTH_WIDE = 6;         // grass/road surface texture
+export const SITE_OUTLINE_WIDTH = 2.5;         // default kontur
+export const SITE_OUTLINE_WIDTH_MEDIUM = 2;    // most circ() calls, several rect() overrides
+export const SITE_OUTLINE_WIDTH_THIN = 1.8;    // oczyszczalnia's own inner circles
+export const SITE_OUTLINE_WIDTH_THINNEST = 1.5; // zlacze's own terminal rows
+
 // ---- Bridge into CSS -----------------------------------------------------
 // CSS cannot import a TypeScript module, so the interface chrome (panels,
 // toolbar, property fields) reads these values through CSS custom
