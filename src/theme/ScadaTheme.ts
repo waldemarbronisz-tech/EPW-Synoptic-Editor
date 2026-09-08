@@ -41,6 +41,33 @@ export const COLOR_WHITE = '#FFFFFF';             // biel
 export const VENTILATION_ACTIVE = '#C89000';      // wentylacja aktywna
 export const VENTILATION_INACTIVE = '#8A7A50';    // wentylacja nieaktywna
 
+// feat/water-management commit 3: light/dark companions for every
+// conductor color, for the new four-pass Houston-style pipe rendering's
+// own highlight/shadow passes (ConnectionLine.tsx). Electrical and
+// water sourced directly from docs/EPW_gospodarka_wodna_referencja.py's
+// own palette - RD/DG/BL/G there each match an existing conductor color
+// almost exactly at the BASE tone (RD #E00000 vs COLOR_ENERGIZED
+// #E01000; DG #909090 = COLOR_DE_ENERGIZED exactly; BL #2848D8 =
+// COLOR_WATER exactly; G #C0C0C0 = COLOR_WATER_INACTIVE exactly, added
+// in commit 2) - confirmed by direct comparison, not assumed - so their
+// own light/dark tones are reused here as-is rather than invented.
+// Ventilation has no counterpart in that reference at all (a
+// water-domain file, never mentioning the third medium) - its own pair
+// below is extrapolated using the same relative lighten/darken ratio
+// every other triad there consistently uses, not sourced from it.
+export const COLOR_ENERGIZED_LIGHT = '#FF7070';
+export const COLOR_ENERGIZED_DARK = '#900000';
+export const COLOR_DE_ENERGIZED_LIGHT = '#C8C8C8';
+export const COLOR_DE_ENERGIZED_DARK = '#585858';
+export const COLOR_WATER_LIGHT = '#5878FF';
+export const COLOR_WATER_DARK = '#182C90';
+export const COLOR_WATER_INACTIVE_LIGHT = '#F0F0F0';
+export const COLOR_WATER_INACTIVE_DARK = '#808080';
+export const VENTILATION_ACTIVE_LIGHT = '#FFC850';
+export const VENTILATION_ACTIVE_DARK = '#906000';
+export const VENTILATION_INACTIVE_LIGHT = '#B8A878';
+export const VENTILATION_INACTIVE_DARK = '#5C5030';
+
 // ---- Geometry ----
 
 // Conductor/symbol proportions derived directly from the grid (feat/
@@ -49,7 +76,38 @@ export const VENTILATION_INACTIVE = '#8A7A50';    // wentylacja nieaktywna
 // the earlier values (11/6/22) made a breaker on a power run get lost
 // inside its own cable, confirmed by eye in the running app.
 export const CONDUCTOR_WIDTH = 8;    // grubosc rdzenia przewodu - pol oczka siatki
-export const CONDUCTOR_OUTLINE = 4;  // laczna grubosc konturu (po 2 z kazdej strony)
+// feat/water-management commit 3: was 4, now core+5 - docs/EPW_
+// gospodarka_wodna_referencja.py's own pipe_seg draws its outline pass
+// at stroke-width={w+5} (w being its own core parameter) - exactly this
+// same relationship, applied to CONDUCTOR_WIDTH as that reference's own
+// w. LoadSwitchSymbol.tsx/MotorSymbol.tsx/SocketSymbol.tsx each embed
+// their own short conductor stub using this same constant, so they
+// stay visually matched to the wire's own new outline automatically -
+// no separate change needed in any of them.
+export const CONDUCTOR_OUTLINE = 5;  // laczna grubosc konturu
+// pipe_seg's own third pass (the light/highlight stroke): width 3.5,
+// offset translate(-1,-3.2) - taken directly, unscaled (a cosmetic
+// accent stroke, not grid-derived the way CONDUCTOR_WIDTH itself is).
+export const CONDUCTOR_HIGHLIGHT_WIDTH = 3.5;
+export const CONDUCTOR_HIGHLIGHT_OFFSET_X = -1;
+export const CONDUCTOR_HIGHLIGHT_OFFSET_Y = -3.2;
+// The reference's own header comment (and this task's own commit 3
+// text) both promise FOUR passes - outline, fill, shadow, highlight -
+// but its own pipe_seg function only actually draws three: no shadow
+// line at all, confirmed by reading that function directly, not
+// assumed. The values below are this pass's own deliberate, documented
+// completion of that gap: the same width as the highlight (this task's
+// own prose calls both "waski"/"waskie" - narrow - without
+// distinguishing them), the offset exactly MIRRORED (down-right instead
+// of up-left), and an opacity this task's own prose asks for
+// ("polprzezroczysty") but never gives a number for either - 0.45
+// reuses the same order of magnitude BandedShading.tsx's own glow()
+// primitive already established for a soft overlay in this codebase
+// (site-objects-2d), rather than inventing an unrelated number.
+export const CONDUCTOR_SHADOW_WIDTH = 3.5;
+export const CONDUCTOR_SHADOW_OFFSET_X = 1;
+export const CONDUCTOR_SHADOW_OFFSET_Y = 3.2;
+export const CONDUCTOR_SHADOW_OPACITY = 0.45;
 export const SYMBOL_STROKE = 5;      // grubosc kreski wewnatrz symbolu
 export const OUTLINE_WIDTH = 5;      // kontur ksztaltow wypelnionych (default; a
                                       // symbol may specify its own different
