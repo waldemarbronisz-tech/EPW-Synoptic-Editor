@@ -6,7 +6,7 @@
 import React from 'react';
 import { Group, Path } from 'react-konva';
 import type { SymbolProps } from '../SymbolRenderer';
-import { bandedRect, bandedVRect, bandedCircle } from './BandedShading';
+import { bandedRect, bandedVRect, bandedCircle, waterStub } from './BandedShading';
 import { resolveSiteState } from './SiteSymbolState';
 import {
   SITE_CONC, SITE_GREY, SITE_DGREY, SITE_BLUE, SITE_GREEN, SITE_RED, SITE_WATER_SPRAY,
@@ -28,6 +28,15 @@ export const GardenSprinklerSymbol: React.FC<SymbolProps> = ({ state }) => {
 
   return (
     <Group scaleX={SITE_CANVAS_SCALE} scaleY={SITE_CANVAS_SCALE}>
+      {/* fix/hydraulic-connections commit 5: krociec+kolnierz on the
+          one terminal (WODA, BOTTOM) - drawn in this SAME pre-scale
+          160x120 local space every other primitive in this file
+          already uses (canvasWidth/Height passed as 160/120, not the
+          post-scale 128/96), so it shrinks along with everything else
+          under this Group's own 0.8 scale. The pad's own bottom edge
+          (x=80,y=106) never reached the true terminal (local 80,120)
+          before this. */}
+      {waterStub(80, 106, 'B', on, 160, 120)}
       {bandedRect(64, 88, 32, 18, SITE_CONC, { band: SITE_BAND_WIDTH_NARROW, outlineWidth: SITE_OUTLINE_WIDTH_MEDIUM })}
       {bandedVRect(70, 40, 20, 50, SITE_GREY)}
       {bandedRect(60, 26, 40, 16, SITE_DGREY, { band: SITE_BAND_WIDTH_NARROW, outlineWidth: SITE_OUTLINE_WIDTH_MEDIUM })}

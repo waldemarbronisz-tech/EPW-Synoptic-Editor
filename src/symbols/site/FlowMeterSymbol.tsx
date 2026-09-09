@@ -13,10 +13,10 @@
 // flowing.
 
 import React from 'react';
-import { Group, Circle, Text, Line, Path } from 'react-konva';
+import { Group, Circle, Text, Path } from 'react-konva';
 import { useStore } from '../../store';
 import type { SymbolProps } from '../SymbolRenderer';
-import { bandedCircleLightOnly, objectPipeSegment } from './BandedShading';
+import { bandedCircleLightOnly, waterStub } from './BandedShading';
 import { resolveSiteState } from './SiteSymbolState';
 import { findDeviceById, getMeasuredPreviewValue, formatMeasuredValue } from '../../meter/MeterResolver';
 import { colorForRow } from '../../components/MeterElementNode';
@@ -37,13 +37,19 @@ export const FlowMeterSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
 
   return (
     <Group>
-      {objectPipeSegment([{ x: 4, y: 62 }, { x: 124, y: 62 }], on)}
+      {/* fix/hydraulic-connections commit 5: krociec+kolnierz at both
+          terminals, from the dial's own horizontal edges (x=44/84,
+          already at the true terminal height y=48) - the old single
+          pipe (y=62, 14 units off the real terminal) and its own
+          dial-to-pipe connector line are retired; the dial's own
+          circle now sits directly astride the pipe run instead. */}
+      {waterStub(44, 48, 'L', on, 128, 96)}
+      {waterStub(84, 48, 'R', on, 128, 96)}
       {bandedCircleLightOnly(64, 36, 20, SITE_GREY)}
       <Circle x={64} y={36} radius={14} fill={SITE_LCD_BACKGROUND} stroke={COLOR_OUTLINE} strokeWidth={2} listening={false} />
       <Text x={39} y={31} width={50} align="center" text={valueText} fontFamily="Consolas, DejaVu Sans Mono, monospace" fontSize={11} fontStyle="bold" fill={valueColor} listening={false} />
       <Text x={44} y={11} width={40} align="center" text="l/min" fontSize={9} fontStyle="bold" fill={COLOR_OUTLINE} listening={false} />
-      <Line points={[64, 56, 64, 62]} stroke={COLOR_OUTLINE} strokeWidth={4} listening={false} />
-      {on && <Path data="M92,62 L108,62 M102,56 L108,62 L102,68" stroke={COLOR_WHITE} strokeWidth={2.5} lineJoin="round" listening={false} />}
+      {on && <Path data="M92,48 L108,48 M102,42 L108,48 L102,54" stroke={COLOR_WHITE} strokeWidth={2.5} lineJoin="round" listening={false} />}
     </Group>
   );
 };

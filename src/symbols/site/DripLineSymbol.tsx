@@ -22,7 +22,7 @@
 import React from 'react';
 import { Group, Rect, Path, Ellipse } from 'react-konva';
 import type { SymbolProps } from '../SymbolRenderer';
-import { objectPipeSegment } from './BandedShading';
+import { objectPipeSegment, waterStub } from './BandedShading';
 import { resolveSiteState } from './SiteSymbolState';
 import { COLOR_OUTLINE, SITE_DGREY, SITE_BLUE } from '../../theme/ScadaTheme';
 
@@ -65,14 +65,24 @@ export const DripLineSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
           (found live, via Playwright, while checking this task's own
           checklist - not assumed). */}
       <Rect x={0} y={0} width={realWidth} height={realHeight} fill="transparent" />
-      {objectPipeSegment([{ x: 6, y: 44 }, { x: realWidth - 6, y: 44 }], on, { width: 11 })}
+      {/* fix/hydraulic-connections commit 5: krociec+kolnierz at the
+          one real terminal (WLOT, LEFT) - the true terminal height is
+          realHeight/2 (48 at the default size), not the old fixed 44.
+          The right END of the drawn pipe is NOT a terminal at all (a
+          drip line has only one) so it stays a plain open pipe end,
+          same as before, just at the corrected height. canvasWidth/
+          Height passed as realWidth/realHeight, not the fixed 128x96
+          every other water object uses - this is the one object whose
+          own "canvas" is genuinely adjustable. */}
+      {waterStub(20, realHeight / 2, 'L', on, realWidth, realHeight, { width: 11 })}
+      {objectPipeSegment([{ x: 20, y: realHeight / 2 }, { x: realWidth - 6, y: realHeight / 2 }], on, { width: 11 })}
       {drippers.map(x => (
         <Group key={x} listening={false}>
-          <Rect x={x - 4} y={50} width={8} height={7} fill={SITE_DGREY.base} stroke={COLOR_OUTLINE} strokeWidth={1.8} />
+          <Rect x={x - 4} y={54} width={8} height={7} fill={SITE_DGREY.base} stroke={COLOR_OUTLINE} strokeWidth={1.8} />
           {on && (
             <>
-              <Path data={`M${x},60 q3,7 0,11 q-3,-4 0,-11 Z`} fill={SITE_BLUE.base} stroke={COLOR_OUTLINE} strokeWidth={1.5} />
-              <Ellipse x={x} y={84} radiusX={9} radiusY={3.5} fill={SITE_BLUE.base} opacity={0.45} />
+              <Path data={`M${x},64 q3,7 0,11 q-3,-4 0,-11 Z`} fill={SITE_BLUE.base} stroke={COLOR_OUTLINE} strokeWidth={1.5} />
+              <Ellipse x={x} y={88} radiusX={9} radiusY={3.5} fill={SITE_BLUE.base} opacity={0.45} />
             </>
           )}
         </Group>

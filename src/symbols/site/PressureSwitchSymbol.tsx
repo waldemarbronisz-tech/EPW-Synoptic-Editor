@@ -9,7 +9,7 @@
 import React from 'react';
 import { Group, Circle, Line } from 'react-konva';
 import type { SymbolProps } from '../SymbolRenderer';
-import { bandedVRect, bandedCircleLightOnly, statusLed, objectPipeSegment } from './BandedShading';
+import { bandedVRect, bandedCircleLightOnly, statusLed, waterStub } from './BandedShading';
 import { resolveSiteState } from './SiteSymbolState';
 import { COLOR_OUTLINE, SITE_GREY, SITE_TANK_WINDOW_BG, SITE_GAUGE_NEEDLE } from '../../theme/ScadaTheme';
 
@@ -25,7 +25,14 @@ export const PressureSwitchSymbol: React.FC<SymbolProps> = ({ state }) => {
 
   return (
     <Group>
-      {objectPipeSegment([{ x: 4, y: 74 }, { x: 124, y: 74 }], true)}
+      {/* fix/hydraulic-connections commit 5: krociec+kolnierz at both
+          terminals, from the mount's own walls (x=52/76) at the true
+          terminal height y=48 - within the mount's own y44-68 span, so
+          the pipe passes directly behind it. The old pipe (y=74, 26
+          units off the real terminal, past the mount entirely) is
+          retired. */}
+      {waterStub(52, 48, 'L', true, 128, 96)}
+      {waterStub(76, 48, 'R', true, 128, 96)}
       {bandedVRect(52, 44, 24, 24, SITE_GREY, { band: 3 })}
       {bandedCircleLightOnly(64, 32, 17, SITE_GREY)}
       <Circle x={64} y={32} radius={12} fill={SITE_TANK_WINDOW_BG} stroke={COLOR_OUTLINE} strokeWidth={2} listening={false} />

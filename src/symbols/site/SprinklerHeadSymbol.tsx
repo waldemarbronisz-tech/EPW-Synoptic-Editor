@@ -10,7 +10,7 @@
 import React from 'react';
 import { Group, Path } from 'react-konva';
 import type { SymbolProps } from '../SymbolRenderer';
-import { bandedRect, bandedVRect, bandedCircleLightOnly } from './BandedShading';
+import { bandedRect, bandedVRect, bandedCircleLightOnly, waterStub } from './BandedShading';
 import { resolveSiteState } from './SiteSymbolState';
 import { SITE_CONC, SITE_DGREY, SITE_BLUE, SITE_SPRAY_BLUE, SITE_OUTLINE_WIDTH_MEDIUM } from '../../theme/ScadaTheme';
 
@@ -25,6 +25,11 @@ export const SprinklerHeadSymbol: React.FC<SymbolProps> = ({ state }) => {
 
   return (
     <Group>
+      {/* fix/hydraulic-connections commit 5: krociec+kolnierz on the
+          one terminal (WODA, BOTTOM) - this object had NONE at all
+          before (the concrete pad's own bottom edge, y=88, never
+          reached the true terminal at y=96). */}
+      {waterStub(64, 88, 'B', on, 128, 96)}
       {bandedRect(46, 72, 36, 16, SITE_CONC, { band: 3, outlineWidth: SITE_OUTLINE_WIDTH_MEDIUM })}
       {bandedVRect(56, 52, 16, 22, SITE_DGREY, { band: 3 })}
       {bandedCircleLightOnly(64, 48, 9, on ? SITE_BLUE : SITE_DGREY, { outlineWidth: SITE_OUTLINE_WIDTH_MEDIUM })}

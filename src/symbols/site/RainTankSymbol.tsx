@@ -12,11 +12,11 @@
 import React from 'react';
 import { Group, Circle, Rect } from 'react-konva';
 import type { SymbolProps } from '../SymbolRenderer';
-import { bandedCircle, bandedRect } from './BandedShading';
+import { bandedCircle, waterFlange, flangeCenterForSide, objectPipeSegment } from './BandedShading';
 import { resolveSiteState } from './SiteSymbolState';
 import {
   COLOR_OUTLINE, SITE_GREY, SITE_DGREY, SITE_BLUE,
-  SITE_BAND_WIDTH_NARROW, SITE_OUTLINE_WIDTH_MEDIUM, SITE_CANVAS_SCALE
+  SITE_OUTLINE_WIDTH_MEDIUM, SITE_CANVAS_SCALE
 } from '../../theme/ScadaTheme';
 
 export type RainTankState = 'ZALACZONY' | 'WYLACZONY';
@@ -45,7 +45,17 @@ export const RainTankSymbol: React.FC<SymbolProps> = ({ state }) => {
       </Group>
       <Circle x={CX} y={CY} radius={33} stroke={COLOR_OUTLINE} strokeWidth={SITE_OUTLINE_WIDTH_MEDIUM} listening={false} />
       {bandedCircle(CX, CY, 11, SITE_DGREY, { outlineWidth: SITE_OUTLINE_WIDTH_MEDIUM })}
-      {bandedRect(122, 58, 30, 12, SITE_GREY, { band: SITE_BAND_WIDTH_NARROW, outlineWidth: SITE_OUTLINE_WIDTH_MEDIUM })}
+      {/* fix/hydraulic-connections commit 5: krociec+kolnierz on the
+          one terminal (KROCIEC, RIGHT) - the true terminal (local
+          160,60, in this file's own pre-scale 160x120 space) does not
+          share the tank's own vertical center (CY=64), so the pipe
+          jogs from the tank's own rim (124,64) over to the target
+          axis before running straight out to the edge - the same
+          technique the reference's own tank() uses for its DOPLYW.
+          Retires the old plain decorative spigot rect, which never
+          reached the true edge at all (stopped at x=152, 8 short). */}
+      {objectPipeSegment([{ x: 124, y: 64 }, { x: 145, y: 64 }, { x: 145, y: 60 }, { x: 160, y: 60 }], true)}
+      {waterFlange(flangeCenterForSide('R', 60, 160, 120).x, 60, 'R', true)}
     </Group>
   );
 };

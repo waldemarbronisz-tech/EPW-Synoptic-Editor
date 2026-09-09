@@ -12,10 +12,10 @@
 // (its own literal display text is identical whether on or off).
 
 import React from 'react';
-import { Group, Rect, Text, Line } from 'react-konva';
+import { Group, Rect, Text } from 'react-konva';
 import { useStore } from '../../store';
 import type { SymbolProps } from '../SymbolRenderer';
-import { bandedRect, objectPipeSegment } from './BandedShading';
+import { bandedRect, waterStub } from './BandedShading';
 import { resolveSiteState } from './SiteSymbolState';
 import { findDeviceById, getMeasuredPreviewValue, formatMeasuredValue } from '../../meter/MeterResolver';
 import { colorForRow } from '../../components/MeterElementNode';
@@ -37,12 +37,19 @@ export const WaterMeterSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
 
   return (
     <Group>
-      {objectPipeSegment([{ x: 4, y: 70 }, { x: 124, y: 70 }], on)}
+      {/* fix/hydraulic-connections commit 5: krociec+kolnierz at both
+          terminals, from the meter body's own walls (x=30/98) at the
+          true terminal height y=48 - already within the body's own
+          y26-60 span, so the pipe passes directly behind it (same
+          "wide pipe, opaque body drawn on top" pattern this whole
+          library already uses) - the old pipe (y=70, well below the
+          body) and its own dangling connector line are retired. */}
+      {waterStub(30, 48, 'L', on, 128, 96)}
+      {waterStub(98, 48, 'R', on, 128, 96)}
       {bandedRect(30, 26, 68, 34, SITE_GREY)}
       <Rect x={36} y={32} width={56} height={16} fill={SITE_LCD_BACKGROUND} stroke={COLOR_OUTLINE} strokeWidth={2} listening={false} />
       <Text x={36} y={35} width={52} align="right" text={valueText} fontFamily="Consolas, DejaVu Sans Mono, monospace" fontSize={12} fontStyle="bold" fill={valueColor} listening={false} />
       <Text x={44} y={51} width={40} align="center" text="m3 SUMA" fontSize={9} fontStyle="bold" fill={COLOR_OUTLINE} listening={false} />
-      <Line points={[64, 60, 64, 70]} stroke={COLOR_OUTLINE} strokeWidth={4} listening={false} />
     </Group>
   );
 };

@@ -331,6 +331,15 @@ export const SITE_GAUGE_NEEDLE = '#C01818';    // presostat's own manometer need
 export const SITE_LED_ON_BLUE = '#3898FF';     // czujnik_deszczu's own led() color override
 export const SITE_SPRAY_BLUE = '#5898FF';      // zraszacz's own water arcs (distinct from SITE_WATER_SPRAY - a different reference file's own literal value)
 
+// fix/hydraulic-connections commit 5: docs/EPW_kolnierze_referencja.py's
+// own hydraulic-connection standard - a stub (krociec) plus a flange
+// (kolnierz) at EVERY water-medium object's own terminal. PIPE_W itself
+// is not repeated here - it is SITE_OBJECT_PIPE_WIDTH above already,
+// the exact same literal value (13) this reference's own PIPE_W is.
+export const SITE_STUB_LENGTH = 14;                          // STUB - typical krociec length from an aparat's own body to its flange
+export const SITE_FLANGE_THICKNESS = 6;                       // FL_W - the flange's own thickness along the pipe's axis
+export const SITE_FLANGE_SPAN = SITE_OBJECT_PIPE_WIDTH + 11;  // FL_H = PIPE_W+11 - the flange's own span across the pipe
+
 // ---- Bridge into CSS -----------------------------------------------------
 // CSS cannot import a TypeScript module, so the interface chrome (panels,
 // toolbar, property fields) reads these values through CSS custom

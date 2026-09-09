@@ -16,7 +16,7 @@
 import React from 'react';
 import { Group, Rect, Path, Line, Text } from 'react-konva';
 import type { SymbolProps } from '../SymbolRenderer';
-import { bandedRect, bandedCircleLightOnly, statusLed, objectPipeSegment } from './BandedShading';
+import { bandedRect, bandedCircleLightOnly, statusLed, waterStub } from './BandedShading';
 import { resolveSiteState } from './SiteSymbolState';
 import {
   COLOR_OUTLINE, SITE_DGREY, SITE_GREEN, SITE_BLUE, SITE_RED, SITE_LED_ON_RED,
@@ -27,7 +27,10 @@ export type WaterSelectorValveState = 'A' | 'ZAMKNIETY' | 'B';
 // oxlint-disable-next-line react/only-export-components -- one file per symbol, same convention as every other site/ symbol.
 export const WATER_SELECTOR_VALVE_STATES: WaterSelectorValveState[] = ['A', 'ZAMKNIETY', 'B'];
 
-const CX = 58, CY = 54;
+// fix/hydraulic-connections commit 5: was 58,54 - see WaterValveSymbol.tsx's
+// own comment on this identical change; every other coordinate here is
+// already relative to CX/CY.
+const CX = 64, CY = 48;
 
 export const WaterSelectorValveSymbol: React.FC<SymbolProps> = ({ state }) => {
   const resolved = resolveSiteState(state, WATER_SELECTOR_VALVE_STATES, 'ZAMKNIETY');
@@ -37,9 +40,9 @@ export const WaterSelectorValveSymbol: React.FC<SymbolProps> = ({ state }) => {
 
   return (
     <Group>
-      {objectPipeSegment([{ x: 4, y: CY }, { x: CX, y: CY }], !isClosed)}
-      {objectPipeSegment([{ x: CX, y: CY }, { x: 112, y: CY }], isA)}
-      {objectPipeSegment([{ x: CX, y: CY }, { x: CX, y: 92 }], isB)}
+      {waterStub(CX, CY, 'L', !isClosed, 128, 96)}
+      {waterStub(CX, CY, 'R', isA, 128, 96)}
+      {waterStub(CX, CY, 'B', isB, 128, 96)}
       {bandedCircleLightOnly(CX, CY, 17, SITE_DGREY)}
 
       {isClosed ? (

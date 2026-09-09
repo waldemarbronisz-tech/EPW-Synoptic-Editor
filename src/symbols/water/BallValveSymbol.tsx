@@ -2,10 +2,16 @@ import React from 'react';
 import { Group, Rect, Path, Circle } from 'react-konva';
 import type { SymbolProps } from '../SymbolRenderer';
 import { SYMBOL_STROKE } from '../../theme/ScadaTheme';
+import { waterStub } from '../site/BandedShading';
+
+// fix/hydraulic-connections commit 5 - see water/ValveSymbol.tsx's own
+// identical comment on this same margin.
+const H_MARGIN_FRACTION = 0.2;
 
 export const BallValveSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
   const w = obj.width;
   const h = obj.height;
+  const margin = w * H_MARGIN_FRACTION;
 
   const isClosed = state === 'CLOSED';
   const isTransition = state === 'OPENING' || state === 'CLOSING';
@@ -13,11 +19,13 @@ export const BallValveSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
 
   const fillColor = isClosed ? '#7f8c8d' : (isTransition ? '#f1c40f' : '#2ecc71');
 
-  // Bow-tie valve geometry
-  const bowTiePath = `M 0 0 L ${w} ${h} L ${w} 0 L 0 ${h} Z`;
+  // Bow-tie valve geometry - shrunk to leave room for the krociec/kolnierz.
+  const bowTiePath = `M ${margin} 0 L ${w - margin} ${h} L ${w - margin} 0 L ${margin} ${h} Z`;
 
   return (
     <Group>
+      {waterStub(margin, h / 2, 'L', !isClosed, w, h)}
+      {waterStub(w - margin, h / 2, 'R', !isClosed, w, h)}
       <Path
         data={bowTiePath}
         fill={fillColor}
