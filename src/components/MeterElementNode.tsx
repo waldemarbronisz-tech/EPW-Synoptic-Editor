@@ -78,7 +78,14 @@ export interface MeterElementNodeProps {
 // A dangling device reference draws in the alarm color: this is the
 // one case worth the user's attention, even though the element still
 // renders normally around it.
-function colorForRow(colorKind: 'NORMAL' | 'PREVIEW' | 'MISSING'): string {
+// feat/water-management commit 4: exported (unchanged otherwise - same
+// name, same three lines) so the new tank/flow/water-meter symbols can
+// shade their own MEASURED value field with this EXACT same color
+// mapping, the same "reuse the meter's own path, do not invent a
+// second one" rule this task applies to reading the value itself
+// (MeterResolver.ts's own getMeasuredPreviewValue/formatMeasuredValue).
+// oxlint-disable-next-line react/only-export-components -- a plain color-mapping function, not a component; kept beside its own original caller.
+export function colorForRow(colorKind: 'NORMAL' | 'PREVIEW' | 'MISSING'): string {
   if (colorKind === 'PREVIEW') return COLOR_DE_ENERGIZED;
   if (colorKind === 'MISSING') return COLOR_ALARM;
   return COLOR_TEXT;

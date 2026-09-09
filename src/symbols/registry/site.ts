@@ -198,5 +198,167 @@ export const siteSymbols: Record<string, SymbolDefinition> = {
     defaultState: '',
     terminals: [],
     isSurface: true
+  },
+
+  // feat/water-management commit 4 - the first 6 of 12 gospodarka wodna
+  // (water management) objects. Registered into this SAME existing
+  // TEREN category, not a new "WODA" one (this task's own commit 4
+  // text explicitly leaves that choice open, asking it be reported):
+  // docs/EPW_gospodarka_wodna_referencja.py's own style header
+  // ("retro industrial SCADA, cieniowanie pasmowe... luk swiatla u
+  // gory-lewej") is word-for-word the SAME banded-shading style this
+  // category's own existing objects already use, and TEREN already
+  // holds water-related site infrastructure of its own (rain tank,
+  // sewage plant, water manhole, from feat/site-objects-2d) - a second
+  // category would only fragment one visually and conceptually
+  // continuous family across two folders for no functional reason.
+  'site.rainwater_tank2': {
+    type: 'site.rainwater_tank2',
+    label: 'Zbiornik na deszczowke',
+    category: 'TEREN',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['NISKI', 'SREDNI', 'WYSOKI'],
+    defaultState: 'NISKI',
+    terminals: [{ id: 'WYLOT', side: 'BOTTOM', medium: 'WATER' }]
+  },
+  'site.water_selector_valve_switched': {
+    type: 'site.water_selector_valve_switched',
+    label: 'Zawor trojdrogowy przelaczajacy',
+    category: 'TEREN',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['A', 'B'],
+    defaultState: 'A',
+    terminals: [
+      { id: 'WLOT', side: 'LEFT', medium: 'WATER' },
+      { id: 'WYLOT_A', side: 'RIGHT', medium: 'WATER' },
+      { id: 'WYLOT_B', side: 'BOTTOM', medium: 'WATER' }
+    ]
+  },
+  'site.water_selector_valve_3pos': {
+    type: 'site.water_selector_valve_3pos',
+    label: 'Zawor trojdrogowy trojpolozeniowy',
+    category: 'TEREN',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['A', 'ZAMKNIETY', 'B'],
+    defaultState: 'ZAMKNIETY',
+    terminals: [
+      { id: 'WLOT', side: 'LEFT', medium: 'WATER' },
+      { id: 'WYLOT_A', side: 'RIGHT', medium: 'WATER' },
+      { id: 'WYLOT_B', side: 'BOTTOM', medium: 'WATER' }
+    ]
+  },
+  'site.check_valve': {
+    type: 'site.check_valve',
+    label: 'Zawor zwrotny',
+    category: 'TEREN',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [
+      { id: 'WLOT', side: 'LEFT', medium: 'WATER' },
+      { id: 'WYLOT', side: 'RIGHT', medium: 'WATER' }
+    ]
+  },
+  'site.water_filter': {
+    type: 'site.water_filter',
+    label: 'Filtr wody',
+    category: 'TEREN',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [
+      { id: 'WLOT', side: 'LEFT', medium: 'WATER' },
+      { id: 'WYLOT', side: 'RIGHT', medium: 'WATER' }
+    ]
+  },
+  'site.hydrofor': {
+    type: 'site.hydrofor',
+    label: 'Hydrofor',
+    category: 'TEREN',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [{ id: 'WYLOT', side: 'LEFT', medium: 'WATER' }]
+  },
+
+  // feat/water-management commit 5 - the remaining 6 of 12 objects.
+  'site.flow_meter': {
+    type: 'site.flow_meter',
+    label: 'Przeplywomierz',
+    category: 'TEREN',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [
+      { id: 'WLOT', side: 'LEFT', medium: 'WATER' },
+      { id: 'WYLOT', side: 'RIGHT', medium: 'WATER' }
+    ]
+  },
+  'site.water_meter': {
+    type: 'site.water_meter',
+    label: 'Wodomierz',
+    category: 'TEREN',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [
+      { id: 'WLOT', side: 'LEFT', medium: 'WATER' },
+      { id: 'WYLOT', side: 'RIGHT', medium: 'WATER' }
+    ]
+  },
+  'site.pressure_switch': {
+    type: 'site.pressure_switch',
+    label: 'Presostat',
+    category: 'TEREN',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [
+      { id: 'WLOT', side: 'LEFT', medium: 'WATER' },
+      { id: 'WYLOT', side: 'RIGHT', medium: 'WATER' }
+    ]
+  },
+  'site.rain_sensor': {
+    type: 'site.rain_sensor',
+    label: 'Czujnik deszczu',
+    category: 'TEREN',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [{ id: 'ZASILANIE', side: 'BOTTOM', medium: 'ELECTRICAL' }]
+  },
+  'site.sprinkler_head': {
+    type: 'site.sprinkler_head',
+    label: 'Zraszacz',
+    category: 'TEREN',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [{ id: 'WODA', side: 'BOTTOM', medium: 'WATER' }]
+  },
+  // Adjustable size, like the two site-objects-2d SURFACES
+  // (GrassSymbol.tsx/ConcreteRoadSymbol.tsx's own header comments) -
+  // but deliberately NOT isSurface: nothing in this task asks other
+  // objects to draw above a drip line the way they do above grass.
+  'site.drip_line': {
+    type: 'site.drip_line',
+    label: 'Linia kroplujaca',
+    category: 'TEREN',
+    defaultWidth: 192,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [{ id: 'WLOT', side: 'LEFT', medium: 'WATER' }]
   }
 };

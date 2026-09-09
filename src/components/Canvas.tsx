@@ -13,6 +13,7 @@ import {
 } from '../utils/WireDrawing';
 import { resolveNets, getJunctionPoints } from '../project/NetResolver';
 import { describeObject } from '../utils/ObjectDisplay';
+import { attachAnchorsToNewPoints } from '../utils/WireAnchoring';
 import { isSymbolDeviceMissing } from '../project/DeviceBindingValidation';
 import { isSymbolInterlocked } from '../project/InterlockIndicator';
 import { WireNodeSymbol } from '../symbols/scada/WireNodeSymbol';
@@ -200,7 +201,16 @@ export const Canvas: React.FC = () => {
     // the toolbar's selector changes after mount - the same reason
     // drawingPointsRef exists instead of just closing over drawingPoints.
     const { drawingMedium: medium, drawingStyle: style } = useStore.getState();
-    useStore.getState().addConnection({ points, medium, style, state: 'LIVE' });
+    // feat/water-management commit 1: a point that landed exactly on a
+    // terminal at the moment of creation remembers it - checked once,
+    // here, against the object list as it stands right now (never
+    // re-checked later; see WireAnchoring.ts's own header).
+    const anchoredPoints = attachAnchorsToNewPoints(points, useStore.getState().objects);
+    // feat/water-management commit 2: state is no longer set here at
+    // all - it is a computed, read-only property of the net this wire
+    // ends up joining (NetResolver.ts), never a value the wire itself
+    // carries at creation time.
+    useStore.getState().addConnection({ points: anchoredPoints, medium, style });
     useStore.getState().saveHistory();
 
     // Readable, UUID-free feedback: if the new wire actually touches a
@@ -612,6 +622,16 @@ export const Canvas: React.FC = () => {
 
   const junctionPoints = getJunctionPoints(connections, objects);
 
+  // feat/water-management commit 2: a wire's own color is now the
+  // RESULT of its net's state (isSourceActive), never a per-connection
+  // setting - computed once per render, here, the same "plain inline
+  // call, no memoization" convention junctionPoints above already
+  // uses, then looked up per connection below by id.
+  const netStateByConnectionId = new Map<string, 'ACTIVE' | 'INACTIVE'>();
+  resolveNets(connections, objects, devices).forEach(net => {
+    net.connectionIds.forEach(id => netStateByConnectionId.set(id, net.state));
+  });
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     if (!stageRef.current || !containerRef.current) return;
@@ -878,6 +898,7 @@ export const Canvas: React.FC = () => {
             <ConnectionNode
               key={conn.id}
               conn={conn}
+              netState={netStateByConnectionId.get(conn.id) ?? 'INACTIVE'}
               isSelected={selectedConnectionIds.includes(conn.id)}
               onSelect={(multi: boolean) => selectConnections([conn.id], multi)}
               gridSize={gridSize}
@@ -895,14 +916,14 @@ export const Canvas: React.FC = () => {
             <>
               <Path
                 data={pathFromPoints(drawingPreview ? [...drawingPoints, drawingPreview] : drawingPoints)}
-                stroke={getConductorCoreColor(drawingMedium, 'LIVE')}
+                stroke={getConductorCoreColor(drawingMedium, 'ACTIVE')}
                 strokeWidth={CONDUCTOR_WIDTH / 2}
                 lineCap="round"
                 lineJoin="round"
                 listening={false}
               />
               {drawingPoints.map((p, idx) => (
-                <Circle key={idx} x={p.x} y={p.y} radius={4} fill={getConductorCoreColor(drawingMedium, 'LIVE')} listening={false} />
+                <Circle key={idx} x={p.x} y={p.y} radius={4} fill={getConductorCoreColor(drawingMedium, 'ACTIVE')} listening={false} />
               ))}
             </>
           )}

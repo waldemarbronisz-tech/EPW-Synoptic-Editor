@@ -105,9 +105,22 @@ export interface CanvasState {
   panY: number;
 }
 
+// feat/water-management commit 1: a point that landed EXACTLY on a
+// symbol's terminal at the moment it was created remembers that
+// terminal here, so it can follow the symbol through a move/rotate
+// instead of being left behind (WireAnchoring.ts). Optional and
+// additive - a connection saved before this field existed simply has
+// no anchor on any of its points (free, exactly as it already
+// behaved) - no schema version bump.
+export interface WirePointAnchor {
+  symbolId: string;
+  terminalId: string;
+}
+
 export interface WirePoint {
   x: number;
   y: number;
+  anchor?: WirePointAnchor;
 }
 
 // Node-based connection model (schema v2): a connection is a freehand
@@ -126,7 +139,14 @@ export interface SynopticConnection {
   points: WirePoint[]; // minimum 2, every point on a GRID_SIZE node, every segment horizontal or vertical
   medium: 'ELECTRICAL' | 'WATER' | 'VENTILATION';
   style: 'NORMAL' | 'BUS'; // BUS is a busbar/manifold: thicker, touchable anywhere along its length
-  state: 'LIVE' | 'DEAD';
+  // feat/water-management commit 2: no longer set by hand in Properties
+  // (that field is gone) and never read for drawing - NetResolver.ts's
+  // own computed net state (ACTIVE/INACTIVE, from whether the net
+  // touches an active source) decides the wire's color now. Left
+  // optional, purely so a file saved before this commit (with a real
+  // LIVE/DEAD value on every connection) still loads without error -
+  // ProjectSchema.ts's own validator accepts an absent value too.
+  state?: 'LIVE' | 'DEAD';
 }
 
 export interface Message {

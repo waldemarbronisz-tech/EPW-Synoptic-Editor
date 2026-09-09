@@ -33,6 +33,7 @@ export type {
   SynopticConnection,
   SynopticObject,
   WirePoint,
+  WirePointAnchor,
 } from './store/types';
 
 export const useStore = create<AppState>()((...a) => ({

@@ -1,5 +1,6 @@
 import type { StateCreator } from 'zustand';
 import type { AppState } from './appState';
+import { syncAnchoredConnections } from '../utils/WireAnchoring';
 
 // Cap on how many undo/redo snapshots are kept; each entry is a full deep
 // copy of objects+connections+meters+signalPanels+frames, so this bounds both memory and undo depth.
@@ -16,6 +17,23 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
   historyIndex: 0,
 
   saveHistory: () => {
+    // feat/water-management commit 1: every move/rotate/resize/align/
+    // distribute action in this codebase converges on calling this
+    // function right after mutating `objects` - the one robust, single
+    // hook point to re-derive every anchored wire endpoint's position
+    // from its terminal's own CURRENT world position, rather than
+    // scattering a call across every individual action (moveSelectionBy,
+    // rotateSelected, alignSelected, distributeSelected, updateObject,
+    // updateObjects, ObjectNode.tsx's onTransformEnd...). Cheap when
+    // nothing is actually anchored (syncAnchoredConnections's own early
+    // per-connection skip) and a no-op the instant every anchored point
+    // already agrees with its terminal.
+    const preSync = get();
+    const syncedConnections = syncAnchoredConnections(preSync.connections, preSync.objects);
+    if (syncedConnections !== preSync.connections) {
+      set({ connections: syncedConnections });
+    }
+
     const { objects, connections, meters, signalPanels, frames, groupCommands, setpointPanels, history, historyIndex } = get();
     const objectsJson = JSON.stringify(objects);
     const connectionsJson = JSON.stringify(connections);

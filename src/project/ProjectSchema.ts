@@ -225,7 +225,12 @@ export function validateProjectSchema(data: any): ValidationResult {
       if (conn.style !== 'NORMAL' && conn.style !== 'BUS') {
          issues.push({ severity: 'ERROR', code: 'INVALID_STYLE', message: `Connection ${conn.id} has an invalid style: ${conn.style}` });
       }
-      if (conn.state !== 'LIVE' && conn.state !== 'DEAD') {
+      // feat/water-management commit 2: state is optional now (a
+      // manual per-connection setting no longer exists - see
+      // NetResolver.ts's own computed net state) - absent is valid,
+      // same as every other optional field in this schema; an actual
+      // garbage value is still an error.
+      if (conn.state !== undefined && conn.state !== 'LIVE' && conn.state !== 'DEAD') {
          issues.push({ severity: 'ERROR', code: 'INVALID_STATE', message: `Connection ${conn.id} has an invalid state: ${conn.state}` });
       }
     }

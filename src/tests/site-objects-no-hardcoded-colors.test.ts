@@ -25,6 +25,18 @@ import gardenSprinklerSource from '../symbols/site/GardenSprinklerSymbol.tsx?raw
 import grassSource from '../symbols/site/GrassSymbol.tsx?raw';
 import concreteRoadSource from '../symbols/site/ConcreteRoadSymbol.tsx?raw';
 import surfaceGeometrySource from '../symbols/site/SurfaceGeometry.ts?raw';
+import rainwaterTank2Source from '../symbols/site/RainwaterTank2Symbol.tsx?raw';
+import waterValveSource from '../symbols/site/WaterValveSymbol.tsx?raw';
+import waterSelectorValveSource from '../symbols/site/WaterSelectorValveSymbol.tsx?raw';
+import checkValveSource from '../symbols/site/CheckValveSymbol.tsx?raw';
+import waterFilterSource from '../symbols/site/WaterFilterSymbol.tsx?raw';
+import hydroforSource from '../symbols/site/HydroforSymbol.tsx?raw';
+import flowMeterSource from '../symbols/site/FlowMeterSymbol.tsx?raw';
+import waterMeterSource from '../symbols/site/WaterMeterSymbol.tsx?raw';
+import pressureSwitchSource from '../symbols/site/PressureSwitchSymbol.tsx?raw';
+import rainSensorSource from '../symbols/site/RainSensorSymbol.tsx?raw';
+import sprinklerHeadSource from '../symbols/site/SprinklerHeadSymbol.tsx?raw';
+import dripLineSource from '../symbols/site/DripLineSymbol.tsx?raw';
 
 const HEX_COLOR_PATTERN = /#[0-9A-Fa-f]{3,8}\b/g;
 
@@ -46,7 +58,19 @@ const sources: Record<string, string> = {
   'GardenSprinklerSymbol.tsx': gardenSprinklerSource,
   'GrassSymbol.tsx': grassSource,
   'ConcreteRoadSymbol.tsx': concreteRoadSource,
-  'SurfaceGeometry.ts': surfaceGeometrySource
+  'SurfaceGeometry.ts': surfaceGeometrySource,
+  'RainwaterTank2Symbol.tsx': rainwaterTank2Source,
+  'WaterValveSymbol.tsx': waterValveSource,
+  'WaterSelectorValveSymbol.tsx': waterSelectorValveSource,
+  'CheckValveSymbol.tsx': checkValveSource,
+  'WaterFilterSymbol.tsx': waterFilterSource,
+  'HydroforSymbol.tsx': hydroforSource,
+  'FlowMeterSymbol.tsx': flowMeterSource,
+  'WaterMeterSymbol.tsx': waterMeterSource,
+  'PressureSwitchSymbol.tsx': pressureSwitchSource,
+  'RainSensorSymbol.tsx': rainSensorSource,
+  'SprinklerHeadSymbol.tsx': sprinklerHeadSource,
+  'DripLineSymbol.tsx': dripLineSource
 };
 
 describe('7. no TEREN symbol component hard-codes a hex color', () => {

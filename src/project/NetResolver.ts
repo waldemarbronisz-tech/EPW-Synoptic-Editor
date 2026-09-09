@@ -11,13 +11,59 @@
 
 import type { SynopticConnection, SynopticObject, WirePoint } from '../store';
 import { getAllWorldTerminals, type WorldTerminal } from '../utils/Terminals';
+import type { Device } from './DeviceSchema';
 
 export interface Net {
   id: string;
   connectionIds: string[];
   terminals: { objId: string; terminalId: string }[];
   medium: 'ELECTRICAL' | 'WATER' | 'VENTILATION' | null;
-  state: 'LIVE' | 'DEAD' | null;
+  // feat/water-management commit 2: no longer a manual per-connection
+  // setting copied straight through - a net's state is now COMPUTED
+  // from whether it touches an active source (isActiveSourceTerminal
+  // below). ACTIVE/INACTIVE replaces the old LIVE/DEAD/null vocabulary
+  // (nothing outside this file ever read the old field - confirmed
+  // before renaming it - so there was no live/dead consumer to keep in
+  // sync with the new meaning).
+  state: 'ACTIVE' | 'INACTIVE';
+}
+
+/**
+ * Whether one terminal (identified by objId/terminalId, already known
+ * to belong to some net) is itself an ACTIVE SOURCE - the two rules
+ * this task defines, checked directly, with no upstream/continuity
+ * tracing at all (this editor has no live data to trace with - see
+ * DeviceSchema.ts's own header: a SWITCHED device's contract is
+ * channel ADDRESSES, never a live value):
+ *
+ *   - a boundary point with boundaryDirection SOURCE - always a
+ *     source, regardless of any device binding.
+ *   - a symbol whose OWN terminal id is 'OUT' ("po stronie jego
+ *     wyjscia" - the universal IN/OUT terminal-naming convention every
+ *     two-terminal symbol in this registry already uses, electrical
+ *     and water alike), bound to a device (via deviceId) whose
+ *     behavior is SWITCHED, with that symbol's own Editor Preview
+ *     state currently 'CLOSED' - the same manually-set preview value
+ *     every other symbol's state already comes from (there is no live
+ *     device state anywhere in this editor to read instead).
+ *
+ * When the state cannot be established at all - no deviceId, or the
+ * id does not resolve to any device in the project's own list - this
+ * terminal is simply not a source (never throws, per this task's own
+ * explicit "traktuj zrodlo jako NIEAKTYWNE" instruction).
+ */
+function isActiveSourceTerminal(objId: string, terminalId: string, objects: SynopticObject[], devices: Device[]): boolean {
+  const obj = objects.find(o => o.id === objId);
+  if (!obj) return false;
+
+  if (obj.type === 'scada.boundary_point' && obj.boundaryDirection === 'SOURCE') return true;
+
+  if (terminalId === 'OUT' && obj.deviceId) {
+    const device = devices.find(d => d.id === obj.deviceId);
+    if (device?.behavior === 'SWITCHED' && obj.editor?.preview_state === 'CLOSED') return true;
+  }
+
+  return false;
 }
 
 export interface NetIssue {
@@ -90,7 +136,7 @@ class UnionFind {
  * always produces an empty nets list, even if items have terminals: a
  * terminal nothing is wired to is not a net.
  */
-export function resolveNets(connections: SynopticConnection[], items: SynopticObject[]): Net[] {
+export function resolveNets(connections: SynopticConnection[], items: SynopticObject[], devices: Device[] = []): Net[] {
   if (connections.length === 0) return [];
 
   const worldTerminals = getAllWorldTerminals(items);
@@ -140,12 +186,14 @@ export function resolveNets(connections: SynopticConnection[], items: SynopticOb
   groups.forEach(g => {
     if (g.connIdx.length === 0) return;
     const netConnections = g.connIdx.map(i => connections[i]);
+    const terminals = g.termIdx.map(ti => ({ objId: worldTerminals[ti].objId, terminalId: worldTerminals[ti].terminalId }));
+    const hasActiveSource = terminals.some(t => isActiveSourceTerminal(t.objId, t.terminalId, items, devices));
     nets.push({
       id: `net-${counter++}`,
       connectionIds: netConnections.map(c => c.id),
-      terminals: g.termIdx.map(ti => ({ objId: worldTerminals[ti].objId, terminalId: worldTerminals[ti].terminalId })),
+      terminals,
       medium: netConnections[0]?.medium ?? null,
-      state: netConnections[0]?.state ?? null
+      state: hasActiveSource ? 'ACTIVE' : 'INACTIVE'
     });
   });
   return nets;
