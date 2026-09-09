@@ -163,8 +163,31 @@ export const createSelectionSlice: StateCreator<AppState, [], [], SelectionSlice
       frames: state.frames.map(f => selectedFrameIds.includes(f.id) ? { ...f, x: f.x + dx, y: f.y + dy } : f),
       groupCommands: state.groupCommands.map(g => selectedGroupCommandIds.includes(g.id) ? { ...g, x: g.x + dx, y: g.y + dy } : g),
       setpointPanels: state.setpointPanels.map(p => selectedSetpointPanelIds.includes(p.id) ? { ...p, x: p.x + dx, y: p.y + dy } : p),
+      // fix/wiring-and-library-groups commit 3: a selected connection's
+      // own points used to be shifted by the plain (dx,dy) vector as a
+      // bare {x,y} literal - silently dropping any `anchor` field along
+      // the way, with no message, no matter WHY the point was moving.
+      // That is correct ONLY when this same group move is deliberately
+      // detaching the wire from a terminal it is not moving together
+      // with (its own anchor's symbol id is not part of THIS move) -
+      // the same "manually moving an anchored point breaks the anchor"
+      // rule ConnectionNode.tsx's own per-point drag already applies,
+      // now extended to this coarser, whole-connection move. When the
+      // anchor's OWN symbol IS moving together with it (selectedIds
+      // includes it too - e.g. a rubber-band selection spanning both a
+      // symbol and its own wire), the point keeps its anchor: both move
+      // by the identical vector, so the numbers agree either way, and
+      // the very next saveHistory's own syncAnchoredConnections simply
+      // confirms it rather than fighting a stale, silently-broken one
+      // the next time the symbol alone moves.
       connections: state.connections.map(c => selectedConnectionIds.includes(c.id)
-        ? { ...c, points: c.points.map(p => ({ x: p.x + dx, y: p.y + dy })) }
+        ? { ...c, points: c.points.map(p => {
+            if (p.anchor && !selectedIds.includes(p.anchor.symbolId)) {
+              const { anchor: _anchor, ...rest } = p;
+              return { ...rest, x: p.x + dx, y: p.y + dy };
+            }
+            return { ...p, x: p.x + dx, y: p.y + dy };
+          }) }
         : c)
     }));
     get().saveHistory();

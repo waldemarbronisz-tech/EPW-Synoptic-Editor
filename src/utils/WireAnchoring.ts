@@ -127,6 +127,44 @@ export function syncAnchoredConnections(connections: SynopticConnection[], objec
 }
 
 /**
+ * fix/wiring-and-library-groups commit 3, point (c): a consistency
+ * check, not a fix in itself - every anchored point's coordinates
+ * SHOULD always exactly equal its own terminal's current world
+ * position, by construction, once syncAnchoredConnections above has
+ * run. Called right after that (historySlice.ts's own saveHistory) on
+ * the RESULTING state, so this only ever reports something if some
+ * OTHER path this file does not control moved a connection's points
+ * without going through the sync above - moveSelectionBy's own
+ * connection-drag branch was exactly such a path (see this commit's
+ * own fix to it) before this commit; kept here afterwards as a
+ * standing guard against the next one, not removed once that one case
+ * was found and fixed.
+ */
+export interface AnchorDiscrepancy {
+  connectionId: string;
+  symbolId: string;
+  terminalId: string;
+}
+
+export function findAnchorDiscrepancies(connections: SynopticConnection[], objects: SynopticObject[]): AnchorDiscrepancy[] {
+  const issues: AnchorDiscrepancy[] = [];
+  for (const conn of connections) {
+    for (const p of conn.points) {
+      if (!p.anchor) continue;
+      const obj = objects.find(o => o.id === p.anchor!.symbolId);
+      if (!obj) continue; // a dangling anchor is releaseAnchorsForDeletedObjects's own concern, not this one's
+      const terminal = getObjectTerminals(obj).find(t => t.id === p.anchor!.terminalId);
+      if (!terminal) continue;
+      const worldPos = getTerminalWorldPosition(obj, terminal);
+      if (worldPos.x !== p.x || worldPos.y !== p.y) {
+        issues.push({ connectionId: conn.id, symbolId: obj.id, terminalId: terminal.id });
+      }
+    }
+  }
+  return issues;
+}
+
+/**
  * Deleting a symbol releases every anchor pointing at it - the point
  * stays exactly where it was (a free end now), per this commit's own
  * explicit requirement ("punkt zostaje tam, gdzie byl"). Returns the
