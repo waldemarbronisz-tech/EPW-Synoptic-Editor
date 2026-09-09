@@ -19,13 +19,20 @@ export const CHECK_VALVE_STATES: CheckValveState[] = ['ZALACZONY', 'WYLACZONY'];
 // (was centered on y=54, the true WLOT/WYLOT terminal height is 48) so
 // the krociec/kolnierz standard lands exactly on the real terminal
 // instead of 6 units off it.
-export const CheckValveSymbol: React.FC<SymbolProps> = ({ state }) => {
+export const CheckValveSymbol: React.FC<SymbolProps> = ({ state, terminalNetState }) => {
   const live = resolveSiteState(state, CHECK_VALVE_STATES, 'WYLACZONY') === 'ZALACZONY';
+  const netState = (id: string) => (terminalNetState?.(id) ?? 'INACTIVE') === 'ACTIVE';
 
   return (
     <Group>
-      {waterStub(42, 48, 'L', live, 128, 96)}
-      {waterStub(86, 48, 'R', live, 128, 96)}
+      {/* feat/wire-routing-around-obstacles commit 5: the krociec no
+          longer carries the valve's own open/closed state - it reads
+          the net each terminal actually belongs to (point b: WLOT and
+          WYLOT can disagree, since they are on different nets). `live`
+          (the valve's own state) still drives the flapper's own
+          visual below, unchanged. */}
+      {waterStub(42, 48, 'L', netState('WLOT'), 128, 96)}
+      {waterStub(86, 48, 'R', netState('WYLOT'), 128, 96)}
       {bandedRect(42, 30, 44, 36, SITE_GREY)}
 
       {/* Hinged flapper - angled open (live) or vertical shut (not). */}

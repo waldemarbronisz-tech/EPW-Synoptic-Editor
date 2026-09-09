@@ -12,7 +12,7 @@ import { waterStub } from '../site/BandedShading';
 const H_MARGIN_FRACTION = 0.2;
 const BOWTIE_HALF_HEIGHT_FRACTION = 0.4; // half of the original 0.8h span
 
-export const DrainValveSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
+export const DrainValveSymbol: React.FC<SymbolProps> = ({ obj, state, terminalNetState }) => {
   const w = obj.width;
   const h = obj.height;
   const margin = w * H_MARGIN_FRACTION;
@@ -23,14 +23,17 @@ export const DrainValveSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
   const isFault = state === 'FAULT';
 
   const fillColor = isOpen ? '#e74c3c' : '#7f8c8d';
+  // feat/wire-routing-around-obstacles commit 5: reads each terminal's
+  // own net state.
+  const netState = (id: string) => (terminalNetState?.(id) ?? 'INACTIVE') === 'ACTIVE';
 
   // Small bow-tie - shrunk horizontally, recentered vertically (see comments above).
   const bowTiePath = `M ${margin} ${bowTieTop} L ${w - margin} ${bowTieBottom} L ${w - margin} ${bowTieTop} L ${margin} ${bowTieBottom} Z`;
 
   return (
     <Group>
-      {waterStub(margin, h / 2, 'L', isOpen, w, h)}
-      {waterStub(w - margin, h / 2, 'R', isOpen, w, h)}
+      {waterStub(margin, h / 2, 'L', netState('IN'), w, h)}
+      {waterStub(w - margin, h / 2, 'R', netState('OUT'), w, h)}
       <Path
         data={bowTiePath}
         fill={fillColor}

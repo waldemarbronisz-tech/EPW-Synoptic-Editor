@@ -25,10 +25,11 @@ export const RAIN_TANK_STATES: RainTankState[] = ['ZALACZONY', 'WYLACZONY'];
 
 const CX = 80, CY = 64;
 
-export const RainTankSymbol: React.FC<SymbolProps> = ({ state }) => {
+export const RainTankSymbol: React.FC<SymbolProps> = ({ state, terminalNetState }) => {
   const on = resolveSiteState(state, RAIN_TANK_STATES, 'WYLACZONY') === 'ZALACZONY';
   const level = on ? 0.68 : 0.22;
   const height = Math.floor(62 * level);
+  const krociecLive = (terminalNetState?.('KROCIEC') ?? 'INACTIVE') === 'ACTIVE';
 
   return (
     // SITE_CANVAS_SCALE - see HouseSymbol.tsx's own comment on this
@@ -54,8 +55,8 @@ export const RainTankSymbol: React.FC<SymbolProps> = ({ state }) => {
           technique the reference's own tank() uses for its DOPLYW.
           Retires the old plain decorative spigot rect, which never
           reached the true edge at all (stopped at x=152, 8 short). */}
-      {objectPipeSegment([{ x: 124, y: 64 }, { x: 145, y: 64 }, { x: 145, y: 60 }, { x: 160, y: 60 }], true)}
-      {waterFlange(flangeCenterForSide('R', 60, 160, 120).x, 60, 'R', true)}
+      {objectPipeSegment([{ x: 124, y: 64 }, { x: 145, y: 64 }, { x: 145, y: 60 }, { x: 160, y: 60 }], krociecLive)}
+      {waterFlange(flangeCenterForSide('R', 60, 160, 120).x, 60, 'R', krociecLive)}
     </Group>
   );
 };

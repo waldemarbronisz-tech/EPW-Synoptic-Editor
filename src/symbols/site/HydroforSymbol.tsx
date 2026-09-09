@@ -21,9 +21,10 @@ export const HYDROFOR_STATES: HydroforState[] = ['ZALACZONY', 'WYLACZONY'];
 // the real terminal - this object had NONE at all before (its old
 // internal pipe, x56-66, was purely a vessel-to-pump connector, never
 // reaching the canvas edge where WYLOT actually is).
-export const HydroforSymbol: React.FC<SymbolProps> = ({ state }) => {
+export const HydroforSymbol: React.FC<SymbolProps> = ({ state, terminalNetState }) => {
   const on = resolveSiteState(state, HYDROFOR_STATES, 'WYLACZONY') === 'ZALACZONY';
   const vessel = on ? SITE_BLUE : SITE_GREY;
+  const wylotLive = (terminalNetState?.('WYLOT') ?? 'INACTIVE') === 'ACTIVE';
 
   return (
     <Group>
@@ -40,8 +41,10 @@ export const HydroforSymbol: React.FC<SymbolProps> = ({ state }) => {
       {objectPipeSegment([{ x: 56, y: 49 }, { x: 66, y: 49 }], on, { width: 10 })}
       {statusLed(110, 19, on)}
 
-      {/* WYLOT: the vessel's own left wall, out to the true terminal. */}
-      {waterStub(14, 48, 'L', on, 128, 96)}
+      {/* WYLOT: the vessel's own left wall, out to the true terminal -
+          feat/wire-routing-around-obstacles commit 5: reads its OWN
+          net state now, not the pump's own on/off appearance. */}
+      {waterStub(14, 48, 'L', wylotLive, 128, 96)}
     </Group>
   );
 };

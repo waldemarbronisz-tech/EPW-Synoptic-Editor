@@ -9,7 +9,7 @@ import { waterStub } from '../site/BandedShading';
 // a 20% margin on each side so both fit.
 const H_MARGIN_FRACTION = 0.2;
 
-export const ValveSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
+export const ValveSymbol: React.FC<SymbolProps> = ({ obj, state, terminalNetState }) => {
   const w = obj.width;
   const h = obj.height;
   const margin = w * H_MARGIN_FRACTION;
@@ -19,6 +19,9 @@ export const ValveSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
   const isFault = state === 'FAULT';
 
   const fillColor = isClosed ? '#7f8c8d' : (isTransition ? '#f1c40f' : '#2ecc71');
+  // feat/wire-routing-around-obstacles commit 5: reads each terminal's
+  // own net state, not the valve's own open/closed appearance.
+  const netState = (id: string) => (terminalNetState?.(id) ?? 'INACTIVE') === 'ACTIVE';
 
   // Bow-tie valve geometry - shrunk to leave room for the krociec/
   // kolnierz standard (see H_MARGIN_FRACTION's own comment above).
@@ -26,8 +29,8 @@ export const ValveSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
 
   return (
     <Group>
-      {waterStub(margin, h / 2, 'L', !isClosed, w, h)}
-      {waterStub(w - margin, h / 2, 'R', !isClosed, w, h)}
+      {waterStub(margin, h / 2, 'L', netState('IN'), w, h)}
+      {waterStub(w - margin, h / 2, 'R', netState('OUT'), w, h)}
       <Path
         data={bowTiePath}
         fill={fillColor}

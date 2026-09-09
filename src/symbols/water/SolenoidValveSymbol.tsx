@@ -14,7 +14,7 @@ import { waterStub } from '../site/BandedShading';
 const H_MARGIN_FRACTION = 0.2;
 const BOWTIE_HALF_HEIGHT_FRACTION = 0.35; // half of the original 0.7h span
 
-export const SolenoidValveSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
+export const SolenoidValveSymbol: React.FC<SymbolProps> = ({ obj, state, terminalNetState }) => {
   const w = obj.width;
   const h = obj.height;
   const margin = w * H_MARGIN_FRACTION;
@@ -26,6 +26,9 @@ export const SolenoidValveSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
   const isFault = state === 'FAULT';
 
   const fillColor = isClosed ? '#7f8c8d' : (isTransition ? '#f1c40f' : '#2ecc71');
+  // feat/wire-routing-around-obstacles commit 5: reads each terminal's
+  // own net state.
+  const netState = (id: string) => (terminalNetState?.(id) ?? 'INACTIVE') === 'ACTIVE';
 
   // Bow-tie valve geometry - shrunk horizontally to leave room for the
   // krociec/kolnierz, and recentered vertically on the true terminal
@@ -34,8 +37,8 @@ export const SolenoidValveSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
 
   return (
     <Group>
-      {waterStub(margin, h / 2, 'L', !isClosed, w, h)}
-      {waterStub(w - margin, h / 2, 'R', !isClosed, w, h)}
+      {waterStub(margin, h / 2, 'L', netState('IN'), w, h)}
+      {waterStub(w - margin, h / 2, 'R', netState('OUT'), w, h)}
       {/* Solenoid Coil Box */}
       <Rect x={w*0.3} y={0} width={w*0.4} height={h*0.4} fill="#2980b9" stroke="#2c3e50" strokeWidth={SYMBOL_STROKE} />
 

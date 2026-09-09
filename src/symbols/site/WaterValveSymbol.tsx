@@ -27,15 +27,23 @@ export const WATER_VALVE_STATES: WaterValveState[] = ['A', 'B'];
 // this one change re-centers the whole body on the real terminals.
 const CX = 64, CY = 48;
 
-export const WaterValveSymbol: React.FC<SymbolProps> = ({ state }) => {
+export const WaterValveSymbol: React.FC<SymbolProps> = ({ state, terminalNetState }) => {
   const isA = resolveSiteState(state, WATER_VALVE_STATES, 'A') === 'A';
   const angle = isA ? 0 : 90;
+  const netState = (id: string) => (terminalNetState?.(id) ?? 'INACTIVE') === 'ACTIVE';
 
   return (
     <Group>
-      {waterStub(CX, CY, 'L', true, 128, 96)}
-      {waterStub(CX, CY, 'R', isA, 128, 96)}
-      {waterStub(CX, CY, 'B', !isA, 128, 96)}
+      {/* feat/wire-routing-around-obstacles commit 5, point (b): each
+          terminal now reads its OWN net - the earlier hardcoded WLOT=
+          true, WYLOT_A=isA, WYLOT_B=!isA (the valve's own position,
+          not real connectivity) is exactly the usterka this task's own
+          example describes ("zawor zamkniety ma po jednej stronie
+          krociec niebieski, po drugiej szary"). isA still drives the
+          lever's own drawn position below, unchanged. */}
+      {waterStub(CX, CY, 'L', netState('WLOT'), 128, 96)}
+      {waterStub(CX, CY, 'R', netState('WYLOT_A'), 128, 96)}
+      {waterStub(CX, CY, 'B', netState('WYLOT_B'), 128, 96)}
       {bandedCircleLightOnly(CX, CY, 17, SITE_DGREY)}
 
       {/* Lever handle - rotates about (CX,CY): a Konva Group pivoting

@@ -1,7 +1,10 @@
 import React from 'react';
 import { Group, Rect, Circle, Text } from 'react-konva';
+import { useStore } from '../store';
 import type { SynopticObject } from '../store';
 import { FONT_UI, FONT_SIZE_BASE } from '../theme/ScadaTheme';
+import { getSymbolDefinition } from './SymbolRegistry';
+import { getTerminalNetStates } from '../project/NetResolver';
 import { CircuitBreakerSymbol } from './electrical/CircuitBreakerSymbol';
 import { DisconnectSwitchSymbol } from './electrical/DisconnectSwitchSymbol';
 import { ContactorSymbol } from './electrical/ContactorSymbol';
@@ -93,6 +96,16 @@ import { DripLineSymbol } from './site/DripLineSymbol';
 export interface SymbolProps {
   obj: SynopticObject;
   state: string; // the resolved state (either preview_state or fallback default)
+  // feat/wire-routing-around-obstacles commit 5: a water-medium
+  // aparat's own krociec no longer carries a color of its own - this
+  // resolves ONE of its own terminal ids to the state of the NET that
+  // terminal currently belongs to (ACTIVE/INACTIVE), or 'INACTIVE' for
+  // a terminal that is not on any net at all (unconnected - point c).
+  // Only ever passed to a component whose registered symbol actually
+  // has a WATER terminal (SymbolRenderer.tsx's own dispatch below) -
+  // every other component simply never receives it, same as any other
+  // optional prop.
+  terminalNetState?: (terminalId: string) => 'ACTIVE' | 'INACTIVE';
 }
 
 // feat/appearance-selection-frames commit 4c: PropertyInspector.tsx's
@@ -155,6 +168,25 @@ export const GenericSymbol: React.FC<SymbolProps> = ({ obj }) => {
 export const SymbolRenderer: React.FC<{ obj: SynopticObject }> = ({ obj }) => {
   const state = obj.editor?.preview_state || 'NORMAL';
 
+  // feat/wire-routing-around-obstacles commit 5, point (a): "uzyj TEJ
+  // SAMEJ funkcji, ktora wyznacza stan sieci dla przewodow" -
+  // getTerminalNetStates is a thin wrapper around NetResolver.ts's own
+  // resolveNets, never a second mechanism. Computed only for an object
+  // whose registered symbol actually has a WATER terminal (most
+  // objects on a screen do not) - a plain useStore.getState() snapshot
+  // read, not a subscribing hook: this component already re-renders on
+  // every store change anyway (Canvas.tsx's own top-level subscription
+  // re-renders its whole objects/connections list), so a second
+  // subscription here would add reactivity this already has, not gain any.
+  const def = getSymbolDefinition(obj.type);
+  const hasWaterTerminal = (def?.terminals || []).some(t => t.medium === 'WATER');
+  let terminalNetState: ((terminalId: string) => 'ACTIVE' | 'INACTIVE') | undefined;
+  if (hasWaterTerminal) {
+    const { connections, objects, devices } = useStore.getState();
+    const netStates = getTerminalNetStates(connections, objects, devices);
+    terminalNetState = (terminalId: string) => netStates.get(`${obj.id}:${terminalId}`) ?? 'INACTIVE';
+  }
+
   switch (obj.type) {
     case 'electrical.circuit_breaker':
       return <CircuitBreakerSymbol obj={obj} state={state} />;
@@ -205,21 +237,21 @@ export const SymbolRenderer: React.FC<{ obj: SynopticObject }> = ({ obj }) => {
     case 'water.tee':
       return <TeeSymbol obj={obj} state={state} />;
     case 'water.valve':
-      return <ValveSymbol obj={obj} state={state} />;
+      return <ValveSymbol obj={obj} state={state} terminalNetState={terminalNetState} />;
     case 'water.gate_valve':
-      return <GateValveSymbol obj={obj} state={state} />;
+      return <GateValveSymbol obj={obj} state={state} terminalNetState={terminalNetState} />;
     case 'water.ball_valve':
-      return <BallValveSymbol obj={obj} state={state} />;
+      return <BallValveSymbol obj={obj} state={state} terminalNetState={terminalNetState} />;
     case 'water.drain':
-      return <DrainSymbol obj={obj} state={state} />;
+      return <DrainSymbol obj={obj} state={state} terminalNetState={terminalNetState} />;
     case 'water.solenoid_valve':
-      return <SolenoidValveSymbol obj={obj} state={state} />;
+      return <SolenoidValveSymbol obj={obj} state={state} terminalNetState={terminalNetState} />;
     case 'water.drain_valve':
-      return <DrainValveSymbol obj={obj} state={state} />;
+      return <DrainValveSymbol obj={obj} state={state} terminalNetState={terminalNetState} />;
     case 'water.pump':
-      return <PumpSymbol obj={obj} state={state} />;
+      return <PumpSymbol obj={obj} state={state} terminalNetState={terminalNetState} />;
     case 'water.tank':
-      return <TankSymbol obj={obj} state={state} />;
+      return <TankSymbol obj={obj} state={state} terminalNetState={terminalNetState} />;
     case 'measurements.generic_display':
       return <MeasurementDisplaySymbol obj={obj} state={state} />;
     case 'measurements.voltage_display':
@@ -283,11 +315,11 @@ export const SymbolRenderer: React.FC<{ obj: SynopticObject }> = ({ obj }) => {
     case 'site.sliding_gate':
       return <SlidingGateSymbol obj={obj} state={state} />;
     case 'site.rain_tank':
-      return <RainTankSymbol obj={obj} state={state} />;
+      return <RainTankSymbol obj={obj} state={state} terminalNetState={terminalNetState} />;
     case 'site.sewage_plant':
-      return <SewagePlantSymbol obj={obj} state={state} />;
+      return <SewagePlantSymbol obj={obj} state={state} terminalNetState={terminalNetState} />;
     case 'site.water_manhole':
-      return <WaterManholeSymbol obj={obj} state={state} />;
+      return <WaterManholeSymbol obj={obj} state={state} terminalNetState={terminalNetState} />;
     case 'site.lamp_post_double':
       return <LampPostDoubleSymbol obj={obj} state={state} />;
     case 'site.lamp_post_single':
@@ -303,35 +335,35 @@ export const SymbolRenderer: React.FC<{ obj: SynopticObject }> = ({ obj }) => {
     case 'site.alarm_horn':
       return <AlarmHornSymbol obj={obj} state={state} />;
     case 'site.garden_sprinkler':
-      return <GardenSprinklerSymbol obj={obj} state={state} />;
+      return <GardenSprinklerSymbol obj={obj} state={state} terminalNetState={terminalNetState} />;
     case 'site.grass':
       return <GrassSymbol obj={obj} state={state} />;
     case 'site.concrete_road':
       return <ConcreteRoadSymbol obj={obj} state={state} />;
     case 'site.rainwater_tank2':
-      return <RainwaterTank2Symbol obj={obj} state={state} />;
+      return <RainwaterTank2Symbol obj={obj} state={state} terminalNetState={terminalNetState} />;
     case 'site.water_selector_valve_switched':
-      return <WaterValveSymbol obj={obj} state={state} />;
+      return <WaterValveSymbol obj={obj} state={state} terminalNetState={terminalNetState} />;
     case 'site.water_selector_valve_3pos':
-      return <WaterSelectorValveSymbol obj={obj} state={state} />;
+      return <WaterSelectorValveSymbol obj={obj} state={state} terminalNetState={terminalNetState} />;
     case 'site.check_valve':
-      return <CheckValveSymbol obj={obj} state={state} />;
+      return <CheckValveSymbol obj={obj} state={state} terminalNetState={terminalNetState} />;
     case 'site.water_filter':
-      return <WaterFilterSymbol obj={obj} state={state} />;
+      return <WaterFilterSymbol obj={obj} state={state} terminalNetState={terminalNetState} />;
     case 'site.hydrofor':
-      return <HydroforSymbol obj={obj} state={state} />;
+      return <HydroforSymbol obj={obj} state={state} terminalNetState={terminalNetState} />;
     case 'site.flow_meter':
-      return <FlowMeterSymbol obj={obj} state={state} />;
+      return <FlowMeterSymbol obj={obj} state={state} terminalNetState={terminalNetState} />;
     case 'site.water_meter':
-      return <WaterMeterSymbol obj={obj} state={state} />;
+      return <WaterMeterSymbol obj={obj} state={state} terminalNetState={terminalNetState} />;
     case 'site.pressure_switch':
-      return <PressureSwitchSymbol obj={obj} state={state} />;
+      return <PressureSwitchSymbol obj={obj} state={state} terminalNetState={terminalNetState} />;
     case 'site.rain_sensor':
       return <RainSensorSymbol obj={obj} state={state} />;
     case 'site.sprinkler_head':
-      return <SprinklerHeadSymbol obj={obj} state={state} />;
+      return <SprinklerHeadSymbol obj={obj} state={state} terminalNetState={terminalNetState} />;
     case 'site.drip_line':
-      return <DripLineSymbol obj={obj} state={state} />;
+      return <DripLineSymbol obj={obj} state={state} terminalNetState={terminalNetState} />;
     default:
       return <GenericSymbol obj={obj} state={state} />;
   }

@@ -12,6 +12,7 @@
 import type { SynopticConnection, SynopticObject, WirePoint } from '../store';
 import { getAllWorldTerminals, type WorldTerminal } from '../utils/Terminals';
 import type { Device } from './DeviceSchema';
+import { tankPercentFromState, isTankOutflowLive } from '../symbols/site/RainwaterTank2Symbol';
 
 export interface Net {
   id: string;
@@ -63,7 +64,35 @@ function isActiveSourceTerminal(objId: string, terminalId: string, objects: Syno
     if (device?.behavior === 'SWITCHED' && obj.editor?.preview_state === 'CLOSED') return true;
   }
 
+  // feat/wire-routing-around-obstacles commit 5, point (e): a tank
+  // holding water is a SOURCE on its own outflow terminal - without
+  // this rule, the net downstream of even a completely full tank
+  // would always read INACTIVE, since nothing else in this net-
+  // resolution model ever marks a plain MEASURED reading as a source
+  // (this exact gap was already flagged as a follow-up after the
+  // previous task). The inflow terminal is deliberately excluded - its
+  // own state comes from whatever feeds it, never from the tank itself.
+  if (obj.type === 'site.rainwater_tank2' && terminalId === 'ODPLYW') {
+    if (isTankOutflowLive(tankPercentFromState(obj.editor?.preview_state))) return true;
+  }
+
   return false;
+}
+
+/**
+ * Every water/electrical/ventilation TERMINAL's own net state, keyed
+ * `${objId}:${terminalId}` - a thin wrapper around resolveNets above,
+ * for callers (SymbolRenderer.tsx's own krociec coloring) that need a
+ * terminal's state rather than a connection's. Never a second,
+ * independent way of deciding ACTIVE/INACTIVE - exactly the same
+ * `nets` this file's own resolveNets already produces, re-keyed.
+ */
+export function getTerminalNetStates(connections: SynopticConnection[], items: SynopticObject[], devices: Device[] = []): Map<string, 'ACTIVE' | 'INACTIVE'> {
+  const map = new Map<string, 'ACTIVE' | 'INACTIVE'>();
+  resolveNets(connections, items, devices).forEach(net => {
+    net.terminals.forEach(t => map.set(`${t.objId}:${t.terminalId}`, net.state));
+  });
+  return map;
 }
 
 export interface NetIssue {

@@ -91,8 +91,25 @@ export function isTankOutflowLive(pct: number): boolean {
   return pct > 0;
 }
 
-export const RainwaterTank2Symbol: React.FC<SymbolProps> = ({ obj, state }) => {
-  const pct = LEVEL_PERCENT_BY_STATE[resolveSiteState(state, RAINWATER_TANK2_STATES, 'NISKI')];
+// feat/wire-routing-around-obstacles commit 5, point (e): the tank's
+// own water level, from its object state alone - exactly what the
+// component itself already derived inline, pulled out so NetResolver.ts's
+// own "a tank with water is an active source" rule can compute the
+// EXACT same number, never a second, parallel derivation of it. Deliberately
+// NOT the assigned MEASURED device's own getMeasuredPreviewValue: that
+// number is this symbol's own independent, decorative value-field
+// reading (see this file's own header, "TWO independent things") -
+// unrelated to whether the tank physically holds water, which is what
+// governs whether it can act as a source. pct is that physical
+// quantity; isTankOutflowLive(pct) is already the correct, established
+// "does it have water" test.
+// oxlint-disable-next-line react/only-export-components -- kept beside the component it belongs to, for testability without rendering Konva, same convention every other exported constant in this file already uses.
+export function tankPercentFromState(state: string | undefined): number {
+  return LEVEL_PERCENT_BY_STATE[resolveSiteState(state || '', RAINWATER_TANK2_STATES, 'NISKI')];
+}
+
+export const RainwaterTank2Symbol: React.FC<SymbolProps> = ({ obj, state, terminalNetState }) => {
+  const pct = tankPercentFromState(state);
 
   const devices = useStore(s => s.devices);
   const device = obj.deviceId ? findDeviceById(devices, obj.deviceId) : undefined;
@@ -103,7 +120,6 @@ export const RainwaterTank2Symbol: React.FC<SymbolProps> = ({ obj, state }) => {
   const hg = Math.floor((BH - 4) * pct / 100);
   const top = BY + BH - 2 - hg;
   const ih = Math.floor((BH - 14) * pct / 100);
-  const outflowLive = isTankOutflowLive(pct);
 
   return (
     <Group>
@@ -151,8 +167,18 @@ export const RainwaterTank2Symbol: React.FC<SymbolProps> = ({ obj, state }) => {
           is explicit that terminals sit at the canvas's own edge
           midpoint, and that invariant is what a real anchored wire
           depends on, not this one function's own illustrative numbers. */}
-      {waterStub(BX, TANK_TERMINAL_AXIS, 'L', true, W, H)}
-      {waterStub(BX + BW, TANK_TERMINAL_AXIS, 'R', outflowLive, W, H)}
+      {/* feat/wire-routing-around-obstacles commit 5: the krociec no
+          longer carries a color of its own - DOPLYW reads whatever the
+          inflow-side NET is (point e: the inflow is never itself a
+          source, its state comes purely from what feeds it), and
+          ODPLYW reads its own net too, which NetResolver.ts's own new
+          rule makes ACTIVE whenever this tank has water (isTankOutflowLive)
+          AND something is actually wired to it - an unconnected
+          terminal still reads INACTIVE regardless of the water level
+          (point c), exactly like every other water aparat's own
+          terminal now does. */}
+      {waterStub(BX, TANK_TERMINAL_AXIS, 'L', (terminalNetState?.('DOPLYW') ?? 'INACTIVE') === 'ACTIVE', W, H)}
+      {waterStub(BX + BW, TANK_TERMINAL_AXIS, 'R', (terminalNetState?.('ODPLYW') ?? 'INACTIVE') === 'ACTIVE', W, H)}
 
       {/* Level window, now INSIDE the shell - the pre-existing overlap
           this commit fixes came from placing it externally instead. */}
