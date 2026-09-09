@@ -7,7 +7,7 @@ import type { SynopticConnection, WirePoint } from '../../store';
 import { ConnectionLine } from '../ConnectionLine';
 import { COLOR_OUTLINE, COLOR_WHITE } from '../../theme/ScadaTheme';
 import { snapValue } from '../../utils/GridSnap';
-import { snapPointToGrid, reorthogonalizeAfterMove } from '../../utils/WireDrawing';
+import { snapPointToGrid, reorthogonalizeAfterMove, simplifyCollinearPoints } from '../../utils/WireDrawing';
 import { isAltKeyDown } from '../../utils/CanvasInputState';
 import type { DragKey, GroupDragApi } from './types';
 
@@ -106,7 +106,14 @@ export const ConnectionNode = ({ conn, netState, isSelected, onSelect, gridSize,
             e.target.y(snapValue(e.target.y(), gridSize, isAltKeyDown()));
           }}
           onDragEnd={(e) => {
-            const newPoints = reorthogonalizeAfterMove(conn.points, idx, { x: e.target.x(), y: e.target.y() });
+            // fix/wiring-and-library-groups commit 2: the identical
+            // accumulation this commit fixes for a moved SYMBOL can
+            // just as well happen here - a human dragging the same bend
+            // point back and forth by hand, repeatedly, through this
+            // exact path. Same general-purpose cleanup, same reasoning
+            // (WireDrawing.ts's own comment on simplifyCollinearPoints).
+            const moved = reorthogonalizeAfterMove(conn.points, idx, { x: e.target.x(), y: e.target.y() });
+            const newPoints = simplifyCollinearPoints(moved);
             useStore.getState().updateConnection(conn.id, { points: newPoints });
             useStore.getState().saveHistory();
           }}

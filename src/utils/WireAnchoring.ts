@@ -13,7 +13,7 @@
 
 import type { SynopticConnection, SynopticObject, WirePoint, WirePointAnchor } from '../store';
 import { getObjectTerminals, getTerminalWorldPosition } from './Terminals';
-import { reorthogonalizeAfterMove } from './WireDrawing';
+import { reorthogonalizeAfterMove, simplifyCollinearPoints } from './WireDrawing';
 
 /**
  * If (x, y) lands exactly on one of `objects`' own terminals, returns
@@ -109,9 +109,18 @@ export function syncAnchoredConnections(connections: SynopticConnection[], objec
       // an elbow have been inserted before it.
     }
 
-    if (!changed) return conn;
+    // fix/wiring-and-library-groups commit 2: collapse any now-redundant
+    // collinear run BEFORE deciding whether anything actually changed -
+    // a connection nobody just moved can still carry leftover redundant
+    // points from an OLDER save (before this fix existed), and this
+    // cleans those up too, not only the ones this sync call itself just
+    // introduced. simplifyCollinearPoints never changes any point's own
+    // value, only removes some, so a real change is exactly a shorter
+    // array.
+    const simplified = simplifyCollinearPoints(points);
+    if (!changed && simplified.length === points.length) return conn;
     anyConnectionChanged = true;
-    return { ...conn, points };
+    return { ...conn, points: simplified };
   });
 
   return anyConnectionChanged ? result : connections;
