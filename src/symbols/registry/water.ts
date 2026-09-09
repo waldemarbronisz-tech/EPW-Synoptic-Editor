@@ -107,6 +107,17 @@ export const waterSymbols: Record<string, SymbolDefinition> = {
   // fix/hydraulic-connections commit 6's rework (DOPLYW/ODPLYW, not
   // the older single WYLOT) - this move carries that shape forward
   // unchanged, it does not revert it.
+  // fix/tank-language-and-media commit 3: the duplicate rainwater tank
+  // - this was the OLDER of two identically-labeled tanks in the
+  // library (the other being site.rainwater_tank2, which has a real
+  // water-level display and a percent field this one never had).
+  // hiddenFromLibrary, never deleted - RainTankSymbol.tsx stays in the
+  // codebase (GRANICE), and any ALREADY-PLACED instance of this exact
+  // type in an existing project still renders correctly
+  // (getSymbolDefinition stays unfiltered) - only the Object Library's
+  // own list (getSymbolsByCategory) no longer offers it for new
+  // placement, the same retirement convention water.valve/
+  // water.gate_valve above already use.
   'site.rain_tank': {
     type: 'site.rain_tank',
     label: 'Zbiornik na deszczowke',
@@ -115,7 +126,8 @@ export const waterSymbols: Record<string, SymbolDefinition> = {
     defaultHeight: 96,
     allowedStates: ['ZALACZONY', 'WYLACZONY'],
     defaultState: 'WYLACZONY',
-    terminals: [{ id: 'KROCIEC', side: 'RIGHT', medium: 'WATER' }]
+    terminals: [{ id: 'KROCIEC', side: 'RIGHT', medium: 'WATER' }],
+    hiddenFromLibrary: true
   },
   'site.sewage_plant': {
     type: 'site.sewage_plant',

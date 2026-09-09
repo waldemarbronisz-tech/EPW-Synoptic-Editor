@@ -22,7 +22,7 @@ describe('28. the rainwater tank is in Water', () => {
     expect(getSymbolDefinition('site.rainwater_tank2')?.category).toBe('Water');
   });
 
-  it('site.rain_tank (the original site-objects-2d tank, same label) is also in Water - not left behind in TEREN', () => {
+  it('site.rain_tank (the original site-objects-2d tank, same label) still carries category Water in its own definition - fix/tank-language-and-media commit 3 hides it from the library, it does not move it back to TEREN or delete it', () => {
     expect(getSymbolDefinition('site.rain_tank')?.category).toBe('Water');
   });
 });
@@ -47,8 +47,13 @@ describe('31. every symbol belongs to EXACTLY one group', () => {
   });
 
   it('every relocated object\'s own definition object is a single, unambiguous category - not present under two different registry keys', () => {
+    // site.rain_tank is deliberately NOT in this list any more -
+    // fix/tank-language-and-media commit 3 hides it from the library
+    // entirely, so it now has ZERO owners in getSymbolsByCategory's
+    // own output, not one - covered separately by test 14/15 in
+    // tank-duplicate-removed.test.ts, not by this "exactly one" check.
     const relocated = [
-      'site.rain_tank', 'site.sewage_plant', 'site.water_manhole', 'site.garden_sprinkler', 'site.rainwater_tank2',
+      'site.sewage_plant', 'site.water_manhole', 'site.garden_sprinkler', 'site.rainwater_tank2',
       'site.water_selector_valve_switched', 'site.water_selector_valve_3pos', 'site.check_valve', 'site.water_filter',
       'site.hydrofor', 'site.flow_meter', 'site.water_meter', 'site.pressure_switch', 'site.sprinkler_head', 'site.drip_line',
       'site.lamp_post_double', 'site.lamp_post_single', 'site.halogen', 'site.garden_light', 'site.cable_junction',
@@ -62,10 +67,10 @@ describe('31. every symbol belongs to EXACTLY one group', () => {
   });
 });
 
-describe('32. the total number of visible symbols is unchanged from before the regroup', () => {
-  it('51 visible symbols total - a pure category reassignment (no symbol added, removed, or hidden/unhidden) can never change this number', () => {
+describe('32. the total number of visible symbols reflects the library exactly as it stands', () => {
+  it('50 visible symbols total - fix/tank-language-and-media commit 3 hid the duplicate rainwater tank (site.rain_tank), the one deliberate hide since the 51-symbol count this test used to assert', () => {
     const total = Object.values(getSymbolsByCategory()).flat().length;
-    expect(total).toBe(51);
+    expect(total).toBe(50);
   });
 });
 
