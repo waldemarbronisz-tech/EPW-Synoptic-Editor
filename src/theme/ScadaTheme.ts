@@ -132,6 +132,25 @@ export const TERMINAL_HIGHLIGHT_COLOR = COLOR_LAMP_LIT;     // reused, not a new
 export const WIRE_NEARBY_TERMINAL_RADIUS = GRID_SIZE * 4;   // while drawing: terminals within this world distance stay visible without individual hover ("co najmniej cztery oczka")
 export const WIRE_TERMINAL_SNAP_DISTANCE = GRID_SIZE / 2;   // magnetism: a wire endpoint snaps to a terminal closer than this ("polowa oczka siatki")
 
+// ---- Wire collision / obstacle-avoidance routing (feat/wire-routing-
+// around-obstacles commit 1/2) ------------------------------------------
+// An obstacle's own rectangle is shrunk by this margin on every side
+// before a wire segment is tested against it - a wire running right
+// along an apparatus's own edge must not read as passing "through" it.
+// Exactly this task's own spec: "margines rowny polowie oczka siatki".
+export const WIRE_OBSTACLE_MARGIN = GRID_SIZE / 2;
+// The colliding-segment overlay drawn on top of a wire that crosses an
+// obstacle - dashed, in the theme's own alarm color (COLOR_ALARM above),
+// wider than the wire's own core so it reads as an added marking, never
+// a replacement for the wire's real state color.
+export const WIRE_COLLISION_MARK_WIDTH = CONDUCTOR_WIDTH + 6;
+export const WIRE_COLLISION_MARK_DASH: [number, number] = [8, 6];
+// Router search cap (commit 2): a bound on how many grid cells the
+// obstacle-avoidance search will expand before giving up and returning
+// the direct point-to-point route instead - see WireRouter.ts's own
+// header for why this exact number.
+export const WIRE_ROUTER_STEP_LIMIT = 4000;
+
 // feat/appearance-selection-frames commit 1: the indicator diode was
 // drawn far too large relative to the row text beside it (confirmed by
 // eye: a ten-row signal panel reads as a column of huge circles with

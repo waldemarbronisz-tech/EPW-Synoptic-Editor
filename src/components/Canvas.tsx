@@ -4,8 +4,10 @@ import { useStore } from '../store';
 import type { SynopticConnection, WirePoint } from '../store';
 import { getSymbolDefinition } from '../symbols/SymbolRegistry';
 import { pathFromPoints, getConductorCoreColor } from './ConnectionLine';
+import type { WireSegmentCollision } from './ConnectionLine';
+import { findAllCollisions } from '../project/WireCollision';
 import { ObjectLabelRenderer } from './ObjectLabelRenderer';
-import { COLOR_ALARM, COLOR_CANVAS_BACKGROUND, COLOR_LAMP_LIT, COLOR_OUTLINE, COLOR_WATER, COLOR_WHITE, CONDUCTOR_WIDTH, FONT_SIZE_BASE, FONT_SIZE_SMALL, FONT_UI } from '../theme/ScadaTheme';
+import { COLOR_ALARM, COLOR_CANVAS_BACKGROUND, COLOR_LAMP_LIT, COLOR_OUTLINE, COLOR_PANEL, COLOR_WATER, COLOR_WHITE, CONDUCTOR_WIDTH, FONT_SIZE_BASE, FONT_SIZE_SMALL, FONT_UI } from '../theme/ScadaTheme';
 import { snapValue } from '../utils/GridSnap';
 import {
   snapPointToGrid, appendWirePoint, removeLastWirePoint,
@@ -99,6 +101,12 @@ export const Canvas: React.FC = () => {
   // once) always reads the current points, never a stale closure.
   const [drawingPoints, setDrawingPoints] = useState<WirePoint[] | null>(null);
   const [drawingPreview, setDrawingPreview] = useState<WirePoint | null>(null);
+  // feat/wire-routing-around-obstacles commit 1: which colliding
+  // segment (if any) the cursor is currently hovering, for the small
+  // tooltip naming the obstacle - one piece of state for the whole
+  // canvas, not one per wire (ConnectionLine's own onCollisionHover
+  // reports into this).
+  const [collisionTooltip, setCollisionTooltip] = useState<{ x: number; y: number; label: string } | null>(null);
   const drawingPointsRef = useRef<WirePoint[] | null>(null);
   useEffect(() => { drawingPointsRef.current = drawingPoints; }, [drawingPoints]);
 
@@ -669,6 +677,21 @@ export const Canvas: React.FC = () => {
     net.connectionIds.forEach(id => netStateByConnectionId.set(id, net.state));
   });
 
+  // feat/wire-routing-around-obstacles commit 1: which of each wire's
+  // own segments currently cross an obstacle - recomputed every render
+  // (cheap, purely geometric, same "no memoization" convention every
+  // other per-render map on this page already uses), then handed to
+  // each ConnectionNode for its own dashed marking. The one-time
+  // Messages warning is a SEPARATE path (historySlice.ts's own
+  // saveHistory, gated by getNewCollisionWarnings so it does not fire
+  // on every render) - this map only ever drives what is drawn.
+  const collisionsByConnectionId = new Map<string, WireSegmentCollision[]>();
+  findAllCollisions(connections, { objects, meters, signalPanels, frames, groupCommands, setpointPanels }).forEach(c => {
+    const list = collisionsByConnectionId.get(c.connectionId) || [];
+    list.push({ segmentIndex: c.segmentIndex, obstacleLabel: c.obstacle.label });
+    collisionsByConnectionId.set(c.connectionId, list);
+  });
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     if (!stageRef.current || !containerRef.current) return;
@@ -943,6 +966,8 @@ export const Canvas: React.FC = () => {
               gridSize={gridSize}
               onAltClickSegment={handleAltClickSegment}
               groupDrag={groupDrag}
+              collisions={collisionsByConnectionId.get(conn.id)}
+              onCollisionHover={setCollisionTooltip}
             />
           ))}
           {/* In-progress wire preview: a thin line through every point
@@ -1275,6 +1300,34 @@ export const Canvas: React.FC = () => {
               stroke={COLOR_WATER}
               strokeWidth={1}
             />
+          )}
+          {/* feat/wire-routing-around-obstacles commit 1: the hover
+              tooltip naming which obstacle a marked segment crosses -
+              a plain Rect+Text pair sized to the text, anchored just
+              above the hovered segment's own midpoint. */}
+          {collisionTooltip && (
+            <Group x={collisionTooltip.x} y={collisionTooltip.y - 28} listening={false}>
+              <Rect
+                width={Math.max(60, collisionTooltip.label.length * 7 + 16)}
+                height={20}
+                offsetX={Math.max(60, collisionTooltip.label.length * 7 + 16) / 2}
+                fill={COLOR_PANEL}
+                stroke={COLOR_ALARM}
+                strokeWidth={1.5}
+                cornerRadius={3}
+              />
+              <Text
+                text={collisionTooltip.label}
+                width={Math.max(60, collisionTooltip.label.length * 7 + 16)}
+                height={20}
+                offsetX={Math.max(60, collisionTooltip.label.length * 7 + 16) / 2}
+                align="center"
+                verticalAlign="middle"
+                fontSize={FONT_SIZE_SMALL}
+                fontFamily={FONT_UI}
+                fill={COLOR_OUTLINE}
+              />
+            </Group>
           )}
         </Layer>
       </Stage>

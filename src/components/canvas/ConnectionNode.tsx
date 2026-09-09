@@ -5,6 +5,7 @@ import { Circle, Group } from 'react-konva';
 import { useStore } from '../../store';
 import type { SynopticConnection, WirePoint } from '../../store';
 import { ConnectionLine } from '../ConnectionLine';
+import type { WireSegmentCollision } from '../ConnectionLine';
 import { COLOR_OUTLINE, COLOR_WHITE } from '../../theme/ScadaTheme';
 import { snapValue } from '../../utils/GridSnap';
 import { snapPointToGrid, reorthogonalizeAfterMove, simplifyCollinearPoints } from '../../utils/WireDrawing';
@@ -17,7 +18,7 @@ import type { DragKey, GroupDragApi } from './types';
 // and moved without breaking orthogonality (WireDrawing.
 // reorthogonalizeAfterMove fixes up its two neighboring segments).
 // Alt+click on a segment (not a handle) inserts a brand new bend there.
-export const ConnectionNode = ({ conn, netState, isSelected, onSelect, gridSize, onAltClickSegment, groupDrag }: {
+export const ConnectionNode = ({ conn, netState, isSelected, onSelect, gridSize, onAltClickSegment, groupDrag, collisions, onCollisionHover }: {
   conn: SynopticConnection,
   // feat/water-management commit 2: computed once per Canvas render
   // (resolveNets) and passed straight through to ConnectionLine - see
@@ -29,6 +30,10 @@ export const ConnectionNode = ({ conn, netState, isSelected, onSelect, gridSize,
   gridSize: number,
   onAltClickSegment: (conn: SynopticConnection, worldPoint: WirePoint) => void,
   groupDrag: GroupDragApi,
+  // feat/wire-routing-around-obstacles commit 1: see ConnectionLine's
+  // own ConnectionProps comment - passed straight through, unchanged.
+  collisions?: WireSegmentCollision[],
+  onCollisionHover?: (info: { x: number; y: number; label: string } | null) => void,
 }) => {
   const moveGroupRef = useRef<any>(null);
   const dragKey: DragKey = `conn:${conn.id}`;
@@ -77,6 +82,8 @@ export const ConnectionNode = ({ conn, netState, isSelected, onSelect, gridSize,
           conn={conn}
           netState={netState}
           isSelected={isSelected}
+          collisions={collisions}
+          onCollisionHover={onCollisionHover}
           onSelect={(e: any) => {
             if (e?.evt?.altKey) {
               e.cancelBubble = true;
