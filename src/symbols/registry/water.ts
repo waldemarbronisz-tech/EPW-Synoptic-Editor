@@ -158,9 +158,13 @@ export const waterSymbols: Record<string, SymbolDefinition> = {
     defaultHeight: 96,
     allowedStates: ['NISKI', 'SREDNI', 'WYSOKI'],
     defaultState: 'NISKI',
+    // fix/tank-language-and-media commit 2, point (a): ODPLYW moves
+    // from the RIGHT edge to the BOTTOM edge - water drains
+    // gravitationally from the shell's own floor, not sideways out of
+    // its wall. DOPLYW is unaffected.
     terminals: [
       { id: 'DOPLYW', side: 'LEFT', medium: 'WATER' },
-      { id: 'ODPLYW', side: 'RIGHT', medium: 'WATER' }
+      { id: 'ODPLYW', side: 'BOTTOM', medium: 'WATER' }
     ]
   },
   'site.water_selector_valve_switched': {

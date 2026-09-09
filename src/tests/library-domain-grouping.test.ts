@@ -90,11 +90,9 @@ describe('the relocated objects kept their own type string, terminals and states
     expect(def.terminals).toEqual([{ id: 'ZASILANIE', side: 'BOTTOM', medium: 'ELECTRICAL' }]);
   });
 
-  it('site.rainwater_tank2: kept its commit-6 DOPLYW/ODPLYW terminals through the move, not reverted to the old single WYLOT', () => {
+  it('site.rainwater_tank2: kept its DOPLYW/ODPLYW terminals through the move, not reverted to the old single WYLOT (ODPLYW moved from RIGHT to BOTTOM in fix/tank-language-and-media commit 2 - see that task\'s own tests for the current shape)', () => {
     const def = getSymbolDefinition('site.rainwater_tank2')!;
-    expect(def.terminals).toEqual([
-      { id: 'DOPLYW', side: 'LEFT', medium: 'WATER' },
-      { id: 'ODPLYW', side: 'RIGHT', medium: 'WATER' }
-    ]);
+    expect(def.terminals!.map(t => t.id)).toEqual(['DOPLYW', 'ODPLYW']);
+    expect(def.terminals!.every(t => t.medium === 'WATER')).toBe(true);
   });
 });
