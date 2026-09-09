@@ -130,6 +130,15 @@ export interface AppState {
   setDrawingMedium: (medium: SynopticConnection['medium']) => void;
   setDrawingStyle: (style: SynopticConnection['style']) => void;
 
+  // feat/wire-routing-around-obstacles commit 3, point (a): PROSTO (the
+  // user places every bend by hand, today's existing behavior) or
+  // OMIJAJ (a new wire's route is computed automatically around
+  // obstacles, WireRouter.ts) - AVOID by default. Session-only, same
+  // as drawingMedium/drawingStyle above: never written into a saved
+  // project file.
+  wireRoutingMode: 'STRAIGHT' | 'AVOID';
+  setWireRoutingMode: (mode: 'STRAIGHT' | 'AVOID') => void;
+
   // Grid snapping: a persistent toggle (View menu, default on) separate
   // from the momentary Alt-key bypass, which lives outside the store
   // entirely (Canvas.tsx tracks the live key state directly).
@@ -160,6 +169,14 @@ export interface AppState {
   addSetpointPanel: (panel: Omit<SetpointPanelElement, 'id'>) => void;
   updateSetpointPanel: (id: string, updates: Partial<SetpointPanelElement>) => void;
   deleteObjects: (ids: string[], connIds?: string[], meterIds?: string[], signalPanelIds?: string[], frameIds?: string[], groupCommandIds?: string[], setpointPanelIds?: string[]) => void;
+  // feat/wire-routing-around-obstacles commit 3, point (f): PRZELICZ
+  // TRASE - recomputes the route of every given (selected) connection
+  // around the screen's CURRENT obstacles, skipping any wire already
+  // marked isManualRoute. On demand only, never automatic (point (e):
+  // a move never triggers this on its own) - one saveHistory() call
+  // for the whole batch, per this task's own "jeden wpis w historii"
+  // requirement.
+  recalculateConnectionRoutes: (ids: string[]) => void;
   selectObjects: (ids: string[], multi?: boolean) => void;
   selectConnections: (ids: string[], multi?: boolean) => void;
   selectMeters: (ids: string[], multi?: boolean) => void;

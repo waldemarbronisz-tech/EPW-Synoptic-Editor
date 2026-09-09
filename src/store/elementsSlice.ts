@@ -2,6 +2,8 @@ import type { StateCreator } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import type { AppState } from './appState';
 import { releaseAnchorsForDeletedObjects } from '../utils/WireAnchoring';
+import { getObstacles } from '../project/WireCollision';
+import { routeAround } from '../project/WireRouter';
 
 // The seven drawing-surface collections (objects/connections/meters/
 // signalPanels/frames/groupCommands/setpointPanels) and their CRUD
@@ -18,6 +20,7 @@ export type ElementsSlice = Pick<AppState,
   | 'addGroupCommand' | 'updateGroupCommand'
   | 'addSetpointPanel' | 'updateSetpointPanel'
   | 'deleteObjects'
+  | 'recalculateConnectionRoutes'
 >;
 
 export const createElementsSlice: StateCreator<AppState, [], [], ElementsSlice> = (set, get) => ({
@@ -181,6 +184,44 @@ export const createElementsSlice: StateCreator<AppState, [], [], ElementsSlice> 
     if (releasedCount > 0) {
       get().addMessage(`[INFO] Deleting the symbol released ${releasedCount} wire endpoint(s) - they now float free.`);
     }
+    get().saveHistory();
+  },
+
+  // feat/wire-routing-around-obstacles commit 3, point (f): recomputes
+  // each given connection's own route around the screen's current
+  // obstacles - a manual wire (isManualRoute) is left untouched
+  // entirely, per point (d). Excludes, per connection, whatever
+  // symbol(s) its own endpoints are anchored to (the same rule
+  // WireCollision.findAllCollisions already applies while drawing) so
+  // a wire is never told its own destination valve is blocking it.
+  recalculateConnectionRoutes: (ids) => {
+    if (ids.length === 0) return;
+    set((state) => {
+      const screen = {
+        objects: state.objects, meters: state.meters, signalPanels: state.signalPanels,
+        frames: state.frames, groupCommands: state.groupCommands, setpointPanels: state.setpointPanels
+      };
+      const connections = state.connections.map(conn => {
+        if (!ids.includes(conn.id) || conn.isManualRoute) return conn;
+        if (conn.points.length < 2) return conn;
+        const first = conn.points[0];
+        const last = conn.points[conn.points.length - 1];
+        const excludeIds = [...new Set(conn.points.filter(p => p.anchor).map(p => p.anchor!.symbolId))];
+        const obstacles = getObstacles(screen, excludeIds);
+        const routed = routeAround(first, last, obstacles, state.canvasConfig.gridSize);
+        // The router only ever receives/returns plain {x,y} - reattach
+        // each endpoint's own original anchor (if any) onto whichever
+        // routed point still lands exactly on it (routeAround always
+        // starts/ends exactly at the points it was given).
+        const points = routed.map((p, i) => {
+          if (i === 0 && p.x === first.x && p.y === first.y && first.anchor) return { ...p, anchor: first.anchor };
+          if (i === routed.length - 1 && p.x === last.x && p.y === last.y && last.anchor) return { ...p, anchor: last.anchor };
+          return p;
+        });
+        return { ...conn, points };
+      });
+      return { connections, isDirty: true };
+    });
     get().saveHistory();
   },
 });

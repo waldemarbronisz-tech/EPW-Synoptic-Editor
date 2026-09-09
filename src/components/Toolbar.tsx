@@ -30,6 +30,7 @@ export const Toolbar: React.FC = () => {
     lockSelected, unlockSelected, rotateSelected,
     isDrawingConnection, setDrawingMode,
     drawingMedium, setDrawingMedium, drawingStyle, setDrawingStyle,
+    wireRoutingMode, setWireRoutingMode,
     addMeter, selectedMeterIds, selectMeters,
     addSignalPanel, selectedSignalPanelIds, selectSignalPanels,
     selectedFrameIds, isDrawingFrame, drawingFrameVariant, setDrawingFrameMode,
@@ -209,6 +210,29 @@ export const Toolbar: React.FC = () => {
           style={{ backgroundColor: drawingStyle === 'BUS' ? COLOR_RUN : 'transparent', color: drawingStyle === 'BUS' ? COLOR_WHITE : undefined }}
         >
           B
+        </button>
+      </div>
+
+      {/* feat/wire-routing-around-obstacles commit 3, point (a): PROSTO
+          (every bend placed by hand, today's existing behavior) or
+          OMIJAJ (a new wire's route is computed automatically around
+          obstacles) - OMIJAJ by default. Session-only (wireRoutingMode
+          lives in toolsSlice.ts, never in the saved project file), same
+          convention as the medium/style selectors right above. */}
+      <div className="toolbar-group">
+        <button
+          title="Prosto (uzytkownik sam stawia zalamania)"
+          onClick={() => setWireRoutingMode('STRAIGHT')}
+          style={{ backgroundColor: wireRoutingMode === 'STRAIGHT' ? COLOR_RUN : 'transparent', color: wireRoutingMode === 'STRAIGHT' ? COLOR_WHITE : undefined }}
+        >
+          P
+        </button>
+        <button
+          title="Omijaj (trasa liczona automatycznie wokol przeszkod)"
+          onClick={() => setWireRoutingMode('AVOID')}
+          style={{ backgroundColor: wireRoutingMode === 'AVOID' ? COLOR_RUN : 'transparent', color: wireRoutingMode === 'AVOID' ? COLOR_WHITE : undefined }}
+        >
+          O
         </button>
       </div>
 

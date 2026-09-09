@@ -11,11 +11,13 @@ import { COLOR_ALARM, COLOR_CANVAS_BACKGROUND, COLOR_LAMP_LIT, COLOR_OUTLINE, CO
 import { snapValue } from '../utils/GridSnap';
 import {
   snapPointToGrid, appendWirePoint, removeLastWirePoint,
-  insertBendOnSegment, nearestPointOnPolyline
+  insertBendOnSegment, nearestPointOnPolyline, simplifyCollinearPoints
 } from '../utils/WireDrawing';
 import { resolveNets, getJunctionPoints } from '../project/NetResolver';
+import { getObstacles } from '../project/WireCollision';
+import { routeAround } from '../project/WireRouter';
 import { describeObject } from '../utils/ObjectDisplay';
-import { attachAnchorsToNewPoints } from '../utils/WireAnchoring';
+import { attachAnchorsToNewPoints, findTerminalAt } from '../utils/WireAnchoring';
 import { getNearbyTerminals, findNearestTerminal, snapToTerminalOrGrid } from '../utils/TerminalReach';
 import { isSymbolDeviceMissing } from '../project/DeviceBindingValidation';
 import { isSymbolInterlocked } from '../project/InterlockIndicator';
@@ -116,7 +118,7 @@ export const Canvas: React.FC = () => {
   // toggles it; Canvas.tsx only needs to read it here. drawingMedium/
   // drawingStyle (part C) are the toolbar's medium/style selector -
   // every new wire is drawn with whichever is currently chosen.
-  const { connections, selectedConnectionIds, selectConnections, isDrawingConnection, drawingMedium } = useStore();
+  const { connections, selectedConnectionIds, selectConnections, isDrawingConnection, drawingMedium, wireRoutingMode } = useStore();
 
   // Group move (commit 2c) - see GroupDragApi's own comment (canvas/
   // types.ts) for the full reasoning. dragNodeRefs is a plain mutable
@@ -212,8 +214,13 @@ export const Canvas: React.FC = () => {
     return snapToTerminalOrGrid(worldX, worldY, objects);
   };
 
-  const finishDrawing = () => {
-    const points = drawingPointsRef.current;
+  // feat/wire-routing-around-obstacles commit 3, point (c): extracted
+  // from the old finishDrawing (which just read drawingPointsRef.current
+  // itself) so the OMIJAJ mode's own auto-finish-on-terminal-hit
+  // (handleMouseDown below) can commit a freshly computed FULL route
+  // immediately, without waiting a render for drawingPointsRef to catch
+  // up to a state update that has not committed yet.
+  const commitWire = (points: WirePoint[] | null) => {
     setDrawingPoints(null);
     setDrawingPreview(null);
     if (!points || points.length < 2) return;
@@ -252,6 +259,27 @@ export const Canvas: React.FC = () => {
       store.addMessage('[INFO] Wire drawn (not touching any terminal yet)');
     }
   };
+
+  const finishDrawing = () => commitWire(drawingPointsRef.current);
+
+  // feat/wire-routing-around-obstacles commit 3: which symbol(s) an
+  // in-progress OMIJAJ route must not treat as an obstacle - the one
+  // this whole wire STARTED from (if it started on a terminal) and
+  // whatever terminal the CURRENT click is landing on (its destination),
+  // exactly the same "a wire is never its own obstacle" rule commit 1
+  // already applies to a finished wire's own two ends.
+  const routingExcludeIds = (firstPoint: WirePoint | undefined, clickPoint: WirePoint): string[] => {
+    const ids = new Set<string>();
+    if (firstPoint) {
+      const startTerminal = findTerminalAt(objects, firstPoint.x, firstPoint.y);
+      if (startTerminal) ids.add(startTerminal.symbolId);
+    }
+    const endTerminal = findTerminalAt(objects, clickPoint.x, clickPoint.y);
+    if (endTerminal) ids.add(endTerminal.symbolId);
+    return [...ids];
+  };
+
+  const routingScreen = { objects, meters, signalPanels, frames, groupCommands, setpointPanels };
 
   // Grid-snap Alt bypass, tracked once, globally, for the whole canvas -
   // plus the wire-drawing tool's own keyboard shortcuts (Enter finishes,
@@ -457,6 +485,34 @@ export const Canvas: React.FC = () => {
       const pos = e.target.getStage().getPointerPosition();
       if (!pos) return;
       const point = toWirePoint(pos);
+
+      // feat/wire-routing-around-obstacles commit 3, points (b)/(c): in
+      // OMIJAJ mode a click places the WHOLE computed route from the
+      // last point to here, not a single point - and finishes the wire
+      // right then if the click landed on a terminal (findNearestTerminal,
+      // same magnetism toWirePoint's own snap already used to place
+      // `point` exactly on it). PROSTO mode is entirely unchanged below.
+      if (useStore.getState().wireRoutingMode === 'AVOID') {
+        const prevPoints = drawingPointsRef.current || [];
+        let fullPoints: WirePoint[];
+        if (prevPoints.length === 0) {
+          fullPoints = [point];
+        } else {
+          const last = prevPoints[prevPoints.length - 1];
+          const excludeIds = routingExcludeIds(prevPoints[0], point);
+          const obstacles = getObstacles(routingScreen, excludeIds);
+          const routed = routeAround(last, point, obstacles, gridSize);
+          fullPoints = simplifyCollinearPoints([...prevPoints, ...routed.slice(1)]);
+        }
+        const landedOnTerminal = prevPoints.length > 0 && !!findNearestTerminal(objects, point);
+        if (landedOnTerminal) {
+          commitWire(fullPoints);
+        } else {
+          setDrawingPoints(fullPoints);
+        }
+        return;
+      }
+
       setDrawingPoints(prev => appendWirePoint(prev || [], point));
       return;
     }
@@ -643,7 +699,11 @@ export const Canvas: React.FC = () => {
     const nearest = nearestPointOnPolyline(conn.points, worldPoint);
     if (!nearest) return;
     const newPoints = insertBendOnSegment(conn.points, nearest.segmentIndex, nearest.point);
-    useStore.getState().updateConnection(conn.id, { points: newPoints });
+    // feat/wire-routing-around-obstacles commit 3, point (d): placing
+    // your own bend switches this wire into manual mode for good - the
+    // PRZELICZ TRASE command (recalculateConnectionRoutes) skips any
+    // connection with this flag set, forever after.
+    useStore.getState().updateConnection(conn.id, { points: newPoints, isManualRoute: true });
     useStore.getState().saveHistory();
   };
 
@@ -691,6 +751,24 @@ export const Canvas: React.FC = () => {
     list.push({ segmentIndex: c.segmentIndex, obstacleLabel: c.obstacle.label });
     collisionsByConnectionId.set(c.connectionId, list);
   });
+
+  // feat/wire-routing-around-obstacles commit 3, point (b): in OMIJAJ
+  // mode the in-progress wire's own live preview shows the ROUTE the
+  // next click would actually place, not a straight line to the
+  // cursor - the user sees which way it will go before committing to
+  // it. PROSTO mode is unchanged (a plain straight preview segment).
+  const drawingPreviewPoints: WirePoint[] | null = (() => {
+    if (!drawingPoints || drawingPoints.length === 0) return null;
+    if (!drawingPreview) return drawingPoints;
+    if (wireRoutingMode === 'AVOID') {
+      const last = drawingPoints[drawingPoints.length - 1];
+      const excludeIds = routingExcludeIds(drawingPoints[0], drawingPreview);
+      const obstacles = getObstacles(routingScreen, excludeIds);
+      const routed = routeAround(last, drawingPreview, obstacles, gridSize);
+      return [...drawingPoints, ...routed.slice(1)];
+    }
+    return [...drawingPoints, drawingPreview];
+  })();
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -979,7 +1057,7 @@ export const Canvas: React.FC = () => {
           {drawingPoints && drawingPoints.length > 0 && (
             <>
               <Path
-                data={pathFromPoints(drawingPreview ? [...drawingPoints, drawingPreview] : drawingPoints)}
+                data={pathFromPoints(drawingPreviewPoints || drawingPoints)}
                 stroke={getConductorCoreColor(drawingMedium, 'ACTIVE')}
                 strokeWidth={CONDUCTOR_WIDTH / 2}
                 lineCap="round"
