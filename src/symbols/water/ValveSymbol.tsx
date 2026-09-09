@@ -1,10 +1,18 @@
 import React from 'react';
 import { Group, Rect, Path, Circle } from 'react-konva';
 import type { SymbolProps } from '../SymbolRenderer';
+import { waterStub } from '../site/BandedShading';
+
+// fix/hydraulic-connections commit 5: the bow-tie used to fill the
+// object's own full width (0..w), leaving no room at all for a
+// krociec/kolnierz on either terminal (IN/LEFT, OUT/RIGHT) - shrunk by
+// a 20% margin on each side so both fit.
+const H_MARGIN_FRACTION = 0.2;
 
 export const ValveSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
   const w = obj.width;
   const h = obj.height;
+  const margin = w * H_MARGIN_FRACTION;
 
   const isClosed = state === 'CLOSED';
   const isTransition = state === 'OPENING' || state === 'CLOSING';
@@ -12,11 +20,14 @@ export const ValveSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
 
   const fillColor = isClosed ? '#7f8c8d' : (isTransition ? '#f1c40f' : '#2ecc71');
 
-  // Bow-tie valve geometry
-  const bowTiePath = `M 0 0 L ${w} ${h} L ${w} 0 L 0 ${h} Z`;
+  // Bow-tie valve geometry - shrunk to leave room for the krociec/
+  // kolnierz standard (see H_MARGIN_FRACTION's own comment above).
+  const bowTiePath = `M ${margin} 0 L ${w - margin} ${h} L ${w - margin} 0 L ${margin} ${h} Z`;
 
   return (
     <Group>
+      {waterStub(margin, h / 2, 'L', !isClosed, w, h)}
+      {waterStub(w - margin, h / 2, 'R', !isClosed, w, h)}
       <Path
         data={bowTiePath}
         fill={fillColor}

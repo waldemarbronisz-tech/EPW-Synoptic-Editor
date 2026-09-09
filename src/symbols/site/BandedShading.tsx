@@ -27,6 +27,7 @@ import {
   SITE_BAND_WIDTH, SITE_OUTLINE_WIDTH,
   SITE_CONC, SITE_BLUE, SITE_GREY,
   SITE_LED_OFF, SITE_LED_ON_GREEN, SITE_LED_HIGHLIGHT, SITE_OBJECT_PIPE_WIDTH,
+  SITE_FLANGE_THICKNESS, SITE_FLANGE_SPAN, SITE_OUTLINE_WIDTH_MEDIUM,
   CONDUCTOR_OUTLINE, CONDUCTOR_SHADOW_WIDTH, CONDUCTOR_SHADOW_OFFSET_X, CONDUCTOR_SHADOW_OFFSET_Y, CONDUCTOR_SHADOW_OPACITY,
   CONDUCTOR_HIGHLIGHT_WIDTH, CONDUCTOR_HIGHLIGHT_OFFSET_X, CONDUCTOR_HIGHLIGHT_OFFSET_Y
 } from '../../theme/ScadaTheme';
@@ -258,6 +259,94 @@ export function objectPipeSegment(points: { x: number; y: number }[], live: bool
         data={data} stroke={triad.light} strokeWidth={CONDUCTOR_HIGHLIGHT_WIDTH} fill="none" lineCap="round" lineJoin="round"
         x={CONDUCTOR_HIGHLIGHT_OFFSET_X} y={CONDUCTOR_HIGHLIGHT_OFFSET_Y}
       />
+    </Group>
+  );
+}
+
+// ============================================================================
+// fix/hydraulic-connections commit 5: the hydraulic connection standard,
+// docs/EPW_kolnierze_referencja.py's own stub()/flange() - a krociec
+// (pipe stub) plus a kolnierz (flange) at EVERY water-medium object's
+// own terminal, drawn the SAME way everywhere ("Zaden aparat nie
+// rysuje wlasnego kroćca po swojemu" - this task's own words). Every
+// water aparat in this library calls waterStub (or, for the handful
+// whose own body does not naturally line up with the true terminal
+// axis, objectPipeSegment plus waterFlange directly, with a short jog
+// in between - the same technique the reference's own tank() uses for
+// its DOPLYW) rather than drawing its own ad-hoc stub.
+// ============================================================================
+
+export type StubSide = 'L' | 'R' | 'T' | 'B';
+
+export interface WaterStubOptions {
+  /** Pipe core width - defaults to SITE_OBJECT_PIPE_WIDTH, same as objectPipeSegment's own default. */
+  width?: number;
+}
+
+/**
+ * Where a flange's own center sits for a given side and canvas size -
+ * exported so a caller needing a JOGGED stub (its own body does not
+ * land on the true terminal axis directly - see this section's own
+ * header comment) can still place waterFlange exactly right without
+ * duplicating this arithmetic.
+ */
+export function flangeCenterForSide(side: StubSide, alongAxis: number, canvasWidth: number, canvasHeight: number): { x: number; y: number } {
+  switch (side) {
+    case 'L': return { x: SITE_FLANGE_THICKNESS / 2 + 1, y: alongAxis };
+    case 'R': return { x: canvasWidth - SITE_FLANGE_THICKNESS / 2 - 1, y: alongAxis };
+    case 'T': return { x: alongAxis, y: SITE_FLANGE_THICKNESS / 2 + 1 };
+    case 'B': return { x: alongAxis, y: canvasHeight - SITE_FLANGE_THICKNESS / 2 - 1 };
+  }
+}
+
+/**
+ * The kolnierz itself (reference's own flange()): a bar PERPENDICULAR
+ * to the pipe's own axis, right at the canvas edge, wider than the
+ * pipe (SITE_FLANGE_SPAN vs SITE_OBJECT_PIPE_WIDTH), with its own
+ * light band - "z pasmem swiatla u gory albo z lewej", the reference's
+ * own words, matched here by always placing the light band at the
+ * flange's own top-left corner regardless of side, exactly as its own
+ * flange() does (`x+1.2,y+1.2`, unconditional on side). Colored by the
+ * same live/not-live rule as the pipe it terminates - never a separate
+ * decision of its own.
+ */
+export function waterFlange(x: number, y: number, side: StubSide, live: boolean): React.ReactElement {
+  const triad = live ? SITE_BLUE : SITE_GREY;
+  const horizontal = side === 'L' || side === 'R';
+  const w = horizontal ? SITE_FLANGE_THICKNESS : SITE_FLANGE_SPAN;
+  const h = horizontal ? SITE_FLANGE_SPAN : SITE_FLANGE_THICKNESS;
+  return (
+    <Group listening={false}>
+      <Rect x={x - w / 2} y={y - h / 2} width={w} height={h} fill={triad.base} stroke={COLOR_OUTLINE} strokeWidth={SITE_OUTLINE_WIDTH_MEDIUM} />
+      {horizontal
+        ? <Rect x={x - w / 2 + 1.2} y={y - h / 2 + 1.2} width={w - 2.4} height={3} fill={triad.light} />
+        : <Rect x={x - w / 2 + 1.2} y={y - h / 2 + 1.2} width={3} height={h - 2.4} fill={triad.light} />}
+    </Group>
+  );
+}
+
+/**
+ * The reference's own stub(): a krociec (objectPipeSegment) from an
+ * aparat's own body-side connection point (bx,by) straight out to the
+ * canvas edge on `side`, plus a kolnierz (waterFlange) right at that
+ * edge - one call per water terminal. (bx,by) must already share the
+ * OTHER axis with the true terminal position (e.g. by already equal
+ * to canvasHeight/2 for an L/R terminal) - this is the STRAIGHT case,
+ * which covers every water aparat in this library except the handful
+ * whose own body sits far enough off-axis to need a short jog first
+ * (see this section's own header comment).
+ */
+export function waterStub(bx: number, by: number, side: StubSide, live: boolean, canvasWidth: number, canvasHeight: number, options: WaterStubOptions = {}): React.ReactElement {
+  const edge = side === 'L' ? { x: 0, y: by }
+    : side === 'R' ? { x: canvasWidth, y: by }
+    : side === 'T' ? { x: bx, y: 0 }
+    : { x: bx, y: canvasHeight };
+  const alongAxis = side === 'L' || side === 'R' ? by : bx;
+  const flangeCenter = flangeCenterForSide(side, alongAxis, canvasWidth, canvasHeight);
+  return (
+    <Group listening={false}>
+      {objectPipeSegment([{ x: bx, y: by }, edge], live, options)}
+      {waterFlange(flangeCenter.x, flangeCenter.y, side, live)}
     </Group>
   );
 }

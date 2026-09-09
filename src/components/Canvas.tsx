@@ -14,6 +14,7 @@ import {
 import { resolveNets, getJunctionPoints } from '../project/NetResolver';
 import { describeObject } from '../utils/ObjectDisplay';
 import { attachAnchorsToNewPoints } from '../utils/WireAnchoring';
+import { getNearbyTerminals, findNearestTerminal, snapToTerminalOrGrid } from '../utils/TerminalReach';
 import { isSymbolDeviceMissing } from '../project/DeviceBindingValidation';
 import { isSymbolInterlocked } from '../project/InterlockIndicator';
 import { WireNodeSymbol } from '../symbols/scada/WireNodeSymbol';
@@ -186,6 +187,21 @@ export const Canvas: React.FC = () => {
   const toCanvasPoint = (stagePos: { x: number; y: number }): WirePoint => {
     const scale = canvasState.zoom;
     return snapPointToGrid((stagePos.x - canvasState.panX) / scale, (stagePos.y - canvasState.panY) / scale);
+  };
+
+  // usterka 1f: while drawing a wire, a raw cursor position closer than
+  // half a grid cell to some terminal snaps to that terminal's own
+  // EXACT coordinate instead of the plain nearest grid node - without
+  // this, landing on a terminal means aiming for its precise pixel, not
+  // just getting close. Scoped to wire-drawing only (finishDrawing's
+  // point placement, and the live preview below) - toCanvasPoint itself
+  // is untouched, so frame-drawing/box-select keep their own plain
+  // grid-snap exactly as before.
+  const toWirePoint = (stagePos: { x: number; y: number }): WirePoint => {
+    const scale = canvasState.zoom;
+    const worldX = (stagePos.x - canvasState.panX) / scale;
+    const worldY = (stagePos.y - canvasState.panY) / scale;
+    return snapToTerminalOrGrid(worldX, worldY, objects);
   };
 
   const finishDrawing = () => {
@@ -432,7 +448,7 @@ export const Canvas: React.FC = () => {
       // a wire lands wherever the click itself snapped to.
       const pos = e.target.getStage().getPointerPosition();
       if (!pos) return;
-      const point = toCanvasPoint(pos);
+      const point = toWirePoint(pos);
       setDrawingPoints(prev => appendWirePoint(prev || [], point));
       return;
     }
@@ -475,9 +491,17 @@ export const Canvas: React.FC = () => {
   };
 
   const handleMouseMove = (e: any) => {
-    if (isDrawingConnection && drawingPointsRef.current) {
+    // usterka 1d/1e/1f: tracked from the moment the wire tool is armed
+    // (not only once drawingPointsRef.current has a first point) - the
+    // very FIRST point placed needs nearby-terminal visibility and
+    // magnetism exactly as much as every point after it. The rubber-
+    // band preview line itself (drawingPoints && drawingPoints.length >
+    // 0, further down) already stays gated on having at least one point
+    // - this only widens what drives the terminal-reach computation
+    // below, not that preview line.
+    if (isDrawingConnection) {
       const pos = e.target.getStage()?.getPointerPosition();
-      if (pos) setDrawingPreview(toCanvasPoint(pos));
+      if (pos) setDrawingPreview(toWirePoint(pos));
     }
 
     if (isPanningRef.current) {
@@ -621,6 +645,19 @@ export const Canvas: React.FC = () => {
   };
 
   const junctionPoints = getJunctionPoints(connections, objects);
+
+  // usterka 1d/1e/1f: while the wire tool is armed, every object with a
+  // terminal within reach of the live cursor shows its terminals
+  // without needing individual hover (nearbyTerminalObjIds), and the
+  // single terminal magnetism would actually snap to right now is
+  // highlighted (highlightedTerminal) - both plain per-render
+  // computations, the same "no memoization" convention
+  // junctionPoints/netStateByConnectionId above already use. null
+  // (rather than an empty Set/no match) specifically means "not
+  // currently drawing a wire", not "drawing, but nothing nearby".
+  const wireCursorPos = isDrawingConnection ? drawingPreview : null;
+  const nearbyTerminalObjIds = wireCursorPos ? new Set(getNearbyTerminals(objects, wireCursorPos).map(t => t.objId)) : null;
+  const highlightedTerminal = wireCursorPos ? findNearestTerminal(objects, wireCursorPos) : null;
 
   // feat/water-management commit 2: a wire's own color is now the
   // RESULT of its net's state (isSourceActive), never a per-connection
@@ -850,6 +887,8 @@ export const Canvas: React.FC = () => {
               gridSize={gridSize}
               onShapeRef={registerObjectShapeRef}
               groupDrag={groupDrag}
+              forceShowTerminals={!!nearbyTerminalObjIds?.has(obj.id)}
+              highlightedTerminalId={highlightedTerminal?.objId === obj.id ? highlightedTerminal.terminalId : null}
             />
           ))}
           {frames.map((frame) => (
@@ -936,6 +975,8 @@ export const Canvas: React.FC = () => {
               gridSize={gridSize}
               onShapeRef={registerObjectShapeRef}
               groupDrag={groupDrag}
+              forceShowTerminals={!!nearbyTerminalObjIds?.has(obj.id)}
+              highlightedTerminalId={highlightedTerminal?.objId === obj.id ? highlightedTerminal.terminalId : null}
             />
           ))}
           {/* Topology junctions (layer 4 - deliberately ABOVE symbols,

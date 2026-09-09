@@ -6,7 +6,7 @@
 import React from 'react';
 import { Group, Line } from 'react-konva';
 import type { SymbolProps } from '../SymbolRenderer';
-import { bandedCircle } from './BandedShading';
+import { bandedCircle, waterStub } from './BandedShading';
 import { resolveSiteState } from './SiteSymbolState';
 import { SITE_CONC, SITE_DGREY, SITE_BLUE, SITE_RIB_LINE, SITE_OUTLINE_WIDTH_MEDIUM, SITE_CANVAS_SCALE } from '../../theme/ScadaTheme';
 
@@ -39,6 +39,12 @@ export const WaterManholeSymbol: React.FC<SymbolProps> = ({ state }) => {
         return <Line key={deg} points={[x1, y1, x2, y2]} stroke={SITE_RIB_LINE} strokeWidth={SITE_OUTLINE_WIDTH_MEDIUM} listening={false} />;
       })}
       {bandedCircle(CX, CY, 11, on ? SITE_BLUE : SITE_DGREY, { outlineWidth: SITE_OUTLINE_WIDTH_MEDIUM })}
+      {/* fix/hydraulic-connections commit 5: krociec+kolnierz on the
+          one terminal (PRZYLACZE, BOTTOM) - the manhole's own x
+          already matches the true terminal (CX=80=160/2), only y
+          needed extending from the manhole's own rim (CY+40=104) out
+          to the true edge (120). Nothing reached the edge before. */}
+      {waterStub(CX, CY + 40, 'B', on, 160, 120)}
     </Group>
   );
 };

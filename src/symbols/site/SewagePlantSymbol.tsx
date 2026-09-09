@@ -6,11 +6,11 @@
 import React from 'react';
 import { Group } from 'react-konva';
 import type { SymbolProps } from '../SymbolRenderer';
-import { bandedRect, bandedCircle } from './BandedShading';
+import { bandedRect, bandedCircle, waterStub } from './BandedShading';
 import { resolveSiteState } from './SiteSymbolState';
 import {
-  SITE_CONC, SITE_DGREY, SITE_GREY, SITE_BLUE, SITE_WATER_DIM, SITE_GREEN, SITE_RED,
-  SITE_BAND_WIDTH_NARROW, SITE_OUTLINE_WIDTH_MEDIUM, SITE_OUTLINE_WIDTH_THIN, SITE_CANVAS_SCALE
+  SITE_CONC, SITE_DGREY, SITE_BLUE, SITE_WATER_DIM, SITE_GREEN, SITE_RED,
+  SITE_OUTLINE_WIDTH_MEDIUM, SITE_OUTLINE_WIDTH_THIN, SITE_CANVAS_SCALE
 } from '../../theme/ScadaTheme';
 
 export type SewagePlantState = 'ZALACZONY' | 'WYLACZONY';
@@ -32,8 +32,16 @@ export const SewagePlantSymbol: React.FC<SymbolProps> = ({ state }) => {
           {bandedCircle(cx, 69, 8, chamberColor, { outlineWidth: SITE_OUTLINE_WIDTH_THIN })}
         </Group>
       ))}
-      {bandedRect(6, 60, 12, 18, SITE_GREY, { band: SITE_BAND_WIDTH_NARROW, outlineWidth: SITE_OUTLINE_WIDTH_MEDIUM })}
-      {bandedRect(142, 60, 12, 18, SITE_GREY, { band: SITE_BAND_WIDTH_NARROW, outlineWidth: SITE_OUTLINE_WIDTH_MEDIUM })}
+      {/* fix/hydraulic-connections commit 5: krociec+kolnierz on both
+          terminals (WLOT/LEFT, WYLOT/RIGHT) - the true terminal height
+          in this file's own pre-scale 160x120 space is y=60, exactly
+          the old spigot rects' own TOP edge (their bodies ran DOWN
+          from there to y=78, off-axis) and neither reached the true
+          edge (stopped 6/6 units short). Replaces both spigot rects
+          entirely - "zaden aparat nie rysuje wlasnego kroćca po
+          swojemu". */}
+      {waterStub(18, 60, 'L', on, 160, 120)}
+      {waterStub(142, 60, 'R', on, 160, 120)}
       {bandedCircle(140, 30, 8, on ? SITE_GREEN : SITE_RED, { outlineWidth: SITE_OUTLINE_WIDTH_MEDIUM })}
     </Group>
   );

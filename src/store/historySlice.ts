@@ -1,6 +1,6 @@
 import type { StateCreator } from 'zustand';
 import type { AppState } from './appState';
-import { syncAnchoredConnections } from '../utils/WireAnchoring';
+import { syncAnchoredConnections, findAnchorDiscrepancies } from '../utils/WireAnchoring';
 
 // Cap on how many undo/redo snapshots are kept; each entry is a full deep
 // copy of objects+connections+meters+signalPanels+frames, so this bounds both memory and undo depth.
@@ -32,6 +32,18 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
     const syncedConnections = syncAnchoredConnections(preSync.connections, preSync.objects);
     if (syncedConnections !== preSync.connections) {
       set({ connections: syncedConnections });
+    }
+
+    // fix/wiring-and-library-groups commit 3, point (c): a consistency
+    // check, not a fix - every anchored point SHOULD already exactly
+    // match its own terminal at this point, since the sync right above
+    // just ran. If it does not, something moved a connection's points
+    // through a path that never went through that sync at all - worth
+    // a Messages notice ("cos jeszcze nie dziala"), not a silent gap.
+    const { objects: postSyncObjects, connections: postSyncConnections } = get();
+    const discrepancies = findAnchorDiscrepancies(postSyncConnections, postSyncObjects);
+    if (discrepancies.length > 0) {
+      get().addMessage(`[WARNING] ${discrepancies.length} wire endpoint(s) drifted from their own terminal - reconnect them manually.`);
     }
 
     const { objects, connections, meters, signalPanels, frames, groupCommands, setpointPanels, history, historyIndex } = get();

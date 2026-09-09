@@ -12,7 +12,7 @@
 import React from 'react';
 import { Group, Path, Line, Text } from 'react-konva';
 import type { SymbolProps } from '../SymbolRenderer';
-import { bandedRect, bandedCircleLightOnly, statusLed, objectPipeSegment } from './BandedShading';
+import { bandedRect, bandedCircleLightOnly, statusLed, waterStub } from './BandedShading';
 import { resolveSiteState } from './SiteSymbolState';
 import { COLOR_OUTLINE, SITE_DGREY, SITE_GREEN, SITE_BLUE, SITE_LEVER_WIDTH, SITE_LEVER_ARROW_WIDTH, SITE_OUTLINE_WIDTH_MEDIUM } from '../../theme/ScadaTheme';
 
@@ -20,7 +20,12 @@ export type WaterValveState = 'A' | 'B';
 // oxlint-disable-next-line react/only-export-components -- one file per symbol, same convention as every other site/ symbol.
 export const WATER_VALVE_STATES: WaterValveState[] = ['A', 'B'];
 
-const CX = 58, CY = 54;
+// fix/hydraulic-connections commit 5: was 58,54 - the true WLOT (LEFT)/
+// WYLOT_A (RIGHT)/WYLOT_B (BOTTOM) terminals sit at x=64 (canvas
+// half-width) and y=48 (half-height), not 58/54. Every other
+// coordinate in this file is already expressed relative to CX/CY, so
+// this one change re-centers the whole body on the real terminals.
+const CX = 64, CY = 48;
 
 export const WaterValveSymbol: React.FC<SymbolProps> = ({ state }) => {
   const isA = resolveSiteState(state, WATER_VALVE_STATES, 'A') === 'A';
@@ -28,9 +33,9 @@ export const WaterValveSymbol: React.FC<SymbolProps> = ({ state }) => {
 
   return (
     <Group>
-      {objectPipeSegment([{ x: 4, y: CY }, { x: CX, y: CY }], true)}
-      {objectPipeSegment([{ x: CX, y: CY }, { x: 112, y: CY }], isA)}
-      {objectPipeSegment([{ x: CX, y: CY }, { x: CX, y: 92 }], !isA)}
+      {waterStub(CX, CY, 'L', true, 128, 96)}
+      {waterStub(CX, CY, 'R', isA, 128, 96)}
+      {waterStub(CX, CY, 'B', !isA, 128, 96)}
       {bandedCircleLightOnly(CX, CY, 17, SITE_DGREY)}
 
       {/* Lever handle - rotates about (CX,CY): a Konva Group pivoting

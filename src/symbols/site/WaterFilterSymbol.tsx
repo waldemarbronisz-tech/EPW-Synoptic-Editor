@@ -5,7 +5,7 @@
 import React from 'react';
 import { Group, Path, Rect, Line } from 'react-konva';
 import type { SymbolProps } from '../SymbolRenderer';
-import { bandedRect, objectPipeSegment } from './BandedShading';
+import { bandedRect, waterStub } from './BandedShading';
 import { resolveSiteState } from './SiteSymbolState';
 import { COLOR_OUTLINE, SITE_GREY, SITE_DGREY, SITE_OUTLINE_WIDTH } from '../../theme/ScadaTheme';
 
@@ -18,7 +18,14 @@ export const WaterFilterSymbol: React.FC<SymbolProps> = ({ state }) => {
 
   return (
     <Group>
-      {objectPipeSegment([{ x: 4, y: 40 }, { x: 124, y: 40 }], on)}
+      {/* fix/hydraulic-connections commit 5: krociec+kolnierz on both
+          terminals (WLOT/LEFT, WYLOT/RIGHT), each running from the
+          flask's own wall (x=44/84, already at y=48 - the true
+          terminal height) straight out to the canvas edge - the old
+          single edge-to-edge pipe (y=40, 8 units off the real
+          terminal) is retired in favor of this. */}
+      {waterStub(44, 48, 'L', on, 128, 96)}
+      {waterStub(84, 48, 'R', on, 128, 96)}
 
       {/* Flask-shaped filter body. */}
       <Path data="M44,48 L84,48 L84,74 Q64,88 44,74 Z" fill={SITE_GREY.base} stroke={COLOR_OUTLINE} strokeWidth={SITE_OUTLINE_WIDTH} />

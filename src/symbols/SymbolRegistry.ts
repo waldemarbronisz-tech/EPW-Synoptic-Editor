@@ -104,6 +104,18 @@ export const getSymbolDefinition = (type: string): SymbolDefinition | undefined 
   return SYMBOL_REGISTRY[type];
 };
 
+// fix/hydraulic-connections commit 7: the Object Library's own folder
+// order, top to bottom - an explicit list, not however SYMBOL_REGISTRY's
+// own import-merge order happens to first encounter each category
+// (that order does not match this task's own requested sequence at
+// all: SCADA is merged in before TEREN, and Automation right after
+// Water, neither of which belongs where this list puts it). Any
+// category not named here - none exist today, but a future one might,
+// before its own entry gets added here - is appended afterward, in
+// whatever order it was first encountered, so it is never silently
+// dropped from the library.
+const CATEGORY_DISPLAY_ORDER = ['Electrical', 'Water', 'HVAC', 'Instrumentation', 'TEREN', 'SCADA', 'Automation'];
+
 // Only what the Object Library should show - getSymbolDefinition above
 // stays unfiltered, since an already-placed object of a hidden type
 // still needs its full definition (label, terminals, rendering) to work.
@@ -116,5 +128,13 @@ export const getSymbolsByCategory = () => {
     }
     categories[def.category].push(def);
   });
-  return categories;
+
+  const ordered: Record<string, SymbolDefinition[]> = {};
+  for (const name of CATEGORY_DISPLAY_ORDER) {
+    if (categories[name]) ordered[name] = categories[name];
+  }
+  for (const name of Object.keys(categories)) {
+    if (!ordered[name]) ordered[name] = categories[name];
+  }
+  return ordered;
 };

@@ -5,13 +5,14 @@
 // them into their own files (this one, ConnectionNode.tsx,
 // TransformerHandles.tsx) is a pure move, no behavior change.
 import { useEffect, useRef, useState } from 'react';
-import { Circle, Group } from 'react-konva';
+import { Circle, Group, Rect } from 'react-konva';
 import { useStore } from '../../store';
 import type { SynopticObject } from '../../store';
 import { SymbolRenderer } from '../../symbols/SymbolRenderer';
-import { COLOR_OUTLINE, COLOR_WATER } from '../../theme/ScadaTheme';
+import { COLOR_OUTLINE, COLOR_WATER, TERMINAL_HIGHLIGHT_COLOR, TERMINAL_RADIUS, TERMINAL_RADIUS_HIGHLIGHTED } from '../../theme/ScadaTheme';
 import { snapValue } from '../../utils/GridSnap';
 import { getObjectTerminals } from '../../utils/Terminals';
+import { getHoverHitRect } from '../../utils/TerminalReach';
 import { computeResizeFromAnchor, getActiveResizeAnchor, setActiveResizeAnchor } from '../../utils/ResizeHandles';
 import { isAltKeyDown } from '../../utils/CanvasInputState';
 import { describeObject } from '../../utils/ObjectDisplay';
@@ -54,7 +55,7 @@ export function handleSymbolDblClick(e: { cancelBubble: boolean }, obj: Synoptic
 // used to read it moved out to its own top-level pass (
 // ObjectTransformerHandle, in TransformerHandles.tsx) and nothing else in
 // this component's own rendering depends on selection state.
-export const ObjectNode = ({ obj, onSelect, onChange, gridSize, onShapeRef, groupDrag }: {
+export const ObjectNode = ({ obj, onSelect, onChange, gridSize, onShapeRef, groupDrag, forceShowTerminals, highlightedTerminalId }: {
   gridSize: number,
   obj: SynopticObject,
   // Receives the raw Konva event (onClick={onSelect} forwards it
@@ -70,6 +71,18 @@ export const ObjectNode = ({ obj, onSelect, onChange, gridSize, onShapeRef, grou
   // pass can still attach a Transformer to it.
   onShapeRef: (id: string, node: any) => void,
   groupDrag: GroupDragApi,
+  // fix/wiring-and-library-groups commit 1, usterka 1d: while the wire
+  // tool is armed, Canvas.tsx computes which objects have a terminal
+  // within WIRE_NEARBY_TERMINAL_RADIUS of the live cursor - this object
+  // shows its terminals whenever it is one of them, with no individual
+  // hover needed at all. Both optional/undefined outside wire-drawing
+  // mode (every other caller of ObjectNode - there is only one - simply
+  // omits them, same as any other optional prop).
+  forceShowTerminals?: boolean,
+  // usterka 1e/1f: which of THIS object's own terminals (if any) is the
+  // one the cursor/magnetism would actually hit right now - drawn
+  // bigger, in a different color, so the user knows before clicking.
+  highlightedTerminalId?: string | null,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const shapeRef = useRef<any>(null);
@@ -84,9 +97,24 @@ export const ObjectNode = ({ obj, onSelect, onChange, gridSize, onShapeRef, grou
   // utils/Terminals.ts. The old click-a-port-to-drag-a-wire interaction
   // (onPortMouseDown/Up/Click, the busbar's dynamic-port onMouseUp
   // special case) is gone entirely; a terminal is purely a visual hint
-  // now (radius 6, shown on hover) of where a freehand-drawn wire
-  // actually needs to end to connect - simply sharing that grid point.
+  // now (shown on hover, or forced while the wire tool is nearby - see
+  // TerminalReach.ts) of where a freehand-drawn wire actually needs to
+  // end to connect - simply sharing that grid point.
   const terminals = getObjectTerminals(obj);
+  const showTerminals = isHovered || !!forceShowTerminals;
+  // usterka 1a/1b/1c: the Group's own hover hit-test used to be the
+  // UNION OF ITS CHILDREN'S OWN DRAWN INK (Konva's default, per-shape
+  // hit canvas) - a terminal dot sits ON a symbol's own edge and often
+  // pokes past whatever thin strokes actually get drawn there, so
+  // moving the cursor TOWARD a dot routinely left the real hit area
+  // before the cursor ever reached it. This invisible Rect, padded well
+  // past every terminal on every side (getHoverHitRect/
+  // TERMINAL_HOVER_MARGIN), replaces that with one generous, uniform
+  // hit area for the whole symbol - the same "invisible full-bounds
+  // Rect as the actual hit source" fix DripLineSymbol.tsx's own
+  // clickability bug used (feat/water-management), applied here at the
+  // ObjectNode level so every symbol gets it, not just one.
+  const hoverRect = getHoverHitRect(obj.width, obj.height);
 
   return (
       <Group
@@ -205,22 +233,41 @@ export const ObjectNode = ({ obj, onSelect, onChange, gridSize, onShapeRef, grou
           useStore.getState().saveHistory();
         }}
       >
+        {/* usterka 1a/1b/1c: an invisible hit area, padded past every
+            terminal in every direction - see this component's own
+            comment above hoverRect. Listens (no listening={false}) so
+            it is what actually keeps onMouseEnter/onMouseLeave (and
+            ordinary clicks) firing while the cursor crosses it; fully
+            transparent, so it changes nothing about how the symbol
+            looks. First child, purely so it never visually overlaps
+            anything drawn on top of it (moot either way, since it is
+            invisible - kept first for the same "background first"
+            convention DripLineSymbol.tsx's own hit rect already set). */}
+        <Rect x={hoverRect.x} y={hoverRect.y} width={hoverRect.width} height={hoverRect.height} fill="transparent" />
+
         <SymbolRenderer obj={obj} />
 
-        {/* Terminals highlight on hover only (usterka D3's precedent,
-            carried forward) - radius 6, contrasting fill, black outline. */}
-        {isHovered && terminals.map((t) => (
-          <Circle
-            key={`term-${t.id}`}
-            x={t.x}
-            y={t.y}
-            radius={6}
-            fill={COLOR_WATER}
-            stroke={COLOR_OUTLINE}
-            strokeWidth={1}
-            listening={false}
-          />
-        ))}
+        {/* Terminals: shown on hover, OR forced by Canvas.tsx while the
+            wire tool is armed and this object has one within reach of
+            the cursor (usterka 1d). The one matching
+            highlightedTerminalId (usterka 1e/1f - the terminal the
+            cursor/magnetism would actually hit right now) draws bigger,
+            in a different color, than the rest. */}
+        {showTerminals && terminals.map((t) => {
+          const isHighlighted = !!highlightedTerminalId && t.id === highlightedTerminalId;
+          return (
+            <Circle
+              key={`term-${t.id}`}
+              x={t.x}
+              y={t.y}
+              radius={isHighlighted ? TERMINAL_RADIUS_HIGHLIGHTED : TERMINAL_RADIUS}
+              fill={isHighlighted ? TERMINAL_HIGHLIGHT_COLOR : COLOR_WATER}
+              stroke={COLOR_OUTLINE}
+              strokeWidth={1}
+              listening={false}
+            />
+          );
+        })}
       </Group>
   );
 };

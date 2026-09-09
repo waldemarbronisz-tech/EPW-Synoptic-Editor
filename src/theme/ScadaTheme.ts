@@ -116,6 +116,22 @@ export const OUTLINE_WIDTH = 5;      // kontur ksztaltow wypelnionych (default; 
 export const BUSBAR_HEIGHT = 16;     // wysokosc szyny zbiorczej - dokladnie jedno oczko
 export const GRID_SIZE = 16;
 
+// ---- Wire terminal hover/reach (fix/wiring-and-library-groups commit 1) ---
+// usterka 1: a terminal dot sits ON a symbol's own edge (getTerminalOffsetForSide),
+// so it visibly pokes half outside whatever the symbol actually draws there -
+// hovering TOWARD the dot used to leave the Group's own (pixel-tight, per-
+// shape) Konva hit area before the cursor ever reached it, hiding the very
+// thing the user was chasing. TERMINAL_HOVER_MARGIN pads an invisible hit
+// rect (ObjectNode.tsx) well past every terminal in every direction - "co
+// najmniej promieniowi kropki razy trzy" (this task's own spec), taken
+// directly rather than rounded to a different number.
+export const TERMINAL_RADIUS = 6;                          // normal terminal dot (unchanged from before this fix)
+export const TERMINAL_RADIUS_HIGHLIGHTED = 9;               // the one the cursor/magnetism would actually hit
+export const TERMINAL_HOVER_MARGIN = TERMINAL_RADIUS * 3;   // padding around a symbol's own bbox that keeps its terminals reachable
+export const TERMINAL_HIGHLIGHT_COLOR = COLOR_LAMP_LIT;     // reused, not a new literal - high-contrast against the normal COLOR_WATER fill
+export const WIRE_NEARBY_TERMINAL_RADIUS = GRID_SIZE * 4;   // while drawing: terminals within this world distance stay visible without individual hover ("co najmniej cztery oczka")
+export const WIRE_TERMINAL_SNAP_DISTANCE = GRID_SIZE / 2;   // magnetism: a wire endpoint snaps to a terminal closer than this ("polowa oczka siatki")
+
 // feat/appearance-selection-frames commit 1: the indicator diode was
 // drawn far too large relative to the row text beside it (confirmed by
 // eye: a ten-row signal panel reads as a column of huge circles with
@@ -314,6 +330,15 @@ export const SITE_LCD_BACKGROUND = '#101418';  // przeplyw2/wodomierz2's own dig
 export const SITE_GAUGE_NEEDLE = '#C01818';    // presostat's own manometer needle
 export const SITE_LED_ON_BLUE = '#3898FF';     // czujnik_deszczu's own led() color override
 export const SITE_SPRAY_BLUE = '#5898FF';      // zraszacz's own water arcs (distinct from SITE_WATER_SPRAY - a different reference file's own literal value)
+
+// fix/hydraulic-connections commit 5: docs/EPW_kolnierze_referencja.py's
+// own hydraulic-connection standard - a stub (krociec) plus a flange
+// (kolnierz) at EVERY water-medium object's own terminal. PIPE_W itself
+// is not repeated here - it is SITE_OBJECT_PIPE_WIDTH above already,
+// the exact same literal value (13) this reference's own PIPE_W is.
+export const SITE_STUB_LENGTH = 14;                          // STUB - typical krociec length from an aparat's own body to its flange
+export const SITE_FLANGE_THICKNESS = 6;                       // FL_W - the flange's own thickness along the pipe's axis
+export const SITE_FLANGE_SPAN = SITE_OBJECT_PIPE_WIDTH + 11;  // FL_H = PIPE_W+11 - the flange's own span across the pipe
 
 // ---- Bridge into CSS -----------------------------------------------------
 // CSS cannot import a TypeScript module, so the interface chrome (panels,
