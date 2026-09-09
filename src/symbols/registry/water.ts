@@ -120,23 +120,23 @@ export const waterSymbols: Record<string, SymbolDefinition> = {
   // water.gate_valve above already use.
   'site.rain_tank': {
     type: 'site.rain_tank',
-    label: 'Zbiornik na deszczowke',
+    label: 'Rainwater Tank',
     category: 'Water',
     defaultWidth: 128,
     defaultHeight: 96,
-    allowedStates: ['ZALACZONY', 'WYLACZONY'],
-    defaultState: 'WYLACZONY',
+    allowedStates: ['ON', 'OFF'],
+    defaultState: 'OFF',
     terminals: [{ id: 'KROCIEC', side: 'RIGHT', medium: 'WATER' }],
     hiddenFromLibrary: true
   },
   'site.sewage_plant': {
     type: 'site.sewage_plant',
-    label: 'Oczyszczalnia sciekow',
+    label: 'Sewage Treatment Plant',
     category: 'Water',
     defaultWidth: 128,
     defaultHeight: 96,
-    allowedStates: ['ZALACZONY', 'WYLACZONY'],
-    defaultState: 'WYLACZONY',
+    allowedStates: ['ON', 'OFF'],
+    defaultState: 'OFF',
     terminals: [
       { id: 'WLOT', side: 'LEFT', medium: 'WATER' },
       { id: 'WYLOT', side: 'RIGHT', medium: 'WATER' }
@@ -144,32 +144,32 @@ export const waterSymbols: Record<string, SymbolDefinition> = {
   },
   'site.water_manhole': {
     type: 'site.water_manhole',
-    label: 'Studzienka przylacza wody',
+    label: 'Water Connection Manhole',
     category: 'Water',
     defaultWidth: 128,
     defaultHeight: 96,
-    allowedStates: ['ZALACZONY', 'WYLACZONY'],
-    defaultState: 'WYLACZONY',
+    allowedStates: ['ON', 'OFF'],
+    defaultState: 'OFF',
     terminals: [{ id: 'PRZYLACZE', side: 'BOTTOM', medium: 'WATER' }]
   },
   'site.garden_sprinkler': {
     type: 'site.garden_sprinkler',
-    label: 'Slupek podlewania ogrodowego',
+    label: 'Garden Watering Post',
     category: 'Water',
     defaultWidth: 128,
     defaultHeight: 96,
-    allowedStates: ['ZALACZONY', 'WYLACZONY'],
-    defaultState: 'WYLACZONY',
+    allowedStates: ['ON', 'OFF'],
+    defaultState: 'OFF',
     terminals: [{ id: 'WODA', side: 'BOTTOM', medium: 'WATER' }]
   },
   'site.rainwater_tank2': {
     type: 'site.rainwater_tank2',
-    label: 'Zbiornik na deszczowke',
+    label: 'Rainwater Tank',
     category: 'Water',
     defaultWidth: 128,
     defaultHeight: 96,
-    allowedStates: ['NISKI', 'SREDNI', 'WYSOKI'],
-    defaultState: 'NISKI',
+    allowedStates: ['LOW', 'MEDIUM', 'HIGH'],
+    defaultState: 'LOW',
     // fix/tank-language-and-media commit 2, point (a): ODPLYW moves
     // from the RIGHT edge to the BOTTOM edge - water drains
     // gravitationally from the shell's own floor, not sideways out of
@@ -181,7 +181,7 @@ export const waterSymbols: Record<string, SymbolDefinition> = {
   },
   'site.water_selector_valve_switched': {
     type: 'site.water_selector_valve_switched',
-    label: 'Zawor trojdrogowy przelaczajacy',
+    label: 'Three-Way Switching Valve',
     category: 'Water',
     defaultWidth: 128,
     defaultHeight: 96,
@@ -195,12 +195,12 @@ export const waterSymbols: Record<string, SymbolDefinition> = {
   },
   'site.water_selector_valve_3pos': {
     type: 'site.water_selector_valve_3pos',
-    label: 'Zawor trojdrogowy trojpolozeniowy',
+    label: 'Three-Way Selector Valve',
     category: 'Water',
     defaultWidth: 128,
     defaultHeight: 96,
-    allowedStates: ['A', 'ZAMKNIETY', 'B'],
-    defaultState: 'ZAMKNIETY',
+    allowedStates: ['A', 'CLOSED', 'B'],
+    defaultState: 'CLOSED',
     terminals: [
       { id: 'WLOT', side: 'LEFT', medium: 'WATER' },
       { id: 'WYLOT_A', side: 'RIGHT', medium: 'WATER' },
@@ -209,12 +209,12 @@ export const waterSymbols: Record<string, SymbolDefinition> = {
   },
   'site.check_valve': {
     type: 'site.check_valve',
-    label: 'Zawor zwrotny',
+    label: 'Check Valve',
     category: 'Water',
     defaultWidth: 128,
     defaultHeight: 96,
-    allowedStates: ['ZALACZONY', 'WYLACZONY'],
-    defaultState: 'WYLACZONY',
+    allowedStates: ['ON', 'OFF'],
+    defaultState: 'OFF',
     terminals: [
       { id: 'WLOT', side: 'LEFT', medium: 'WATER' },
       { id: 'WYLOT', side: 'RIGHT', medium: 'WATER' }
@@ -222,12 +222,12 @@ export const waterSymbols: Record<string, SymbolDefinition> = {
   },
   'site.water_filter': {
     type: 'site.water_filter',
-    label: 'Filtr wody',
+    label: 'Water Filter',
     category: 'Water',
     defaultWidth: 128,
     defaultHeight: 96,
-    allowedStates: ['ZALACZONY', 'WYLACZONY'],
-    defaultState: 'WYLACZONY',
+    allowedStates: ['ON', 'OFF'],
+    defaultState: 'OFF',
     terminals: [
       { id: 'WLOT', side: 'LEFT', medium: 'WATER' },
       { id: 'WYLOT', side: 'RIGHT', medium: 'WATER' }
@@ -235,22 +235,22 @@ export const waterSymbols: Record<string, SymbolDefinition> = {
   },
   'site.hydrofor': {
     type: 'site.hydrofor',
-    label: 'Hydrofor',
+    label: 'Pressure Booster',
     category: 'Water',
     defaultWidth: 128,
     defaultHeight: 96,
-    allowedStates: ['ZALACZONY', 'WYLACZONY'],
-    defaultState: 'WYLACZONY',
+    allowedStates: ['ON', 'OFF'],
+    defaultState: 'OFF',
     terminals: [{ id: 'WYLOT', side: 'LEFT', medium: 'WATER' }]
   },
   'site.flow_meter': {
     type: 'site.flow_meter',
-    label: 'Przeplywomierz',
+    label: 'Flow Meter',
     category: 'Water',
     defaultWidth: 128,
     defaultHeight: 96,
-    allowedStates: ['ZALACZONY', 'WYLACZONY'],
-    defaultState: 'WYLACZONY',
+    allowedStates: ['ON', 'OFF'],
+    defaultState: 'OFF',
     terminals: [
       { id: 'WLOT', side: 'LEFT', medium: 'WATER' },
       { id: 'WYLOT', side: 'RIGHT', medium: 'WATER' }
@@ -258,12 +258,12 @@ export const waterSymbols: Record<string, SymbolDefinition> = {
   },
   'site.water_meter': {
     type: 'site.water_meter',
-    label: 'Wodomierz',
+    label: 'Water Meter',
     category: 'Water',
     defaultWidth: 128,
     defaultHeight: 96,
-    allowedStates: ['ZALACZONY', 'WYLACZONY'],
-    defaultState: 'WYLACZONY',
+    allowedStates: ['ON', 'OFF'],
+    defaultState: 'OFF',
     terminals: [
       { id: 'WLOT', side: 'LEFT', medium: 'WATER' },
       { id: 'WYLOT', side: 'RIGHT', medium: 'WATER' }
@@ -271,12 +271,12 @@ export const waterSymbols: Record<string, SymbolDefinition> = {
   },
   'site.pressure_switch': {
     type: 'site.pressure_switch',
-    label: 'Presostat',
+    label: 'Pressure Switch',
     category: 'Water',
     defaultWidth: 128,
     defaultHeight: 96,
-    allowedStates: ['ZALACZONY', 'WYLACZONY'],
-    defaultState: 'WYLACZONY',
+    allowedStates: ['ON', 'OFF'],
+    defaultState: 'OFF',
     terminals: [
       { id: 'WLOT', side: 'LEFT', medium: 'WATER' },
       { id: 'WYLOT', side: 'RIGHT', medium: 'WATER' }
@@ -284,22 +284,22 @@ export const waterSymbols: Record<string, SymbolDefinition> = {
   },
   'site.sprinkler_head': {
     type: 'site.sprinkler_head',
-    label: 'Zraszacz',
+    label: 'Sprinkler Head',
     category: 'Water',
     defaultWidth: 128,
     defaultHeight: 96,
-    allowedStates: ['ZALACZONY', 'WYLACZONY'],
-    defaultState: 'WYLACZONY',
+    allowedStates: ['ON', 'OFF'],
+    defaultState: 'OFF',
     terminals: [{ id: 'WODA', side: 'BOTTOM', medium: 'WATER' }]
   },
   'site.drip_line': {
     type: 'site.drip_line',
-    label: 'Linia kroplujaca',
+    label: 'Drip Line',
     category: 'Water',
     defaultWidth: 192,
     defaultHeight: 96,
-    allowedStates: ['ZALACZONY', 'WYLACZONY'],
-    defaultState: 'WYLACZONY',
+    allowedStates: ['ON', 'OFF'],
+    defaultState: 'OFF',
     terminals: [{ id: 'WLOT', side: 'LEFT', medium: 'WATER' }]
   },
 };

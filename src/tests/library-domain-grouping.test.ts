@@ -8,9 +8,9 @@
 import { describe, it, expect } from 'vitest';
 import { getSymbolsByCategory, getSymbolDefinition } from '../symbols/SymbolRegistry';
 
-describe('27. TEREN contains exactly five entries', () => {
+describe('27. SITE contains exactly five entries', () => {
   it('house, warehouse, sliding gate, grass, concrete road - nothing else', () => {
-    const teren = getSymbolsByCategory()['TEREN'] || [];
+    const teren = getSymbolsByCategory()['SITE'] || [];
     expect(teren.map(d => d.type).sort()).toEqual([
       'site.concrete_road', 'site.grass', 'site.house', 'site.sliding_gate', 'site.warehouse'
     ]);
@@ -22,19 +22,19 @@ describe('28. the rainwater tank is in Water', () => {
     expect(getSymbolDefinition('site.rainwater_tank2')?.category).toBe('Water');
   });
 
-  it('site.rain_tank (the original site-objects-2d tank, same label) still carries category Water in its own definition - fix/tank-language-and-media commit 3 hides it from the library, it does not move it back to TEREN or delete it', () => {
+  it('site.rain_tank (the original site-objects-2d tank, same label) still carries category Water in its own definition - fix/tank-language-and-media commit 3 hides it from the library, it does not move it back to SITE or delete it', () => {
     expect(getSymbolDefinition('site.rain_tank')?.category).toBe('Water');
   });
 });
 
 describe('29. the alarm beacon is in Electrical', () => {
-  it('site.alarm_beacon (Kogut alarmowy) has category Electrical', () => {
+  it('site.alarm_beacon (Alarm Beacon) has category Electrical', () => {
     expect(getSymbolDefinition('site.alarm_beacon')?.category).toBe('Electrical');
   });
 });
 
 describe('30. the rain sensor is in Instrumentation', () => {
-  it('site.rain_sensor (Czujnik deszczu) has category Instrumentation', () => {
+  it('site.rain_sensor (Rain Sensor) has category Instrumentation', () => {
     expect(getSymbolDefinition('site.rain_sensor')?.category).toBe('Instrumentation');
   });
 });
@@ -75,9 +75,9 @@ describe('32. the total number of visible symbols reflects the library exactly a
 });
 
 describe('the library\'s own folder order matches this task\'s own requested sequence', () => {
-  it('Electrical, Water, HVAC, Instrumentation, TEREN, SCADA - in exactly that order (Automation has no visible entries today, so its own folder does not appear at all)', () => {
+  it('Electrical, Water, HVAC, Instrumentation, SITE, SCADA - in exactly that order (Automation has no visible entries today, so its own folder does not appear at all)', () => {
     const order = Object.keys(getSymbolsByCategory());
-    expect(order).toEqual(['Electrical', 'Water', 'HVAC', 'Instrumentation', 'TEREN', 'SCADA']);
+    expect(order).toEqual(['Electrical', 'Water', 'HVAC', 'Instrumentation', 'SITE', 'SCADA']);
   });
 });
 
@@ -85,7 +85,7 @@ describe('the relocated objects kept their own type string, terminals and states
   it('site.hydrofor: same single WATER terminal, same two states, now category Water', () => {
     const def = getSymbolDefinition('site.hydrofor')!;
     expect(def.category).toBe('Water');
-    expect(def.allowedStates).toEqual(['ZALACZONY', 'WYLACZONY']);
+    expect(def.allowedStates).toEqual(['ON', 'OFF']);
     expect(def.terminals).toEqual([{ id: 'WYLOT', side: 'LEFT', medium: 'WATER' }]);
   });
 

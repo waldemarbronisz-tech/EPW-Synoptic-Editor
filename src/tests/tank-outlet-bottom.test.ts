@@ -101,8 +101,8 @@ describe('12. the percent field never overlaps the shell, at any state', () => {
     }
   });
 
-  it('specifically checked at 88 percent (WYSOKI), per this commit\'s own explicit requirement', () => {
-    expect(LEVEL_PERCENT_BY_STATE.WYSOKI).toBe(88);
+  it('specifically checked at 88 percent (HIGH), per this commit\'s own explicit requirement', () => {
+    expect(LEVEL_PERCENT_BY_STATE.HIGH).toBe(88);
     expect(overlaps(TANK_VALUE_FIELD_BOUNDS, TANK_SHELL_BOUNDS)).toBe(false);
   });
 

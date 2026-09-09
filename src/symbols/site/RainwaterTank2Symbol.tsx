@@ -32,8 +32,8 @@
 //
 // TWO independent things still drive this symbol's own two displays:
 //   - GEOMETRY (water bar height, level-window fill, whether ODPLYW
-//     reads live) comes from the object's OWN state (NISKI/SREDNI/
-//     WYSOKI -> 18/52/88%), exactly like every other site object's
+//     reads live) comes from the object's OWN state (LOW/MEDIUM/
+//     HIGH -> 18/52/88%), exactly like every other site object's
 //     editor.preview_state.
 //   - The VALUE FIELD's own text still comes from the assigned
 //     MEASURED device instead, through the EXACT SAME path the meter
@@ -56,9 +56,9 @@ import {
   SITE_OUTLINE_WIDTH
 } from '../../theme/ScadaTheme';
 
-export type RainwaterTank2State = 'NISKI' | 'SREDNI' | 'WYSOKI';
+export type RainwaterTank2State = 'LOW' | 'MEDIUM' | 'HIGH';
 // oxlint-disable-next-line react/only-export-components -- one file per symbol, same convention as every other site/ symbol.
-export const RAINWATER_TANK2_STATES: RainwaterTank2State[] = ['NISKI', 'SREDNI', 'WYSOKI'];
+export const RAINWATER_TANK2_STATES: RainwaterTank2State[] = ['LOW', 'MEDIUM', 'HIGH'];
 
 // docs/EPW_kolnierze_referencja.py's own tank(pct): the three named
 // states this task gives map to these exact percentages. Exported so
@@ -66,7 +66,7 @@ export const RAINWATER_TANK2_STATES: RainwaterTank2State[] = ['NISKI', 'SREDNI',
 // position against the shell/dome/stubs at all three real states
 // without rendering anything.
 // oxlint-disable-next-line react/only-export-components -- kept beside the component it belongs to, for testability without rendering Konva, same convention DripLineSymbol.tsx's own computeDripperPositions already uses.
-export const LEVEL_PERCENT_BY_STATE: Record<RainwaterTank2State, number> = { NISKI: 18, SREDNI: 52, WYSOKI: 88 };
+export const LEVEL_PERCENT_BY_STATE: Record<RainwaterTank2State, number> = { LOW: 18, MEDIUM: 52, HIGH: 88 };
 
 const W = 128, H = 96;
 
@@ -115,8 +115,8 @@ export const TANK_OUTFLOW_AXIS = W / 2;
 
 // fix/hydraulic-connections commit 6: "Odplyw rysowany jako NIEAKTYWNY,
 // gdy poziom wynosi zero" - exported so this exact rule is directly
-// testable at pct=0 (none of the three real states - NISKI/SREDNI/
-// WYSOKI, 18/52/88% - actually reach zero on their own).
+// testable at pct=0 (none of the three real states - LOW/MEDIUM/
+// HIGH, 18/52/88% - actually reach zero on their own).
 // oxlint-disable-next-line react/only-export-components -- kept beside the component it belongs to, for testability without rendering Konva, same convention DripLineSymbol.tsx's own computeDripperPositions already uses.
 export function isTankOutflowLive(pct: number): boolean {
   return pct > 0;
@@ -136,7 +136,7 @@ export function isTankOutflowLive(pct: number): boolean {
 // "does it have water" test.
 // oxlint-disable-next-line react/only-export-components -- kept beside the component it belongs to, for testability without rendering Konva, same convention every other exported constant in this file already uses.
 export function tankPercentFromState(state: string | undefined): number {
-  return LEVEL_PERCENT_BY_STATE[resolveSiteState(state || '', RAINWATER_TANK2_STATES, 'NISKI')];
+  return LEVEL_PERCENT_BY_STATE[resolveSiteState(state || '', RAINWATER_TANK2_STATES, 'LOW')];
 }
 
 export const RainwaterTank2Symbol: React.FC<SymbolProps> = ({ obj, state, terminalNetState }) => {

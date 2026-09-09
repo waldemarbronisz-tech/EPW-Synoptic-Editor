@@ -23,13 +23,13 @@ const EXAMPLE_PROJECTS: Record<string, string> = {
 describe('14. the library contains exactly one rainwater tank', () => {
   it('site.rain_tank is hidden - only site.rainwater_tank2 appears in the visible Water group', () => {
     const water = getSymbolsByCategory()['Water'] || [];
-    const tanks = water.filter(d => d.label === 'Zbiornik na deszczowke');
+    const tanks = water.filter(d => d.label === 'Rainwater Tank');
     expect(tanks.map(d => d.type)).toEqual(['site.rainwater_tank2']);
   });
 
   it('no visible category anywhere in the library offers a second tank under this label', () => {
     const allVisible = Object.values(getSymbolsByCategory()).flat();
-    const tanks = allVisible.filter(d => d.label === 'Zbiornik na deszczowke');
+    const tanks = allVisible.filter(d => d.label === 'Rainwater Tank');
     expect(tanks.length).toBe(1);
   });
 });

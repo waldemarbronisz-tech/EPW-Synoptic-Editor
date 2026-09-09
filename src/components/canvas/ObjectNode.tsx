@@ -47,10 +47,10 @@ export function handleSymbolDblClick(e: { cancelBubble: boolean }, obj: Synoptic
   if (useStore.getState().isDrawingConnection) return;
   e.cancelBubble = true;
   if (!obj.deviceId) {
-    useStore.getState().openDeviceCreateOrAssignForm(obj.id, obj.type, `Schemat, symbol ${describeObject(obj)}`);
+    useStore.getState().openDeviceCreateOrAssignForm(obj.id, obj.type, `Diagram, symbol ${describeObject(obj)}`);
     return;
   }
-  useStore.getState().openDeviceForm(obj.deviceId, `Schemat, symbol ${describeObject(obj)}`);
+  useStore.getState().openDeviceForm(obj.deviceId, `Diagram, symbol ${describeObject(obj)}`);
 }
 
 // isSelected is no longer a prop here (commit 5) - the Transformer that
