@@ -13,19 +13,20 @@ import flowMeterSource from '../symbols/site/FlowMeterSymbol.tsx?raw';
 import waterMeterSource from '../symbols/site/WaterMeterSymbol.tsx?raw';
 import { computeDripperPositions } from '../symbols/site/DripLineSymbol';
 
-describe('the last 6 objects are registered in TEREN with the right states/terminals', () => {
+describe('the last 6 objects are registered (Water/Instrumentation - fix/hydraulic-connections commit 7 moved them out of TEREN) with the right states/terminals', () => {
   it('site.flow_meter, site.water_meter, site.pressure_switch: two states, two WATER terminals each', () => {
     for (const type of ['site.flow_meter', 'site.water_meter', 'site.pressure_switch']) {
       const def = getSymbolDefinition(type)!;
-      expect(def.category).toBe('TEREN');
+      expect(def.category).toBe('Water');
       expect(def.allowedStates).toEqual(['ZALACZONY', 'WYLACZONY']);
       expect(def.terminals!.length).toBe(2);
       expect(def.terminals!.every(t => t.medium === 'WATER')).toBe(true);
     }
   });
 
-  it('site.rain_sensor: two states, one ELECTRICAL terminal (a powered sensor, no plumbing)', () => {
+  it('site.rain_sensor: two states, one ELECTRICAL terminal (a powered sensor, no plumbing), category Instrumentation', () => {
     const def = getSymbolDefinition('site.rain_sensor')!;
+    expect(def.category).toBe('Instrumentation');
     expect(def.allowedStates).toEqual(['ZALACZONY', 'WYLACZONY']);
     expect(def.terminals).toEqual([{ id: 'ZASILANIE', side: 'BOTTOM', medium: 'ELECTRICAL' }]);
   });
@@ -43,16 +44,13 @@ describe('the last 6 objects are registered in TEREN with the right states/termi
     expect(def.isSurface).toBeFalsy();
   });
 
-  it('all 6 show up in the live TEREN category listing (12 water-management objects total, alongside the earlier 16)', () => {
-    const teren = getSymbolsByCategory()['TEREN'];
-    const types = teren.map(d => d.type);
-    for (const type of [
-      'site.flow_meter', 'site.water_meter', 'site.pressure_switch',
-      'site.rain_sensor', 'site.sprinkler_head', 'site.drip_line'
-    ]) {
-      expect(types).toContain(type);
+  it('the five now in Water show up there; the sixth (rain sensor) shows up in Instrumentation', () => {
+    const water = getSymbolsByCategory()['Water'].map(d => d.type);
+    for (const type of ['site.flow_meter', 'site.water_meter', 'site.pressure_switch', 'site.sprinkler_head', 'site.drip_line']) {
+      expect(water).toContain(type);
     }
-    expect(teren.length).toBe(16 + 12);
+    const instrumentation = getSymbolsByCategory()['Instrumentation'].map(d => d.type);
+    expect(instrumentation).toContain('site.rain_sensor');
   });
 });
 

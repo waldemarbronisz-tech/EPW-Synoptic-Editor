@@ -14,11 +14,11 @@ import { DeviceFormDialog } from '../components/DeviceFormDialog';
 import type { SwitchedDevice } from '../project/DeviceSchema';
 import rainwaterTank2Source from '../symbols/site/RainwaterTank2Symbol.tsx?raw';
 
-describe('the 6 new objects are registered in TEREN with the right states/terminals', () => {
-  it('site.rainwater_tank2: three water-level states, one WATER terminal', () => {
+describe('the 6 new objects are registered (Water category - fix/hydraulic-connections commit 7 moved them out of TEREN) with the right states/terminals', () => {
+  it('site.rainwater_tank2: three water-level states, two WATER terminals (DOPLYW/ODPLYW - fix/hydraulic-connections commit 6 replaced the old single WYLOT)', () => {
     const def = getSymbolDefinition('site.rainwater_tank2')!;
     expect(def).toBeDefined();
-    expect(def.category).toBe('TEREN');
+    expect(def.category).toBe('Water');
     expect(def.allowedStates).toEqual(['NISKI', 'SREDNI', 'WYSOKI']);
     expect(def.terminals!.every(t => t.medium === 'WATER')).toBe(true);
   });
@@ -47,13 +47,13 @@ describe('the 6 new objects are registered in TEREN with the right states/termin
     expect(def.allowedStates).toEqual(['ZALACZONY', 'WYLACZONY']);
   });
 
-  it('all 6 actually show up in the live TEREN category listing', () => {
-    const teren = getSymbolsByCategory()['TEREN'].map(d => d.type);
+  it('all 6 actually show up in the live Water category listing', () => {
+    const water = getSymbolsByCategory()['Water'].map(d => d.type);
     for (const type of [
       'site.rainwater_tank2', 'site.water_selector_valve_switched', 'site.water_selector_valve_3pos',
       'site.check_valve', 'site.water_filter', 'site.hydrofor'
     ]) {
-      expect(teren).toContain(type);
+      expect(water).toContain(type);
     }
   });
 });
