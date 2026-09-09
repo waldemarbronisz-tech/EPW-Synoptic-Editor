@@ -34,7 +34,7 @@ import React from 'react';
 import { Group, Path, Rect } from 'react-konva';
 import { useStore } from '../../store';
 import type { SymbolProps } from '../SymbolRenderer';
-import { bandedRect, valueField, objectPipeSegment, waterFlange, flangeCenterForSide } from './BandedShading';
+import { bandedRect, valueField, waterStub } from './BandedShading';
 import { resolveSiteState } from './SiteSymbolState';
 import { findDeviceById, getMeasuredPreviewValue, formatMeasuredValue } from '../../meter/MeterResolver';
 import { colorForRow } from '../../components/MeterElementNode';
@@ -74,6 +74,14 @@ export const TANK_LEVEL_WINDOW_BOUNDS = {
 const { x: BX, y: BY, width: BW, height: BH } = TANK_SHELL_BOUNDS;
 const CXX = BX + BW / 2;
 
+// fix/wire-routing-around-obstacles commit 4: the one height both
+// DOPLYW and ODPLYW krociec runs share - the LEFT/RIGHT terminal's own
+// true, fixed edge-midpoint position (H/2), never a hand-picked height
+// of its own. Exported so test 24/25 can check it against
+// getTerminalOffsetForSide directly, without rendering anything.
+// oxlint-disable-next-line react/only-export-components -- kept beside the component it belongs to, same convention as every other exported constant in this file.
+export const TANK_TERMINAL_AXIS = H / 2;
+
 // fix/hydraulic-connections commit 6: "Odplyw rysowany jako NIEAKTYWNY,
 // gdy poziom wynosi zero" - exported so this exact rule is directly
 // testable at pct=0 (none of the three real states - NISKI/SREDNI/
@@ -83,8 +91,25 @@ export function isTankOutflowLive(pct: number): boolean {
   return pct > 0;
 }
 
-export const RainwaterTank2Symbol: React.FC<SymbolProps> = ({ obj, state }) => {
-  const pct = LEVEL_PERCENT_BY_STATE[resolveSiteState(state, RAINWATER_TANK2_STATES, 'NISKI')];
+// feat/wire-routing-around-obstacles commit 5, point (e): the tank's
+// own water level, from its object state alone - exactly what the
+// component itself already derived inline, pulled out so NetResolver.ts's
+// own "a tank with water is an active source" rule can compute the
+// EXACT same number, never a second, parallel derivation of it. Deliberately
+// NOT the assigned MEASURED device's own getMeasuredPreviewValue: that
+// number is this symbol's own independent, decorative value-field
+// reading (see this file's own header, "TWO independent things") -
+// unrelated to whether the tank physically holds water, which is what
+// governs whether it can act as a source. pct is that physical
+// quantity; isTankOutflowLive(pct) is already the correct, established
+// "does it have water" test.
+// oxlint-disable-next-line react/only-export-components -- kept beside the component it belongs to, for testability without rendering Konva, same convention every other exported constant in this file already uses.
+export function tankPercentFromState(state: string | undefined): number {
+  return LEVEL_PERCENT_BY_STATE[resolveSiteState(state || '', RAINWATER_TANK2_STATES, 'NISKI')];
+}
+
+export const RainwaterTank2Symbol: React.FC<SymbolProps> = ({ obj, state, terminalNetState }) => {
+  const pct = tankPercentFromState(state);
 
   const devices = useStore(s => s.devices);
   const device = obj.deviceId ? findDeviceById(devices, obj.deviceId) : undefined;
@@ -95,10 +120,6 @@ export const RainwaterTank2Symbol: React.FC<SymbolProps> = ({ obj, state }) => {
   const hg = Math.floor((BH - 4) * pct / 100);
   const top = BY + BH - 2 - hg;
   const ih = Math.floor((BH - 14) * pct / 100);
-  const outflowLive = isTankOutflowLive(pct);
-
-  const doplywFlange = flangeCenterForSide('L', 20, W, H);
-  const odplywFlange = flangeCenterForSide('R', 88, W, H);
 
   return (
     <Group>
@@ -123,16 +144,41 @@ export const RainwaterTank2Symbol: React.FC<SymbolProps> = ({ obj, state }) => {
       <Path data={`M${CXX - 22},${BY - 6} A28,13 0 0 1 ${CXX + 22},${BY - 6}`} stroke={SITE_DGREY.dark} strokeWidth={1.2} listening={false} />
       <Path data={`M${BX + 7},${BY - 4} A22,13 0 0 1 ${BX + 24},${BY - 13}`} stroke={SITE_GREY.light} strokeWidth={3.5} lineCap="round" listening={false} />
 
-      {/* DOPLYW: enters from the LEFT edge, routed into the shell's own
-          upper part - always live (rain keeps arriving regardless of
-          the tank's own current level). */}
-      {objectPipeSegment([{ x: 0, y: 20 }, { x: 14, y: 20 }, { x: 14, y: BY + 7 }, { x: BX, y: BY + 7 }], true)}
-      {waterFlange(doplywFlange.x, doplywFlange.y, 'L', true)}
-
-      {/* ODPLYW: leaves to the RIGHT from the shell's own lower part -
-          inactive (grey) whenever the level is zero. */}
-      {objectPipeSegment([{ x: BX + BW, y: BY + BH - 7 }, { x: 112, y: BY + BH - 7 }, { x: 112, y: 88 }, { x: W, y: 88 }], outflowLive)}
-      {waterFlange(odplywFlange.x, odplywFlange.y, 'R', outflowLive)}
+      {/* fix/wire-routing-around-obstacles commit 4: DOPLYW/ODPLYW are
+          now SINGLE STRAIGHT horizontal krociec runs (waterStub - the
+          exact same standard shared function every other water
+          aparat's own terminal uses, commit 5 of the previous task),
+          not a jogged path. The previous jog ran at y=20 (in) / y=88
+          (out) - neither height is the DOPLYW/ODPLYW terminal's own
+          true, fixed position: getTerminalOffsetForSide('LEFT'/'RIGHT',
+          128, 96) always resolves to the exact edge midpoint, y=48
+          (Terminals.ts, unchanged by GRANICE in both this task and the
+          previous one) - so that jogged krociec never actually touched
+          its own wire-anchoring terminal at all, a worse, hidden defect
+          than the visible turn this commit was asked to remove. Both
+          stubs now run at y=48, DIRECTLY into the shell wall - straight
+          per this commit's own requirement, and for the same reason
+          exactly matching the terminal a connected wire actually snaps
+          to. docs/EPW_kolnierze_referencja.py's own tank() places these
+          off-center (BY+9 / BY+BH-9, distinct heights for in/out) -
+          not used literally here, the same kind of documented
+          discrepancy raport.md already flagged for this reference
+          file's own STUB constant in the previous task: the reference
+          is explicit that terminals sit at the canvas's own edge
+          midpoint, and that invariant is what a real anchored wire
+          depends on, not this one function's own illustrative numbers. */}
+      {/* feat/wire-routing-around-obstacles commit 5: the krociec no
+          longer carries a color of its own - DOPLYW reads whatever the
+          inflow-side NET is (point e: the inflow is never itself a
+          source, its state comes purely from what feeds it), and
+          ODPLYW reads its own net too, which NetResolver.ts's own new
+          rule makes ACTIVE whenever this tank has water (isTankOutflowLive)
+          AND something is actually wired to it - an unconnected
+          terminal still reads INACTIVE regardless of the water level
+          (point c), exactly like every other water aparat's own
+          terminal now does. */}
+      {waterStub(BX, TANK_TERMINAL_AXIS, 'L', (terminalNetState?.('DOPLYW') ?? 'INACTIVE') === 'ACTIVE', W, H)}
+      {waterStub(BX + BW, TANK_TERMINAL_AXIS, 'R', (terminalNetState?.('ODPLYW') ?? 'INACTIVE') === 'ACTIVE', W, H)}
 
       {/* Level window, now INSIDE the shell - the pre-existing overlap
           this commit fixes came from placing it externally instead. */}

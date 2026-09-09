@@ -1,6 +1,8 @@
 import type { StateCreator } from 'zustand';
 import type { AppState } from './appState';
 import { syncAnchoredConnections, findAnchorDiscrepancies } from '../utils/WireAnchoring';
+import { findAllCollisions } from '../project/WireCollision';
+import { getNewCollisionWarnings } from '../utils/WireCollisionWarnings';
 
 // Cap on how many undo/redo snapshots are kept; each entry is a full deep
 // copy of objects+connections+meters+signalPanels+frames, so this bounds both memory and undo depth.
@@ -45,6 +47,21 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
     if (discrepancies.length > 0) {
       get().addMessage(`[WARNING] ${discrepancies.length} wire endpoint(s) drifted from their own terminal - reconnect them manually.`);
     }
+
+    // feat/wire-routing-around-obstacles commit 1: a wire crossing an
+    // apparatus's body is a WARNING, never a blocker (GRANICE) - posted
+    // once per (wire, obstacle) occurrence, via this same "one hook
+    // point after every mutation" saveHistory already is, rather than a
+    // separate render-driven effect that would fire on every hover.
+    const { objects: liveObjects, connections: liveConnections, meters: liveMeters, signalPanels: liveSignalPanels, frames: liveFrames, groupCommands: liveGroupCommands, setpointPanels: liveSetpointPanels } = get();
+    const allCollisions = findAllCollisions(liveConnections, {
+      objects: liveObjects, meters: liveMeters, signalPanels: liveSignalPanels,
+      frames: liveFrames, groupCommands: liveGroupCommands, setpointPanels: liveSetpointPanels
+    });
+    getNewCollisionWarnings(allCollisions).forEach(c => {
+      const wireLabel = liveConnections.find(conn => conn.id === c.connectionId)?.medium || 'Wire';
+      get().addMessage(`[WARNING] ${wireLabel} wire crosses ${c.obstacle.label} - route it around instead.`);
+    });
 
     const { objects, connections, meters, signalPanels, frames, groupCommands, setpointPanels, history, historyIndex } = get();
     const objectsJson = JSON.stringify(objects);

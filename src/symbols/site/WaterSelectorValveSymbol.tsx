@@ -32,17 +32,22 @@ export const WATER_SELECTOR_VALVE_STATES: WaterSelectorValveState[] = ['A', 'ZAM
 // already relative to CX/CY.
 const CX = 64, CY = 48;
 
-export const WaterSelectorValveSymbol: React.FC<SymbolProps> = ({ state }) => {
+export const WaterSelectorValveSymbol: React.FC<SymbolProps> = ({ state, terminalNetState }) => {
   const resolved = resolveSiteState(state, WATER_SELECTOR_VALVE_STATES, 'ZAMKNIETY');
   const isA = resolved === 'A';
   const isB = resolved === 'B';
   const isClosed = resolved === 'ZAMKNIETY';
+  const netState = (id: string) => (terminalNetState?.(id) ?? 'INACTIVE') === 'ACTIVE';
 
   return (
     <Group>
-      {waterStub(CX, CY, 'L', !isClosed, 128, 96)}
-      {waterStub(CX, CY, 'R', isA, 128, 96)}
-      {waterStub(CX, CY, 'B', isB, 128, 96)}
+      {/* feat/wire-routing-around-obstacles commit 5: each terminal's
+          krociec reads its own net now, not this valve's own position -
+          isA/isB/isClosed still drive the lever/wedge artwork below,
+          unchanged. */}
+      {waterStub(CX, CY, 'L', netState('WLOT'), 128, 96)}
+      {waterStub(CX, CY, 'R', netState('WYLOT_A'), 128, 96)}
+      {waterStub(CX, CY, 'B', netState('WYLOT_B'), 128, 96)}
       {bandedCircleLightOnly(CX, CY, 17, SITE_DGREY)}
 
       {isClosed ? (

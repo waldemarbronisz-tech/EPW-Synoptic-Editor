@@ -20,16 +20,19 @@ export const SPRINKLER_HEAD_STATES: SprinklerHeadState[] = ['ZALACZONY', 'WYLACZ
 
 const ARC_DX = [-34, -18, 0, 18, 34];
 
-export const SprinklerHeadSymbol: React.FC<SymbolProps> = ({ state }) => {
+export const SprinklerHeadSymbol: React.FC<SymbolProps> = ({ state, terminalNetState }) => {
   const on = resolveSiteState(state, SPRINKLER_HEAD_STATES, 'WYLACZONY') === 'ZALACZONY';
+  const wodaLive = (terminalNetState?.('WODA') ?? 'INACTIVE') === 'ACTIVE';
 
   return (
     <Group>
       {/* fix/hydraulic-connections commit 5: krociec+kolnierz on the
           one terminal (WODA, BOTTOM) - this object had NONE at all
           before (the concrete pad's own bottom edge, y=88, never
-          reached the true terminal at y=96). */}
-      {waterStub(64, 88, 'B', on, 128, 96)}
+          reached the true terminal at y=96).
+          feat/wire-routing-around-obstacles commit 5: reads its own
+          net state, not this object's own on/off appearance. */}
+      {waterStub(64, 88, 'B', wodaLive, 128, 96)}
       {bandedRect(46, 72, 36, 16, SITE_CONC, { band: 3, outlineWidth: SITE_OUTLINE_WIDTH_MEDIUM })}
       {bandedVRect(56, 52, 16, 22, SITE_DGREY, { band: 3 })}
       {bandedCircleLightOnly(64, 48, 9, on ? SITE_BLUE : SITE_DGREY, { outlineWidth: SITE_OUTLINE_WIDTH_MEDIUM })}

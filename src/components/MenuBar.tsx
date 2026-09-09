@@ -18,6 +18,9 @@ export interface MenuBarProps {
 
 export const MenuBar: React.FC<MenuBarProps> = ({ onOpenScadaPreview, onOpenDeviceRegistries, onOpenDeviceList, onOpenHelp }) => {
   const { undo, redo, copySelected, paste, deleteObjects, selectedIds, isDirty, snapToGridEnabled, toggleSnapToGrid } = useStore();
+  // feat/wire-routing-around-obstacles commit 3, point (f): PRZELICZ
+  // TRASE - on demand only, never automatic.
+  const { selectedConnectionIds, recalculateConnectionRoutes } = useStore();
 
   const handleMenuClick = (action: () => void) => {
     action();
@@ -81,6 +84,7 @@ export const MenuBar: React.FC<MenuBarProps> = ({ onOpenScadaPreview, onOpenDevi
           <div className="dropdown-item" onClick={() => handleMenuClick(copySelected)}>Copy</div>
           <div className="dropdown-item" onClick={() => handleMenuClick(paste)}>Paste</div>
           <div className="dropdown-item" onClick={() => handleMenuClick(() => deleteObjects(selectedIds))}>Delete</div>
+          <div className="dropdown-item" onClick={() => handleMenuClick(() => recalculateConnectionRoutes(selectedConnectionIds))}>Przelicz trase</div>
         </div>
       </div>
       <div className="menu-item">

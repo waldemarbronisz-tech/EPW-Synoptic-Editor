@@ -47,8 +47,9 @@ export function computeDripperPositions(width: number): number[] {
   return Array.from({ length: count }, (_, i) => DRIPPER_MARGIN + i * actualSpacing);
 }
 
-export const DripLineSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
+export const DripLineSymbol: React.FC<SymbolProps> = ({ obj, state, terminalNetState }) => {
   const on = resolveSiteState(state, DRIP_LINE_STATES, 'WYLACZONY') === 'ZALACZONY';
+  const wlotLive = (terminalNetState?.('WLOT') ?? 'INACTIVE') === 'ACTIVE';
   const scaleX = obj.scaleX || 1;
   const scaleY = obj.scaleY || 1;
   const realWidth = obj.width * scaleX;
@@ -74,7 +75,7 @@ export const DripLineSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
           Height passed as realWidth/realHeight, not the fixed 128x96
           every other water object uses - this is the one object whose
           own "canvas" is genuinely adjustable. */}
-      {waterStub(20, realHeight / 2, 'L', on, realWidth, realHeight, { width: 11 })}
+      {waterStub(20, realHeight / 2, 'L', wlotLive, realWidth, realHeight, { width: 11 })}
       {objectPipeSegment([{ x: 20, y: realHeight / 2 }, { x: realWidth - 6, y: realHeight / 2 }], on, { width: 11 })}
       {drippers.map(x => (
         <Group key={x} listening={false}>

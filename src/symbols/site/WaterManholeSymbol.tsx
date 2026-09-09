@@ -21,8 +21,9 @@ const RIB_INNER = 13, RIB_OUTER = 26;
 // docs/EPW_rysunki_referencja.py's own `for a in range(0,360,45)` loop.
 const RIB_ANGLES_DEG = [0, 45, 90, 135, 180, 225, 270, 315];
 
-export const WaterManholeSymbol: React.FC<SymbolProps> = ({ state }) => {
+export const WaterManholeSymbol: React.FC<SymbolProps> = ({ state, terminalNetState }) => {
   const on = resolveSiteState(state, WATER_MANHOLE_STATES, 'WYLACZONY') === 'ZALACZONY';
+  const przylaczeLive = (terminalNetState?.('PRZYLACZE') ?? 'INACTIVE') === 'ACTIVE';
 
   return (
     // SITE_CANVAS_SCALE - see HouseSymbol.tsx's own comment on this
@@ -44,7 +45,7 @@ export const WaterManholeSymbol: React.FC<SymbolProps> = ({ state }) => {
           already matches the true terminal (CX=80=160/2), only y
           needed extending from the manhole's own rim (CY+40=104) out
           to the true edge (120). Nothing reached the edge before. */}
-      {waterStub(CX, CY + 40, 'B', on, 160, 120)}
+      {waterStub(CX, CY + 40, 'B', przylaczeLive, 160, 120)}
     </Group>
   );
 };

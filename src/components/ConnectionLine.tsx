@@ -1,5 +1,5 @@
 import React from 'react';
-import { Group, Path } from 'react-konva';
+import { Group, Path, Line } from 'react-konva';
 import type { SynopticConnection } from '../store';
 import {
   COLOR_DE_ENERGIZED, COLOR_DE_ENERGIZED_LIGHT, COLOR_DE_ENERGIZED_DARK,
@@ -11,8 +11,19 @@ import {
   CONDUCTOR_OUTLINE, CONDUCTOR_WIDTH,
   CONDUCTOR_HIGHLIGHT_WIDTH, CONDUCTOR_HIGHLIGHT_OFFSET_X, CONDUCTOR_HIGHLIGHT_OFFSET_Y,
   CONDUCTOR_SHADOW_WIDTH, CONDUCTOR_SHADOW_OFFSET_X, CONDUCTOR_SHADOW_OFFSET_Y, CONDUCTOR_SHADOW_OPACITY,
-  COLOR_OUTLINE, COLOR_WHITE, BUSBAR_HEIGHT
+  COLOR_OUTLINE, COLOR_WHITE, BUSBAR_HEIGHT,
+  COLOR_ALARM, WIRE_COLLISION_MARK_WIDTH, WIRE_COLLISION_MARK_DASH
 } from '../theme/ScadaTheme';
+
+// feat/wire-routing-around-obstacles commit 1: which of this wire's own
+// segments (by index into conn.points) currently cross an obstacle, and
+// that obstacle's own human-readable label - for the dashed alarm-color
+// marking drawn ON TOP of the wire (never replacing its own state
+// color) and the hover tooltip naming what it crosses.
+export interface WireSegmentCollision {
+  segmentIndex: number;
+  obstacleLabel: string;
+}
 
 export interface ConnectionProps {
   conn: SynopticConnection;
@@ -29,6 +40,15 @@ export interface ConnectionProps {
   // (insert a bend on this segment, per usterka B) apart from a plain
   // click (select).
   onSelect: (e?: any) => void;
+  // Empty/undefined for the overwhelming majority of wires (no
+  // collision at all) - a plain array, not a Set, since it is always
+  // small and only ever iterated, never looked up by index.
+  collisions?: WireSegmentCollision[];
+  // Fires with a canvas-space anchor point and the obstacle's label on
+  // hover-in, and with null on hover-out - Canvas.tsx owns the actual
+  // tooltip element (a single one for the whole canvas, not one per
+  // wire).
+  onCollisionHover?: (info: { x: number; y: number; label: string } | null) => void;
 }
 
 /**
@@ -78,7 +98,7 @@ function getConductorShadeColors(medium: SynopticConnection['medium'], netState:
     : { light: COLOR_DE_ENERGIZED_LIGHT, dark: COLOR_DE_ENERGIZED_DARK };
 }
 
-export const ConnectionLine: React.FC<ConnectionProps> = ({ conn, netState, isSelected, onSelect }) => {
+export const ConnectionLine: React.FC<ConnectionProps> = ({ conn, netState, isSelected, onSelect, collisions, onCollisionHover }) => {
   if (!conn.points || conn.points.length < 2) return null;
 
   const path = pathFromPoints(conn.points);
@@ -123,6 +143,33 @@ export const ConnectionLine: React.FC<ConnectionProps> = ({ conn, netState, isSe
         x={CONDUCTOR_HIGHLIGHT_OFFSET_X} y={CONDUCTOR_HIGHLIGHT_OFFSET_Y}
         listening={false}
       />
+      {/* feat/wire-routing-around-obstacles commit 1: a colliding
+          segment's own dashed alarm-color marking, drawn on top of
+          everything above - ADDED to the wire's own state color, never
+          replacing it (GRANICE: a collision is a warning, the wire
+          still works and still shows its real state). A Konva Line,
+          deliberately not a fifth Path element - pipe-rendering-
+          houston.test.ts's own source scan counts the Path elements
+          this file uses (one hit-area pass plus the four real Houston
+          passes above) and their round caps/joins; this marking is
+          neither of those four passes and must not be counted as one. */}
+      {(collisions || []).map((c, i) => {
+        const a = conn.points[c.segmentIndex];
+        const b = conn.points[c.segmentIndex + 1];
+        if (!a || !b) return null;
+        const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+        return (
+          <Line
+            key={i}
+            points={[a.x, a.y, b.x, b.y]}
+            stroke={COLOR_ALARM}
+            strokeWidth={WIRE_COLLISION_MARK_WIDTH}
+            dash={WIRE_COLLISION_MARK_DASH}
+            onMouseEnter={() => onCollisionHover?.({ x: mid.x, y: mid.y, label: c.obstacleLabel })}
+            onMouseLeave={() => onCollisionHover?.(null)}
+          />
+        );
+      })}
     </Group>
   );
 };

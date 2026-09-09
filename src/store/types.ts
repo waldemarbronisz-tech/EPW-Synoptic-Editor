@@ -147,6 +147,15 @@ export interface SynopticConnection {
   // LIVE/DEAD value on every connection) still loads without error -
   // ProjectSchema.ts's own validator accepts an absent value too.
   state?: 'LIVE' | 'DEAD';
+  // feat/wire-routing-around-obstacles commit 3, point (d): once a user
+  // places their OWN bend on a wire (Alt+click insert), that wire is
+  // "manual" from then on - the PRZELICZ TRASE command (WireRouter.ts's
+  // own routeAround) skips it forever after, never silently reshaping a
+  // route someone deliberately customized. Optional and additive
+  // (absent = not manual, the default for every wire drawn before this
+  // field existed, and for a wire never Alt+click-edited) - no schema
+  // version bump, same convention as every other optional field above.
+  isManualRoute?: boolean;
 }
 
 export interface Message {

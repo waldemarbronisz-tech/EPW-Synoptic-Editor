@@ -11,13 +11,16 @@ import { waterStub } from '../site/BandedShading';
 // so no recentering is needed here, only shrinking.
 const RADIUS_MARGIN_FRACTION = 0.2;
 
-export const PumpSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
+export const PumpSymbol: React.FC<SymbolProps> = ({ obj, state, terminalNetState }) => {
   const w = obj.width;
   const h = obj.height;
   const radius = Math.min(w, h) / 2 * (1 - RADIUS_MARGIN_FRACTION);
 
   const isRunning = state === 'RUNNING';
   const isFault = state === 'FAULT';
+  // feat/wire-routing-around-obstacles commit 5: reads each terminal's
+  // own net state, not the pump's own running state.
+  const netState = (id: string) => (terminalNetState?.(id) ?? 'INACTIVE') === 'ACTIVE';
 
   const [angle, setAngle] = useState(0);
 
@@ -46,8 +49,8 @@ export const PumpSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
           own left/right edges - retires the old decorative "Outlet"
           rect, which was drawn at the TOP and never matched the
           registry's own RIGHT-side OUT terminal at all. */}
-      {waterStub(w / 2 - radius, h / 2, 'L', true, w, h)}
-      {waterStub(w / 2 + radius, h / 2, 'R', isRunning, w, h)}
+      {waterStub(w / 2 - radius, h / 2, 'L', netState('IN'), w, h)}
+      {waterStub(w / 2 + radius, h / 2, 'R', netState('OUT'), w, h)}
 
       {/* Base */}
       <Rect x={w*0.2} y={h*0.8} width={w*0.6} height={h*0.2} fill="#34495e" />

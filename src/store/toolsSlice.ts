@@ -12,6 +12,7 @@ export type ToolsSlice = Pick<AppState,
   | 'isDrawingFrame' | 'drawingFrameVariant' | 'frameToolContinuous' | 'setDrawingFrameMode'
   | 'drawingMedium' | 'drawingStyle' | 'setDrawingMedium' | 'setDrawingStyle'
   | 'snapToGridEnabled' | 'toggleSnapToGrid'
+  | 'wireRoutingMode' | 'setWireRoutingMode'
 >;
 
 export const createToolsSlice: StateCreator<AppState, [], [], ToolsSlice> = (set) => ({
@@ -23,6 +24,14 @@ export const createToolsSlice: StateCreator<AppState, [], [], ToolsSlice> = (set
   snapToGridEnabled: true,
   drawingMedium: 'ELECTRICAL' as SynopticConnection['medium'],
   drawingStyle: 'NORMAL' as SynopticConnection['style'],
+  // feat/wire-routing-around-obstacles commit 3, point (a): which of
+  // the two drawing modes a NEW wire is drawn with - AVOID by default,
+  // per this task's own spec. Session-only UI state, exactly like
+  // drawingMedium/drawingStyle above (same slice, same convention) -
+  // never written into a saved project file (ProjectManager.ts's own
+  // getProjectData lists its fields explicitly; this is deliberately
+  // not one of them - test 23).
+  wireRoutingMode: 'AVOID' as 'STRAIGHT' | 'AVOID',
 
   setDrawingMode: (active) => set({
     isDrawingConnection: active
@@ -47,6 +56,7 @@ export const createToolsSlice: StateCreator<AppState, [], [], ToolsSlice> = (set
 
   setDrawingMedium: (medium) => set({ drawingMedium: medium }),
   setDrawingStyle: (style) => set({ drawingStyle: style }),
+  setWireRoutingMode: (mode) => set({ wireRoutingMode: mode }),
 
   toggleSnapToGrid: () => set((state) => ({ snapToGridEnabled: !state.snapToGridEnabled })),
 });

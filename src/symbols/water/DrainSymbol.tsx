@@ -12,7 +12,7 @@ import { waterStub } from '../site/BandedShading';
 // and the unchanged bottom-left corner) is where the krociec starts.
 const TOP_LEFT_MARGIN_FRACTION = 0.15;
 
-export const DrainSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
+export const DrainSymbol: React.FC<SymbolProps> = ({ obj, state, terminalNetState }) => {
   const w = obj.width;
   const h = obj.height;
   const topLeftX = w * TOP_LEFT_MARGIN_FRACTION;
@@ -20,10 +20,12 @@ export const DrainSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
   const leftWallAtHalf = topLeftX + (bottomLeftX - topLeftX) * 0.5;
 
   const isFault = state === 'FAULT';
+  // feat/wire-routing-around-obstacles commit 5: reads its own net state.
+  const inLive = (terminalNetState?.('IN') ?? 'INACTIVE') === 'ACTIVE';
 
   return (
     <Group>
-      {waterStub(leftWallAtHalf, h / 2, 'L', true, w, h)}
+      {waterStub(leftWallAtHalf, h / 2, 'L', inLive, w, h)}
       {/* Funnel/drain shape */}
       <Path data={`M ${topLeftX} 0 L ${w} 0 L ${w*0.7} ${h} L ${bottomLeftX} ${h} Z`} fill="#95a5a6" stroke="#2c3e50" strokeWidth={SYMBOL_STROKE} />
 

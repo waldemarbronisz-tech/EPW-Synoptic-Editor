@@ -9,7 +9,7 @@ import { waterStub } from '../site/BandedShading';
 // kolnierz on its real IN (LEFT)/OUT (RIGHT) terminals, both at h/2.
 const H_MARGIN_FRACTION = 0.15;
 
-export const TankSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
+export const TankSymbol: React.FC<SymbolProps> = ({ obj, state, terminalNetState }) => {
   const w = obj.width;
   const h = obj.height;
   const margin = w * H_MARGIN_FRACTION;
@@ -26,6 +26,15 @@ export const TankSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
   if (isHigh) fillLevel = 0.85;
 
   const waterColor = isFault ? '#c0392b' : '#3498db';
+  // feat/wire-routing-around-obstacles commit 5: reads each terminal's
+  // own net state - this generic (non-MEASURED, no device binding)
+  // tank does not qualify for the "aparat MEASURED o rodzaju zbiornik"
+  // source rule (NetResolver.ts, scoped to site.rainwater_tank2 only,
+  // the one real MEASURED tank in this registry - see raport.md), so
+  // its own OUT no longer self-sources from fillLevel either; both
+  // terminals are now plain net-state readouts like every other water
+  // aparat's.
+  const netState = (id: string) => (terminalNetState?.(id) ?? 'INACTIVE') === 'ACTIVE';
 
   // Tank outline (rounded top and bottom simulation with path)
   const tankPath = `
@@ -40,8 +49,8 @@ export const TankSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
     <Group>
       {/* krociec+kolnierz on the real IN (LEFT)/OUT (RIGHT) terminals,
           from the tank's own shrunk walls. */}
-      {waterStub(bodyLeft, h / 2, 'L', true, w, h)}
-      {waterStub(bodyRight, h / 2, 'R', fillLevel > 0, w, h)}
+      {waterStub(bodyLeft, h / 2, 'L', netState('IN'), w, h)}
+      {waterStub(bodyRight, h / 2, 'R', netState('OUT'), w, h)}
 
       {/* Background/Empty Tank */}
       <Path data={tankPath} fill="#ecf0f1" stroke="#2c3e50" strokeWidth={SYMBOL_STROKE} />

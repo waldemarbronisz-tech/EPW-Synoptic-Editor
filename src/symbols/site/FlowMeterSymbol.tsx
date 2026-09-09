@@ -26,8 +26,9 @@ export type FlowMeterState = 'ZALACZONY' | 'WYLACZONY';
 // oxlint-disable-next-line react/only-export-components -- one file per symbol, same convention as every other site/ symbol.
 export const FLOW_METER_STATES: FlowMeterState[] = ['ZALACZONY', 'WYLACZONY'];
 
-export const FlowMeterSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
+export const FlowMeterSymbol: React.FC<SymbolProps> = ({ obj, state, terminalNetState }) => {
   const on = resolveSiteState(state, FLOW_METER_STATES, 'WYLACZONY') === 'ZALACZONY';
+  const netState = (id: string) => (terminalNetState?.(id) ?? 'INACTIVE') === 'ACTIVE';
 
   const devices = useStore(s => s.devices);
   const device = obj.deviceId ? findDeviceById(devices, obj.deviceId) : undefined;
@@ -43,8 +44,8 @@ export const FlowMeterSymbol: React.FC<SymbolProps> = ({ obj, state }) => {
           pipe (y=62, 14 units off the real terminal) and its own
           dial-to-pipe connector line are retired; the dial's own
           circle now sits directly astride the pipe run instead. */}
-      {waterStub(44, 48, 'L', on, 128, 96)}
-      {waterStub(84, 48, 'R', on, 128, 96)}
+      {waterStub(44, 48, 'L', netState('WLOT'), 128, 96)}
+      {waterStub(84, 48, 'R', netState('WYLOT'), 128, 96)}
       {bandedCircleLightOnly(64, 36, 20, SITE_GREY)}
       <Circle x={64} y={36} radius={14} fill={SITE_LCD_BACKGROUND} stroke={COLOR_OUTLINE} strokeWidth={2} listening={false} />
       <Text x={39} y={31} width={50} align="center" text={valueText} fontFamily="Consolas, DejaVu Sans Mono, monospace" fontSize={11} fontStyle="bold" fill={valueColor} listening={false} />
