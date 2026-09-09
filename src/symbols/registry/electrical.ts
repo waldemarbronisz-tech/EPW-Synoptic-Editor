@@ -238,5 +238,88 @@ export const electricalSymbols: Record<string, SymbolDefinition> = {
     terminals: [{ id: 'IN', side: 'TOP', medium: 'ELECTRICAL' }]
   },
 
-  // Water
+  // fix/wiring-and-library-groups commit 5: seven site-lighting/alarm
+  // objects, relocated here from registry/site.ts (TEREN) - grouped by
+  // DOMAIN now (they are electrical fixtures, not site infrastructure),
+  // not by when they were first registered. This is a registry-entry
+  // move only, per this task's own explicit "NIE przepisywanie
+  // komponentow" - every field is unchanged except `category`, and the
+  // `type` string itself deliberately KEEPS its original 'site.*'
+  // prefix (not renamed to 'electrical.*'): a saved project references
+  // an object by this exact string (ProjectSchema.ts's own
+  // getSymbolDefinition(obj.type) lookup), and SymbolRenderer.tsx's own
+  // switch-case dispatches on it too - renaming it would silently break
+  // both for zero functional gain, since nothing in this app ever infers
+  // a symbol's category FROM its type string. Same reasoning applies
+  // to every other file this commit moves an entry into.
+  'site.lamp_post_double': {
+    type: 'site.lamp_post_double',
+    label: 'Slup oswietleniowy (2 oprawy)',
+    category: 'Electrical',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [{ id: 'ZASILANIE', side: 'BOTTOM', medium: 'ELECTRICAL' }]
+  },
+  'site.lamp_post_single': {
+    type: 'site.lamp_post_single',
+    label: 'Slup oswietleniowy (1 oprawa)',
+    category: 'Electrical',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [{ id: 'ZASILANIE', side: 'BOTTOM', medium: 'ELECTRICAL' }]
+  },
+  'site.halogen': {
+    type: 'site.halogen',
+    label: 'Halogen',
+    category: 'Electrical',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [{ id: 'ZASILANIE', side: 'BOTTOM', medium: 'ELECTRICAL' }]
+  },
+  'site.garden_light': {
+    type: 'site.garden_light',
+    label: 'Slupek oswietleniowy ogrodowy',
+    category: 'Electrical',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [{ id: 'ZASILANIE', side: 'BOTTOM', medium: 'ELECTRICAL' }]
+  },
+  'site.cable_junction': {
+    type: 'site.cable_junction',
+    label: 'Zlacze kablowe',
+    category: 'Electrical',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [{ id: 'ZASILANIE', side: 'BOTTOM', medium: 'ELECTRICAL' }]
+  },
+  'site.alarm_beacon': {
+    type: 'site.alarm_beacon',
+    label: 'Kogut alarmowy',
+    category: 'Electrical',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [{ id: 'ZASILANIE', side: 'BOTTOM', medium: 'ELECTRICAL' }]
+  },
+  'site.alarm_horn': {
+    type: 'site.alarm_horn',
+    label: 'Glosnik alarmowy',
+    category: 'Electrical',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [{ id: 'ZASILANIE', side: 'BOTTOM', medium: 'ELECTRICAL' }]
+  },
 };

@@ -96,4 +96,189 @@ export const waterSymbols: Record<string, SymbolDefinition> = {
     terminals: [{ id: 'IN', side: 'LEFT', medium: 'WATER' }]
   },
 
+  // fix/wiring-and-library-groups commit 5: fifteen objects relocated
+  // here from registry/site.ts (TEREN) - four originally from feat/
+  // site-objects-2d (rain tank, sewage plant, water manhole, garden
+  // sprinkler), plus all twelve of feat/water-management's own new
+  // objects (the tank included - see raport.md for why this task's own
+  // prose never names it directly, and how that gap was resolved).
+  // Registry-entry move only, `type` strings unchanged (see
+  // electrical.ts's own header comment on this same commit for the
+  // full reasoning) - only `category` changes, here to 'Water'.
+  'site.rain_tank': {
+    type: 'site.rain_tank',
+    label: 'Zbiornik na deszczowke',
+    category: 'Water',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [{ id: 'KROCIEC', side: 'RIGHT', medium: 'WATER' }]
+  },
+  'site.sewage_plant': {
+    type: 'site.sewage_plant',
+    label: 'Oczyszczalnia sciekow',
+    category: 'Water',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [
+      { id: 'WLOT', side: 'LEFT', medium: 'WATER' },
+      { id: 'WYLOT', side: 'RIGHT', medium: 'WATER' }
+    ]
+  },
+  'site.water_manhole': {
+    type: 'site.water_manhole',
+    label: 'Studzienka przylacza wody',
+    category: 'Water',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [{ id: 'PRZYLACZE', side: 'BOTTOM', medium: 'WATER' }]
+  },
+  'site.garden_sprinkler': {
+    type: 'site.garden_sprinkler',
+    label: 'Slupek podlewania ogrodowego',
+    category: 'Water',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [{ id: 'WODA', side: 'BOTTOM', medium: 'WATER' }]
+  },
+  'site.rainwater_tank2': {
+    type: 'site.rainwater_tank2',
+    label: 'Zbiornik na deszczowke',
+    category: 'Water',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['NISKI', 'SREDNI', 'WYSOKI'],
+    defaultState: 'NISKI',
+    terminals: [{ id: 'WYLOT', side: 'BOTTOM', medium: 'WATER' }]
+  },
+  'site.water_selector_valve_switched': {
+    type: 'site.water_selector_valve_switched',
+    label: 'Zawor trojdrogowy przelaczajacy',
+    category: 'Water',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['A', 'B'],
+    defaultState: 'A',
+    terminals: [
+      { id: 'WLOT', side: 'LEFT', medium: 'WATER' },
+      { id: 'WYLOT_A', side: 'RIGHT', medium: 'WATER' },
+      { id: 'WYLOT_B', side: 'BOTTOM', medium: 'WATER' }
+    ]
+  },
+  'site.water_selector_valve_3pos': {
+    type: 'site.water_selector_valve_3pos',
+    label: 'Zawor trojdrogowy trojpolozeniowy',
+    category: 'Water',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['A', 'ZAMKNIETY', 'B'],
+    defaultState: 'ZAMKNIETY',
+    terminals: [
+      { id: 'WLOT', side: 'LEFT', medium: 'WATER' },
+      { id: 'WYLOT_A', side: 'RIGHT', medium: 'WATER' },
+      { id: 'WYLOT_B', side: 'BOTTOM', medium: 'WATER' }
+    ]
+  },
+  'site.check_valve': {
+    type: 'site.check_valve',
+    label: 'Zawor zwrotny',
+    category: 'Water',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [
+      { id: 'WLOT', side: 'LEFT', medium: 'WATER' },
+      { id: 'WYLOT', side: 'RIGHT', medium: 'WATER' }
+    ]
+  },
+  'site.water_filter': {
+    type: 'site.water_filter',
+    label: 'Filtr wody',
+    category: 'Water',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [
+      { id: 'WLOT', side: 'LEFT', medium: 'WATER' },
+      { id: 'WYLOT', side: 'RIGHT', medium: 'WATER' }
+    ]
+  },
+  'site.hydrofor': {
+    type: 'site.hydrofor',
+    label: 'Hydrofor',
+    category: 'Water',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [{ id: 'WYLOT', side: 'LEFT', medium: 'WATER' }]
+  },
+  'site.flow_meter': {
+    type: 'site.flow_meter',
+    label: 'Przeplywomierz',
+    category: 'Water',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [
+      { id: 'WLOT', side: 'LEFT', medium: 'WATER' },
+      { id: 'WYLOT', side: 'RIGHT', medium: 'WATER' }
+    ]
+  },
+  'site.water_meter': {
+    type: 'site.water_meter',
+    label: 'Wodomierz',
+    category: 'Water',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [
+      { id: 'WLOT', side: 'LEFT', medium: 'WATER' },
+      { id: 'WYLOT', side: 'RIGHT', medium: 'WATER' }
+    ]
+  },
+  'site.pressure_switch': {
+    type: 'site.pressure_switch',
+    label: 'Presostat',
+    category: 'Water',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [
+      { id: 'WLOT', side: 'LEFT', medium: 'WATER' },
+      { id: 'WYLOT', side: 'RIGHT', medium: 'WATER' }
+    ]
+  },
+  'site.sprinkler_head': {
+    type: 'site.sprinkler_head',
+    label: 'Zraszacz',
+    category: 'Water',
+    defaultWidth: 128,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [{ id: 'WODA', side: 'BOTTOM', medium: 'WATER' }]
+  },
+  'site.drip_line': {
+    type: 'site.drip_line',
+    label: 'Linia kroplujaca',
+    category: 'Water',
+    defaultWidth: 192,
+    defaultHeight: 96,
+    allowedStates: ['ZALACZONY', 'WYLACZONY'],
+    defaultState: 'WYLACZONY',
+    terminals: [{ id: 'WLOT', side: 'LEFT', medium: 'WATER' }]
+  },
 };

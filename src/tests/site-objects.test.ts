@@ -22,12 +22,12 @@ const NO_STATE_TYPES = ['site.concrete_road']; // 4. droga betonowa has no state
 // (mandatory test 3, feat/site-objects-2d) - kept as its own list
 // since test 3 below asserts the exact state NAMES, not just the count.
 const THREE_STATE_TYPES = ['site.sliding_gate'];
-// site.water_selector_valve_3pos and site.rainwater_tank2 are also
-// genuinely three-state (feat/water-management commit 4), each with
-// its own different state names - not covered by test 3's own gate-
-// specific numbering, but exempted from test 5's "everything else has
-// exactly two" rule for the same reason the gate is.
-const OTHER_MULTI_STATE_TYPES = ['site.water_selector_valve_3pos', 'site.rainwater_tank2'];
+// fix/wiring-and-library-groups commit 5: site.water_selector_valve_3pos
+// and site.rainwater_tank2 (both also genuinely three-state, feat/
+// water-management commit 4) moved out of TEREN into Water this commit
+// - siteSymbols() below no longer returns them at all, so the
+// OTHER_MULTI_STATE_TYPES exemption this file used to need for test 5
+// is dead code now, not a defect to route around.
 
 function siteSymbols() {
   const cats = getSymbolsByCategory();
@@ -69,9 +69,9 @@ describe('TEREN category - state counts (2, 3, 4, 5)', () => {
     if (def) expect(def.allowedStates).toEqual([]);
   });
 
-  it('5. every other TEREN symbol (not the gate, not a surface, not one of the other genuinely multi-state objects) has exactly two states', () => {
+  it('5. every other TEREN symbol (not the gate, not a surface) has exactly two states', () => {
     siteSymbols().forEach(def => {
-      if (THREE_STATE_TYPES.includes(def.type) || NO_STATE_TYPES.includes(def.type) || OTHER_MULTI_STATE_TYPES.includes(def.type)) return;
+      if (THREE_STATE_TYPES.includes(def.type) || NO_STATE_TYPES.includes(def.type)) return;
       expect(def.allowedStates.length).toBe(2);
     });
   });
