@@ -212,6 +212,15 @@ export const siteSymbols: Record<string, SymbolDefinition> = {
   // sewage plant, water manhole, from feat/site-objects-2d) - a second
   // category would only fragment one visually and conceptually
   // continuous family across two folders for no functional reason.
+  // fix/hydraulic-connections commit 6: two terminals now, not one -
+  // DOPLYW (inflow, LEFT) and ODPLYW (outflow, RIGHT), matching docs/
+  // EPW_kolnierze_referencja.py's own tank()'s connection layout. The
+  // old single 'WYLOT' (BOTTOM) terminal is gone; a project saved
+  // before this commit with a wire anchored to it simply finds no such
+  // terminal any more (WireAnchoring.ts's own, pre-existing "not found -
+  // leave the point free, never throw" rule) - the same tolerance an
+  // object deleted out from under an anchor already gets, not a new
+  // failure mode this commit introduces.
   'site.rainwater_tank2': {
     type: 'site.rainwater_tank2',
     label: 'Zbiornik na deszczowke',
@@ -220,7 +229,10 @@ export const siteSymbols: Record<string, SymbolDefinition> = {
     defaultHeight: 96,
     allowedStates: ['NISKI', 'SREDNI', 'WYSOKI'],
     defaultState: 'NISKI',
-    terminals: [{ id: 'WYLOT', side: 'BOTTOM', medium: 'WATER' }]
+    terminals: [
+      { id: 'DOPLYW', side: 'LEFT', medium: 'WATER' },
+      { id: 'ODPLYW', side: 'RIGHT', medium: 'WATER' }
+    ]
   },
   'site.water_selector_valve_switched': {
     type: 'site.water_selector_valve_switched',
