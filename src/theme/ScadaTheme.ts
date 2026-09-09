@@ -131,6 +131,10 @@ export const TERMINAL_HOVER_MARGIN = TERMINAL_RADIUS * 3;   // padding around a 
 export const TERMINAL_HIGHLIGHT_COLOR = COLOR_LAMP_LIT;     // reused, not a new literal - high-contrast against the normal COLOR_WATER fill
 export const WIRE_NEARBY_TERMINAL_RADIUS = GRID_SIZE * 4;   // while drawing: terminals within this world distance stay visible without individual hover ("co najmniej cztery oczka")
 export const WIRE_TERMINAL_SNAP_DISTANCE = GRID_SIZE / 2;   // magnetism: a wire endpoint snaps to a terminal closer than this ("polowa oczka siatki")
+// feat/tank-language-and-media commit 1: a terminal of a medium
+// incompatible with the wire currently being drawn - reused, not a new
+// literal, same convention as TERMINAL_HIGHLIGHT_COLOR above.
+export const TERMINAL_DIMMED_COLOR = COLOR_DE_ENERGIZED;
 
 // ---- Wire collision / obstacle-avoidance routing (feat/wire-routing-
 // around-obstacles commit 1/2) ------------------------------------------
