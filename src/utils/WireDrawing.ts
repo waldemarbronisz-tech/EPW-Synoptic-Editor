@@ -57,6 +57,44 @@ export function reorthogonalizeAfterMove(points: WirePoint[], movedIndex: number
   return result;
 }
 
+/**
+ * Collapses any run of three consecutive points that lie on one
+ * straight line (all sharing an x, or all sharing a y) down to two -
+ * the middle one adds nothing to the wire's own shape. fix/wiring-and-
+ * library-groups commit 2: the actual fix for "przesuwanie symbolu
+ * mnozy wezly" - see WireAnchoring.ts's own syncAnchoredConnections for
+ * why repeatedly reorthogonalizing the SAME anchored point (once per
+ * symbol move) otherwise leaves one stale elbow behind per move,
+ * without ever removing it, even though every fresh elbow this
+ * function's own caller inserts ends up exactly collinear with the one
+ * before it once traced back to the same fixed reference point - this
+ * is the general-purpose cleanup that collapses that whole chain back
+ * down to just the one elbow actually needed right now, regardless of
+ * how many times it has been moved before.
+ *
+ * Never drops an ANCHORED point even when it happens to be
+ * geometrically redundant - it still carries meaning (which terminal
+ * it follows) that a plain bend does not, and NetResolver's own
+ * touching rule (pointOnSegment, not vertex membership) means removing
+ * a genuinely redundant FREE point never breaks a net some other wire
+ * happens to tap into at that same coordinate - the resulting single,
+ * longer segment still passes exactly through it.
+ */
+export function simplifyCollinearPoints(points: WirePoint[]): WirePoint[] {
+  if (points.length < 3) return points;
+  const result: WirePoint[] = [points[0]];
+  for (let i = 1; i < points.length - 1; i++) {
+    const prev = result[result.length - 1];
+    const curr = points[i];
+    const next = points[i + 1];
+    const collinear = (prev.x === curr.x && curr.x === next.x) || (prev.y === curr.y && curr.y === next.y);
+    if (collinear && !curr.anchor) continue; // adds nothing to the shape - drop it
+    result.push(curr);
+  }
+  result.push(points[points.length - 1]);
+  return result;
+}
+
 /** Alt+click on a segment: insert a new bend point there. */
 export function insertBendOnSegment(points: WirePoint[], segmentIndex: number, atPoint: WirePoint): WirePoint[] {
   if (segmentIndex < 0 || segmentIndex >= points.length - 1) return points;
