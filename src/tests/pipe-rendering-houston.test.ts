@@ -43,10 +43,15 @@ describe('ScadaTheme - Houston pipe proportions, taken from the reference file',
 });
 
 describe('ConnectionLine.tsx - four passes, rounded joins, applies to every medium', () => {
-  it('draws exactly four real (non-hit-area) <Path> passes per wire', () => {
+  it('draws exactly four real (non-hit-area) <Path> passes per wire, plus four more for the (conditional) water flange', () => {
     const pathTags = connectionLineSource.match(/<Path\b/g) ?? [];
-    // 1 invisible hit-area pass + 4 real passes (outline/fill/shadow/highlight) = 5.
-    expect(pathTags.length).toBe(5);
+    // 1 invisible hit-area pass + 4 real pipe passes (outline/fill/
+    // shadow/highlight) + 4 more flange passes (fix/wiring-and-library-
+    // groups commit 4 - same four-pass technique, written once inside
+    // getFlangeSegments(conn).map(...), so it appears once in the
+    // source regardless of how many (zero or more) flanges any given
+    // wire actually ends up drawing at runtime) = 9.
+    expect(pathTags.length).toBe(9);
   });
 
   it('every real pass uses rounded joins and caps, not the old butt/miter', () => {
@@ -54,8 +59,9 @@ describe('ConnectionLine.tsx - four passes, rounded joins, applies to every medi
     expect(connectionLineSource).not.toContain('lineJoin="miter"');
     const roundJoins = connectionLineSource.match(/lineJoin="round"/g) ?? [];
     const roundCaps = connectionLineSource.match(/lineCap="round"/g) ?? [];
-    expect(roundJoins.length).toBe(4);
-    expect(roundCaps.length).toBe(4);
+    // 4 pipe passes + 4 flange passes.
+    expect(roundJoins.length).toBe(8);
+    expect(roundCaps.length).toBe(8);
   });
 
   it('a shadow and a highlight pass both exist, each reading its own ScadaTheme offset/width/opacity constants', () => {

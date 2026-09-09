@@ -1,6 +1,6 @@
 import React from 'react';
 import { Group, Path } from 'react-konva';
-import type { SynopticConnection } from '../store';
+import type { SynopticConnection, WirePoint } from '../store';
 import {
   COLOR_DE_ENERGIZED, COLOR_DE_ENERGIZED_LIGHT, COLOR_DE_ENERGIZED_DARK,
   COLOR_ENERGIZED, COLOR_ENERGIZED_LIGHT, COLOR_ENERGIZED_DARK,
@@ -11,6 +11,7 @@ import {
   CONDUCTOR_OUTLINE, CONDUCTOR_WIDTH,
   CONDUCTOR_HIGHLIGHT_WIDTH, CONDUCTOR_HIGHLIGHT_OFFSET_X, CONDUCTOR_HIGHLIGHT_OFFSET_Y,
   CONDUCTOR_SHADOW_WIDTH, CONDUCTOR_SHADOW_OFFSET_X, CONDUCTOR_SHADOW_OFFSET_Y, CONDUCTOR_SHADOW_OPACITY,
+  PIPE_FLANGE_LENGTH, PIPE_FLANGE_WIDTH_MULTIPLIER,
   COLOR_OUTLINE, COLOR_WHITE, BUSBAR_HEIGHT
 } from '../theme/ScadaTheme';
 
@@ -78,6 +79,53 @@ function getConductorShadeColors(medium: SynopticConnection['medium'], netState:
     : { light: COLOR_DE_ENERGIZED_LIGHT, dark: COLOR_DE_ENERGIZED_DARK };
 }
 
+/** A point one flange length back from `from`, along the (always axis-
+ * aligned) direction toward `towards` - the short inset end of a
+ * flange stub, drawn from there out to the terminal itself. */
+function insetFlangePoint(from: WirePoint, towards: WirePoint): WirePoint {
+  if (from.x === towards.x) {
+    const dir = towards.y > from.y ? 1 : -1;
+    return { x: from.x, y: from.y + dir * PIPE_FLANGE_LENGTH };
+  }
+  const dir = towards.x > from.x ? 1 : -1;
+  return { x: from.x + dir * PIPE_FLANGE_LENGTH, y: from.y };
+}
+
+/**
+ * fix/wiring-and-library-groups commit 4: the Houston reference's own
+ * pipe-to-fitting flange - a short, wider stub right where a WATER
+ * pipe's end is anchored to a symbol's own terminal. Not a separate
+ * element or an extra polyline point (this task's own explicit
+ * "kolnierz NIE jest osobnym elementem ani punktem lamanej") - purely
+ * a second, wider two-point segment drawn on top of the pipe's own
+ * end, in the SAME place `conn.points` already has coordinates for
+ * (the terminal itself, and its immediate neighbor). Only an
+ * ANCHORED end gets one (a free end never touched a terminal to begin
+ * with); electrical/ventilation never get one at all (medium check by
+ * the caller, via this function's own early return) - this is water-
+ * armature-specific, not a general wire-end decoration.
+ */
+// oxlint-disable-next-line react/only-export-components -- kept beside the component it belongs to, same convention as this file's own pathFromPoints/getConductorCoreColor above.
+export function getFlangeSegments(conn: Pick<SynopticConnection, 'medium' | 'points'>): WirePoint[][] {
+  if (conn.medium !== 'WATER') return [];
+  const points = conn.points;
+  if (!points || points.length < 2) return [];
+
+  const segments: WirePoint[][] = [];
+  const first = points[0];
+  const last = points[points.length - 1];
+
+  // The two ends' own "towards" reference (points[1] / points[length-2])
+  // stay well-defined even for a 2-point wire (both then resolve to the
+  // OTHER end) - a jumper anchored at both ends legitimately gets two
+  // distinct flange stubs, one near each terminal, not a duplicate of
+  // the same one.
+  if (first.anchor) segments.push([first, insetFlangePoint(first, points[1])]);
+  if (last.anchor) segments.push([last, insetFlangePoint(last, points[points.length - 2])]);
+
+  return segments;
+}
+
 export const ConnectionLine: React.FC<ConnectionProps> = ({ conn, netState, isSelected, onSelect }) => {
   if (!conn.points || conn.points.length < 2) return null;
 
@@ -123,6 +171,35 @@ export const ConnectionLine: React.FC<ConnectionProps> = ({ conn, netState, isSe
         x={CONDUCTOR_HIGHLIGHT_OFFSET_X} y={CONDUCTOR_HIGHLIGHT_OFFSET_Y}
         listening={false}
       />
+
+      {/* Pipe flange (commit 4): every ANCHORED water end, drawn with
+          the exact same four passes as the pipe itself - so it
+          inherits the identical net-state color - just at
+          PIPE_FLANGE_WIDTH_MULTIPLIER times the width, over the last
+          PIPE_FLANGE_LENGTH units of the pipe. Not a separate element:
+          purely an extra, wider stroke pass layered on top of the
+          pipe's own already-drawn end. */}
+      {getFlangeSegments(conn).map((flangePoints, idx) => {
+        const flangePath = pathFromPoints(flangePoints);
+        const flangeCoreWidth = coreWidth * PIPE_FLANGE_WIDTH_MULTIPLIER;
+        const flangeOutlineWidth = flangeCoreWidth + CONDUCTOR_OUTLINE;
+        return (
+          <Group key={`flange-${idx}`} listening={false}>
+            <Path data={flangePath} stroke={isSelected ? COLOR_WHITE : COLOR_OUTLINE} strokeWidth={flangeOutlineWidth} lineCap="round" lineJoin="round" />
+            <Path data={flangePath} stroke={coreColor} strokeWidth={flangeCoreWidth} lineCap="round" lineJoin="round" />
+            <Path
+              data={flangePath} stroke={shadowColor} strokeWidth={CONDUCTOR_SHADOW_WIDTH}
+              lineCap="round" lineJoin="round" opacity={CONDUCTOR_SHADOW_OPACITY}
+              x={CONDUCTOR_SHADOW_OFFSET_X} y={CONDUCTOR_SHADOW_OFFSET_Y}
+            />
+            <Path
+              data={flangePath} stroke={highlightColor} strokeWidth={CONDUCTOR_HIGHLIGHT_WIDTH}
+              lineCap="round" lineJoin="round"
+              x={CONDUCTOR_HIGHLIGHT_OFFSET_X} y={CONDUCTOR_HIGHLIGHT_OFFSET_Y}
+            />
+          </Group>
+        );
+      })}
     </Group>
   );
 };

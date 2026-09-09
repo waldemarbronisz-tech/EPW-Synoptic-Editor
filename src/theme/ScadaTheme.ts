@@ -116,6 +116,17 @@ export const OUTLINE_WIDTH = 5;      // kontur ksztaltow wypelnionych (default; 
 export const BUSBAR_HEIGHT = 16;     // wysokosc szyny zbiorczej - dokladnie jedno oczko
 export const GRID_SIZE = 16;
 
+// fix/wiring-and-library-groups commit 4: the Houston reference's own
+// pipe-to-fitting joint - a short, wider stub right where a water pipe
+// meets an armature's own terminal. "Okolo pol oczka siatki" (this
+// task's own spec) taken literally; "rdzenia rury powiekszonej o 40
+// procent" is a multiplier on whichever core width already applies
+// (CONDUCTOR_WIDTH, or BUSBAR_HEIGHT for a BUS-style pipe) - not a
+// fixed width of its own, since the flange must scale the same way the
+// pipe it sits on already does.
+export const PIPE_FLANGE_LENGTH = GRID_SIZE / 2;
+export const PIPE_FLANGE_WIDTH_MULTIPLIER = 1.4;
+
 // ---- Wire terminal hover/reach (fix/wiring-and-library-groups commit 1) ---
 // usterka 1: a terminal dot sits ON a symbol's own edge (getTerminalOffsetForSide),
 // so it visibly pokes half outside whatever the symbol actually draws there -
